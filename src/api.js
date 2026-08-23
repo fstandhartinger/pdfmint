@@ -510,6 +510,13 @@ router.put('/templates/:name', withAuth, asyncRoute(async (req, res) => {
   }
   const html = req.body?.html;
   if (!html || typeof html !== 'string') throw bad('missing_content', 'Send the template body in "html".', { docs: '/docs#templates' });
+  const MAX_TEMPLATE_BYTES = 2 * 1024 * 1024;
+  if (Buffer.byteLength(html, 'utf8') > MAX_TEMPLATE_BYTES) {
+    throw bad('template_too_large', `The template is ${(Buffer.byteLength(html, 'utf8') / 1048576).toFixed(1)} MB, over the 2 MB limit.`, {
+      hint: 'A template is markup with {{placeholders}} in it. Host images by URL rather than inlining them as base64.',
+      docs: '/docs#templates',
+    });
+  }
   const options = req.body?.options && typeof req.body.options === 'object' ? req.body.options : {};
   normalisePdfOptions(options); // validate now rather than at render time
   const { rows } = await query(

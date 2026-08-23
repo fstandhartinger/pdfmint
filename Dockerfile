@@ -31,6 +31,16 @@ RUN npm ci --omit=dev \
 COPY src ./src
 COPY public ./public
 
+# Chromium runs arbitrary caller HTML, and Render does not grant the capabilities
+# its own sandbox needs, so the process is dropped to an unprivileged user. A
+# renderer escape then lands as `pdfmint`, not as root, in a container whose only
+# writable paths are /tmp and the browser's own cache.
+RUN groupadd --system --gid 10001 pdfmint \
+ && useradd --system --uid 10001 --gid pdfmint --home-dir /home/pdfmint --create-home pdfmint \
+ && chown -R pdfmint:pdfmint /home/pdfmint \
+ && chmod -R a+rx /ms-playwright
+USER pdfmint
+
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
