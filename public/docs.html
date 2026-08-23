@@ -793,6 +793,7 @@ as usual (default 60, max 7 days), so give yourself enough time to fetch it.</p>
 <tr><td><code>running</code></td><td class="wrap">A worker has claimed it; <code>started_at</code> is set.</td></tr>
 <tr><td><code>succeeded</code></td><td class="wrap">The result fields are merged into the response: <code>url</code>, <code>filename</code>, <code>pages</code>, <code>size</code>, <code>duration_ms</code>, <code>expires_in_minutes</code>.</td></tr>
 <tr><td><code>failed</code></td><td class="wrap">An <code>error</code> object with <code>code</code>, <code>message</code> and sometimes <code>hint</code> — the same codes as the <a href="#errors">synchronous API</a>.</td></tr>
+<tr><td><code>cancelled</code></td><td class="wrap">You cancelled it with <a href="#jobs-cancel"><code>DELETE /v1/jobs/{id}</code></a>. The credit was given back.</td></tr>
 </tbody></table></div>
 
 <div class="code">
@@ -823,6 +824,26 @@ curl -s https://pdfmint-b9tt.onrender.com/v1/jobs/$JOB_ID \
   "expires_in_minutes": 120
 }</code></pre>
 </div>
+
+<h3 id="jobs-cancel"><span class="pill del">DELETE</span><span class="path">/v1/jobs/{id}</span> <a class="anchor" href="#jobs-cancel">#</a></h3>
+<p>Cancels a job that has not finished, and <strong>gives the credit back</strong>. A queued job is
+stopped before it ever renders. A job that is already <code>running</code> is inside Chromium in
+some worker, and this cannot reach in and kill that render — what it does do is discard the result,
+stop the stalled-job recovery from ever picking it up again, and refund you. That matters for the
+one case this exists for: a document big enough to exhaust the renderer used to sit
+<code>running</code> forever, with no way to stop it short of an operator editing the database.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X DELETE https://pdfmint-b9tt.onrender.com/v1/jobs/$JOB_ID \
+  -H "Authorization: Bearer $PDFMINT_API_KEY"
+
+# {"job_id":"job_z25FB4zf4nb55i7Z","status":"cancelled"}</code></pre>
+</div>
+
+<p>A job that has already finished answers <code>409 job_already_finished</code> and names the state
+it is in, rather than pretending to cancel something that is over. Another account's job is
+<code>404 job_not_found</code>, the same as it is for <code>GET</code>.</p>
 
 <h3 id="async-webhook">Webhook delivery <a class="anchor" href="#async-webhook">#</a></h3>
 <p>Give a <code>webhookUrl</code> and you do not have to poll at all. When the job finishes we

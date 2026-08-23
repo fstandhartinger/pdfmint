@@ -115,7 +115,10 @@ function startWorker(runner) {
       job = await claim();
       if (job) {
         const result = await runner(job);
-        await query(`UPDATE jobs SET status = 'succeeded', result = $2, finished_at = now() WHERE id = $1`,
+        // `AND status = 'running'` so a cancellation that landed mid-render is not
+        // silently overwritten by the result the caller already said they did not want.
+        await query(`UPDATE jobs SET status = 'succeeded', result = $2, finished_at = now()
+                      WHERE id = $1 AND status = 'running'`,
           [job.id, JSON.stringify(result)]);
         // The webhook has no request to take a host from, so it uses the configured
         // public URL. The stored path stays relative for GET /v1/jobs/{id}.
@@ -134,7 +137,8 @@ function startWorker(runner) {
           message: String(e.message || e).slice(0, 400),
           ...(e.hint ? { hint: e.hint } : {}),
         };
-        await query(`UPDATE jobs SET status = 'failed', error = $2, finished_at = now() WHERE id = $1`,
+        await query(`UPDATE jobs SET status = 'failed', error = $2, finished_at = now()
+                      WHERE id = $1 AND status = 'running'`,
           [job.id, JSON.stringify(error)]).catch(() => {});
         await deliver(job, { job_id: job.id, status: 'failed', error });
       } else {
@@ -191,4 +195,51 @@ function startJobReaper() {
   setInterval(tick, 6 * 3600 * 1000).unref();
 }
 
-module.exports = { enqueue, get, startWorker, startJobReaper, MAX_WEBHOOK_ATTEMPTS };
+
+/**
+ * Cancels a queued or running job and gives the credit back.
+ *
+ * A queued job is stopped before it ever renders. A running one is already
+ * inside Chromium in some worker, and this cannot reach in and kill that — but
+ * marking it cancelled means the result is discarded, the stalled-job recovery
+ * will not pick it up again, and the caller stops being billed for something
+ * they no longer want. Before this existed the only way to stop a job that was
+ * killing the renderer was an operator editing the database by hand.
+ */
+async function cancel(accountId, id) {
+  const { rows } = await query(
+    `UPDATE jobs
+        SET status      = 'cancelled',
+            finished_at = now(),
+            error       = jsonb_build_object(
+                            'code', 'job_cancelled',
+                            'message', 'This job was cancelled before it finished.')
+      WHERE id = $1 AND account_id = $2 AND status IN ('queued', 'running')
+      RETURNING id, status`,
+    [id, accountId],
+  );
+  if (rows.length) {
+    // The credit was taken when the job was enqueued.
+    await query(`UPDATE accounts SET credits_used = GREATEST(0, credits_used - 1) WHERE id = $1`,
+      [accountId]).catch(() => {});
+    return { job_id: id, status: 'cancelled' };
+  }
+
+  // Nothing was updated: either it is not this account's job, or it is finished.
+  const { rows: found } = await query(
+    `SELECT status FROM jobs WHERE id = $1 AND account_id = $2`, [id, accountId],
+  );
+  if (!found.length) {
+    throw new ApiError(404, 'job_not_found', `There is no job called "${id}" on this account.`, {
+      hint: 'Job IDs are returned by an asynchronous request and look like job_XXXX. They belong to the account that created them.',
+      docs: '/docs#async',
+    });
+  }
+  throw new ApiError(409, 'job_already_finished',
+    `That job is already "${found[0].status}", so there is nothing left to cancel.`, {
+      hint: 'Only a queued or running job can be cancelled. Fetch it with GET /v1/jobs/{id} to see the result.',
+      docs: '/docs#async',
+    });
+}
+
+module.exports = { enqueue, get, cancel, startWorker, startJobReaper, MAX_WEBHOOK_ATTEMPTS };

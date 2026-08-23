@@ -503,6 +503,10 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
   });
 }));
 
+router.delete('/jobs/:id', withAuth, asyncRoute(async (req, res) => {
+  res.json(await jobs.cancel(req.account.id, String(req.params.id)));
+}));
+
 router.get('/jobs/:id', withAuth, asyncRoute(async (req, res) => {
   const job = await jobs.get(req.account.id, String(req.params.id));
   if (job.file_path) {
