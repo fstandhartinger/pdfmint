@@ -52,7 +52,7 @@ body.docs{overflow-x:hidden}
 
 /* --------------------------------------------------------------- content */
 
-.content{min-width:0;padding:1.75rem 0 6rem}
+.content{min-width:0;width:100%;max-width:none;margin:0;padding:1.75rem 0 6rem}
 .content > section{scroll-margin-top:72px}
 .content h1{font-size:2.1rem;margin:0 0 .3rem}
 .content h2{font-size:1.5rem;margin:3.2rem 0 .7rem;padding-top:.4rem;scroll-margin-top:72px}
@@ -141,12 +141,16 @@ h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:.55}
 @media (max-width:520px){
   .docs-top{padding:.7rem .9rem}
   .docs-top .logo{font-size:1.05rem}
-  .docs-top nav{gap:.75rem;font-size:.83rem}
+  /* One row, always: the section links live in the TOC right below anyway. */
+  .docs-top nav{gap:.75rem;font-size:.83rem;flex-wrap:nowrap}
+  .docs-top nav a:not(.cta){display:none}
+  .docs-top nav a[href="/dashboard"]{display:inline}
   .layout{padding:0 .9rem}
   .content h1{font-size:1.45rem}
   .lede{font-size:1rem}
   pre{font-size:.78rem;padding:.85rem}
   .code pre{padding-right:.85rem}
   .code .copy{position:static;display:block;margin:.4rem 0 0;opacity:1}
-  .tw table{min-width:480px}
+  .tw table{min-width:660px;font-size:.83rem}
+  .tw th,.tw td{padding:.5rem .6rem}
 }

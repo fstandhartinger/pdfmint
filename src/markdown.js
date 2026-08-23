@@ -41,7 +41,23 @@ tr { break-inside:avoid; page-break-inside:avoid; }
 th, td { border:1px solid var(--rule); padding:.45em .6em; text-align:left; vertical-align:top; }
 th { background:#f0f2f5; font-weight:600; }
 tbody tr:nth-child(even) td { background:#fafbfc; }
-input[type=checkbox] { margin-right:.4em; }
+/* GitHub task lists: marked emits <ul><li><input type=checkbox>. Without this a
+   PDF shows both a bullet and a form control, and the control prints as a flat
+   grey box because print has no widget rendering. Draw the box ourselves. */
+ul:has(input[type=checkbox]) { list-style:none; padding-left:.2em; }
+li:has(> input[type=checkbox]) { list-style:none; }
+input[type=checkbox] {
+  appearance:none; -webkit-appearance:none;
+  width:.95em; height:.95em; margin:0 .5em 0 0; padding:0;
+  vertical-align:-.12em; border:1.5px solid var(--muted); border-radius:3px;
+  background:#fff; position:relative; flex:none;
+}
+input[type=checkbox]:checked { background:var(--accent); border-color:var(--accent); }
+input[type=checkbox]:checked::after {
+  content:""; position:absolute; left:.28em; top:.08em;
+  width:.22em; height:.48em; border:solid #fff; border-width:0 2px 2px 0;
+  transform:rotate(45deg);
+}
 `.trim();
 
 marked.setOptions({ gfm: true, breaks: false });

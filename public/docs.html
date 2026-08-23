@@ -44,12 +44,16 @@
         <li><a href="#timeout">Timeouts</a></li>
         <li><a href="#waitfor">waitFor</a></li>
         <li><a href="#password">Password protection</a></li>
+        <li><a href="#watermark">Watermarks</a></li>
+        <li><a href="#async">Async &amp; webhooks</a></li>
+        <li><a href="#debug">Debugging a render</a></li>
       </ul>
 
       <h2>Endpoints</h2>
       <ul>
         <li><a href="#pdf">POST /v1/pdf</a></li>
         <li><a href="#options" class="sub">PDF options</a></li>
+        <li><a href="#jobs" class="sub">GET /v1/jobs/{id}</a></li>
         <li><a href="#image">POST /v1/image</a></li>
         <li><a href="#merge">POST /v1/merge</a></li>
         <li><a href="#me">GET /v1/me</a></li>
@@ -65,6 +69,8 @@
         <li><a href="#recipe-breaks">Controlling page breaks</a></li>
         <li><a href="#recipe-chart">Waiting for a chart</a></li>
         <li><a href="#recipe-password">Password protection</a></li>
+        <li><a href="#recipe-watermark">Draft watermark</a></li>
+        <li><a href="#recipe-async">Long job via webhook</a></li>
         <li><a href="#recipe-merge">Merging documents</a></li>
       </ul>
 
@@ -641,6 +647,226 @@ included on every plan, free ones too.</p>
 <p>See <a href="#recipe-password">the recipe</a> for a runnable example.</p>
 </section>
 
+<!-- ============================================================ WATERMARK -->
+<section id="watermark">
+<h2>Watermarks <a class="anchor" href="#watermark">#</a></h2>
+
+<p>Set <code>watermark</code> and diagonal text is stamped across <strong>every</strong> page. It is
+applied after rendering, so it also covers pages that came from a merge, and it sits above the
+content rather than behind it.</p>
+
+<p>A bare string is the shorthand for <code>{ "text": … }</code>:</p>
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>"watermark": "DRAFT"
+
+"watermark": {
+  "text": "CONFIDENTIAL",
+  "color": "#c0392b",
+  "opacity": 0.12,
+  "rotation": 30,
+  "font": "times-roman"
+}</code></pre>
+</div>
+
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>text</code></td><td class="t">string</td><td class="t">required</td><td class="wrap">The words to stamp. Missing or blank gives <code>invalid_option</code>.</td></tr>
+<tr><td><code>font</code></td><td class="t">string</td><td class="t"><code>helvetica-bold</code></td><td class="wrap">One of <code>helvetica</code>, <code>helvetica-bold</code>, <code>times-roman</code>, <code>courier</code>. An unrecognised name falls back to <code>helvetica-bold</code> rather than failing.</td></tr>
+<tr><td><code>fontSize</code></td><td class="t">number (pt)</td><td class="t">auto</td><td class="wrap">Left out, the size is computed so the rotated text spans 85% of each page — so it fits A4 and Letter alike, and long words do not overflow. Never smaller than 14&nbsp;pt.</td></tr>
+<tr><td><code>color</code></td><td class="t">string</td><td class="t"><code>#9aa3b2</code></td><td class="wrap">A six-digit hex colour, with or without the <code>#</code>. Anything unparseable falls back to mid-grey.</td></tr>
+<tr><td><code>opacity</code></td><td class="t">number</td><td class="t"><code>0.18</code></td><td class="wrap">0.01–1. Values outside the range are clamped, not rejected.</td></tr>
+<tr><td><code>rotation</code></td><td class="t">number (deg)</td><td class="t"><code>45</code></td><td class="wrap">Counter-clockwise from horizontal. Use <code>0</code> for a straight banner across the middle.</td></tr>
+</tbody></table></div>
+
+<div class="note">
+<p>The watermark is real text in the PDF, not a raster overlay — it stays crisp at any zoom, and it
+is selectable. If you need it to be un-removable, combine it with
+<a href="#password">password protection</a> and <code>allowCopying: false</code>.</p>
+</div>
+</section>
+
+<!-- ================================================================ ASYNC -->
+<section id="async">
+<h2>Async &amp; webhooks <a class="anchor" href="#async">#</a></h2>
+
+<p>A slow page — a heavy dashboard, a chart that needs <code>waitFor</code>, a hundred-page report —
+can hold an HTTP connection open for a minute or more. Some clients time out first. Send
+<code>"async": true</code> (or a <code>webhookUrl</code>, which implies it) and
+<a href="#pdf"><code>POST /v1/pdf</code></a> answers <code>202</code> straight away with a job id:</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "html": "&lt;h1&gt;Async report&lt;/h1&gt;",
+        "filename": "async.pdf",
+        "async": true,
+        "expiresInMinutes": 120
+      }'</code></pre>
+</div>
+<div class="code">
+<div class="cap">202 Accepted</div>
+<pre><code>{
+  "job_id": "job_z25FB4zf4nb55i7Z",
+  "status": "queued",
+  "status_url": "https://pdfmint-b9tt.onrender.com/v1/jobs/job_z25FB4zf4nb55i7Z",
+  "credits_remaining": 272
+}</code></pre>
+</div>
+
+<p>The request body is validated <em>before</em> the 202 — a bad option, an unknown template or a
+blocked URL still comes back as a normal <code>400</code>, so you never queue a job that cannot
+possibly succeed. The credit is taken at enqueue time and refunded if the render fails.</p>
+
+<div class="note warn">
+<p>An async job always produces a <strong>hosted file</strong>, whatever <code>output</code> you
+asked for — there is no open connection to stream bytes down. <code>expiresInMinutes</code> works
+as usual (default 60, max 7 days), so give yourself enough time to fetch it.</p>
+</div>
+
+<h3 id="jobs"><span class="pill get">GET</span><span class="path">/v1/jobs/{id}</span> <a class="anchor" href="#jobs">#</a></h3>
+<p>Polls one job. Free, and scoped to the account that created it — someone else's job id is
+<code>404 job_not_found</code>, as is a job that has been reaped.</p>
+
+<div class="tw"><table>
+<thead><tr><th><code>status</code></th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>queued</code></td><td class="wrap">Accepted, not started. <code>started_at</code> and <code>finished_at</code> are <code>null</code>.</td></tr>
+<tr><td><code>running</code></td><td class="wrap">A worker has claimed it; <code>started_at</code> is set.</td></tr>
+<tr><td><code>succeeded</code></td><td class="wrap">The result fields are merged into the response: <code>url</code>, <code>filename</code>, <code>pages</code>, <code>size</code>, <code>duration_ms</code>, <code>expires_in_minutes</code>.</td></tr>
+<tr><td><code>failed</code></td><td class="wrap">An <code>error</code> object with <code>code</code>, <code>message</code> and sometimes <code>hint</code> — the same codes as the <a href="#errors">synchronous API</a>.</td></tr>
+</tbody></table></div>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s https://pdfmint-b9tt.onrender.com/v1/jobs/job_z25FB4zf4nb55i7Z \
+  -H "Authorization: Bearer $PDFMINT_API_KEY"</code></pre>
+</div>
+<div class="code">
+<div class="cap">200 OK — a little over a second later</div>
+<pre><code>{
+  "job_id": "job_z25FB4zf4nb55i7Z",
+  "kind": "pdf",
+  "status": "succeeded",
+  "created_at": "2026-08-23T15:08:39.278Z",
+  "started_at": "2026-08-23T15:08:39.364Z",
+  "finished_at": "2026-08-23T15:08:40.454Z",
+  "attempts": 0,
+  "url": "https://pdfmint-b9tt.onrender.com/f/9xKR-JWGbkear8iiGJAVnBn9",
+  "size": 8042,
+  "pages": 1,
+  "filename": "async.pdf",
+  "duration_ms": 56,
+  "expires_in_minutes": 120
+}</code></pre>
+</div>
+
+<h3 id="async-webhook">Webhook delivery <a class="anchor" href="#async-webhook">#</a></h3>
+<p>Give a <code>webhookUrl</code> and you do not have to poll at all. When the job finishes we
+<code>POST</code> JSON to it with <code>Content-Type: application/json</code> and
+<code>User-Agent: PDFMint-Webhook/1</code>.</p>
+
+<div class="code">
+<div class="cap">success payload</div>
+<pre><code>{
+  "job_id": "job_z25FB4zf4nb55i7Z",
+  "status": "succeeded",
+  "filename": "async.pdf",
+  "pages": 1,
+  "size": 8042,
+  "url": "https://pdfmint-b9tt.onrender.com/f/9xKR-JWGbkear8iiGJAVnBn9",
+  "expires_in_minutes": 120,
+  "duration_ms": 56
+}</code></pre>
+</div>
+<div class="code">
+<div class="cap">failure payload</div>
+<pre><code>{
+  "job_id": "job_…",
+  "status": "failed",
+  "error": {
+    "code": "wait_for_timeout",
+    "message": "Timed out waiting for \"#chart-ready\" to appear on the page.",
+    "hint": "Check the selector, or use a number of milliseconds instead (for example waitFor: 1000)."
+  }
+}</code></pre>
+</div>
+
+<ul>
+  <li>The webhook URL goes through the same <a href="#url">public-address checks</a> as a rendered
+      URL. In n8n that means the Webhook node's <strong>Production URL</strong>, never
+      <code>localhost</code>.</li>
+  <li>Answer with any 2xx. Anything else — or no answer within 15&nbsp;seconds — is a failed
+      attempt.</li>
+  <li>Up to <strong>3 attempts</strong>, backing off 4&nbsp;s then 8&nbsp;s. <code>attempts</code> on
+      the job record tells you how many were made.</li>
+  <li>If all three fail the job is still <code>succeeded</code> and the file still exists — poll
+      <a href="#jobs"><code>/v1/jobs/{id}</code></a> to recover it.</li>
+  <li>Finished job records are deleted <strong>7 days</strong> after they finish.</li>
+</ul>
+
+<p>The queue lives in the database, not in process memory, so a redeploy mid-job does not lose it: a
+job left <code>running</code> for more than 10 minutes is requeued when the service comes back.</p>
+</section>
+
+<!-- ================================================================ DEBUG -->
+<section id="debug">
+<h2>Debugging a render <a class="anchor" href="#debug">#</a></h2>
+
+<p>When a PDF comes out blank, or an image is missing, or a placeholder produced nothing, the
+question is always the same: <em>what did the browser actually see?</em> Send
+<code>"debug": true</code> and the answer comes back with the document.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "html": "&lt;h1&gt;Dbg&lt;/h1&gt;&lt;script&gt;notAFunction()&lt;/script&gt;",
+        "debug": true,
+        "output": "base64"
+      }'</code></pre>
+</div>
+<div class="code">
+<div class="cap">200 OK (base64 elided)</div>
+<pre><code>{
+  "filename": "document.pdf",
+  "pages": 1,
+  "size": 6220,
+  "duration_ms": 38,
+  "credits_remaining": 273,
+  "debug": {
+    "renderedHtml": "&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;h1&gt;Dbg&lt;/h1&gt;&lt;script&gt;notAFunction()&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;",
+    "finalUrl": "about:blank",
+    "pageErrors": ["notAFunction is not defined"]
+  }
+}</code></pre>
+</div>
+
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>What it tells you</th></tr></thead>
+<tbody>
+<tr><td><code>renderedHtml</code></td><td class="wrap">The DOM as it stood the instant before printing — <strong>after</strong> placeholder substitution, after your JavaScript ran, after <code>waitFor</code>. If a <code>{{placeholder}}</code> is still sitting there, or a container is empty, you can see it.</td></tr>
+<tr><td><code>finalUrl</code></td><td class="wrap">Where the browser ended up — <code>about:blank</code> for HTML and Markdown sources, the post-redirect URL for a <code>url</code> source.</td></tr>
+<tr><td><code>pageErrors</code></td><td class="wrap">Up to 5 uncaught JavaScript errors thrown by the page, each truncated to 200 characters. A chart library that failed to load shows up here.</td></tr>
+</tbody></table></div>
+
+<p>With the JSON output modes the block is in the body under <code>debug</code>. With the default
+<code>binary</code> output there is no body to put it in, so the page errors come back in the
+<code>X-PDFMint-Page-Errors</code> header instead (joined with <code>|</code>, truncated to 900
+characters).</p>
+
+<div class="note">
+<p><code>renderedHtml</code> can be as large as your document. Turn <code>debug</code> on while you
+are diagnosing something, not in production.</p>
+</div>
+</section>
+
 <!-- ================================================================== PDF -->
 <section id="pdf">
 <h2><span class="pill post">POST</span><span class="path">/v1/pdf</span> <a class="anchor" href="#pdf">#</a></h2>
@@ -670,6 +896,10 @@ included on every plan, free ones too.</p>
 <tr><td><code>css</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Extra CSS. Markdown source only.</td></tr>
 <tr><td><code>googleFonts</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Google Fonts family spec. Markdown source only.</td></tr>
 <tr><td><code>metadata</code></td><td class="t">object</td><td class="t">—</td><td class="wrap">Document properties: <code>title</code>, <code>author</code>, <code>subject</code>, <code>keywords</code> (array or comma-separated string), <code>creator</code>. Producer is always set to <code>PDFMint</code>. Metadata is written best-effort — a failure here never fails the render.</td></tr>
+<tr><td><code>watermark</code></td><td class="t">string &#124; object</td><td class="t">—</td><td class="wrap">Stamp diagonal text across every page. A bare string is the text. See <a href="#watermark">Watermarks</a>.</td></tr>
+<tr><td><code>async</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Queue the render and answer <code>202</code> immediately with a job id. See <a href="#async">Async &amp; webhooks</a>.</td></tr>
+<tr><td><code>webhookUrl</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">A public URL we POST the finished job to. Setting it implies <code>async</code>. Alias: <code>webhook_url</code>.</td></tr>
+<tr><td><code>debug</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Return the HTML the browser actually rendered, the final URL and any page errors. See <a href="#debug">Debugging a render</a>.</td></tr>
 <tr><td><code>password</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Encrypt with AES-256. See <a href="#password">Password protection</a>.</td></tr>
 <tr><td><code>ownerPassword</code></td><td class="t">string</td><td class="t">random</td><td class="wrap">Owner password governing permissions.</td></tr>
 <tr><td><code>allowPrinting</code></td><td class="t">boolean</td><td class="t"><code>true</code></td><td class="wrap">Printing permission on an encrypted PDF.</td></tr>
@@ -690,6 +920,7 @@ included on every plan, free ones too.</p>
 <tr><td><code>X-PDFMint-Credits-Remaining</code></td><td class="wrap">Always</td><td class="wrap">Credits left this month</td></tr>
 <tr><td><code>X-PDFMint-Credits-Limit</code></td><td class="wrap">Always</td><td class="wrap">Credits included in the plan</td></tr>
 <tr><td><code>X-PDFMint-Warning</code></td><td class="wrap">If anything was odd</td><td class="wrap">Non-fatal notes, joined with <code>&#124;</code> — unresolved placeholders, conflicting page-size options</td></tr>
+<tr><td><code>X-PDFMint-Page-Errors</code></td><td class="wrap">With <code>"debug": true</code></td><td class="wrap">JavaScript errors the page threw, joined with <code>&#124;</code>, truncated to 900 characters</td></tr>
 <tr><td><code>X-Request-Id</code></td><td class="wrap">Always, every endpoint</td><td class="wrap">Quote this if you report a problem</td></tr>
 </tbody></table></div>
 </section>
@@ -707,7 +938,7 @@ all, these names are read from the top level of the body instead — handy for a
 <tr><td><code>format</code></td><td class="t">string</td><td class="t"><code>A4</code></td><td class="wrap">Paper size: <code>A0</code>, <code>A1</code>, <code>A2</code>, <code>A3</code>, <code>A4</code>, <code>A5</code>, <code>A6</code>, <code>Letter</code>, <code>Legal</code>, <code>Tabloid</code>, <code>Ledger</code>. Case-insensitive. Anything else is <code>invalid_option</code>.</td></tr>
 <tr><td><code>width</code><br><code>height</code></td><td class="t">length</td><td class="t">—</td><td class="wrap">Custom page size. Both are required together, or you get <code>invalid_option</code>. If given, they override <code>format</code> and a warning says so.</td></tr>
 <tr><td><code>landscape</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Rotate the page.</td></tr>
-<tr><td><code>margin</code></td><td class="t">length &#124; object</td><td class="t"><code>0</code></td><td class="wrap">One length for all four sides, or <code>{ "top": …, "right": …, "bottom": …, "left": … }</code> — any side you leave out is <code>0</code>. The default is 0 so your own CSS decides the spacing.</td></tr>
+<tr><td><code>margin</code></td><td class="t">length &#124; object</td><td class="t"><code>12mm</code></td><td class="wrap">One length for all four sides, or <code>{ "top": …, "right": …, "bottom": …, "left": … }</code> — any side you leave out of that object is <code>0</code>. Omit <code>margin</code> entirely and you get <strong>12&nbsp;mm</strong> on all four sides, because content run hard against the paper edge looks broken. For full bleed, send <code>"margin": 0</code> (or <code>""</code>) explicitly.</td></tr>
 <tr><td><code>scale</code></td><td class="t">number</td><td class="t"><code>1</code></td><td class="wrap">Print scale, 0.1–2. Use <code>0.8</code> to fit a wide table. Outside the range: <code>invalid_option</code>.</td></tr>
 <tr><td><code>printBackground</code></td><td class="t">boolean</td><td class="t"><strong><code>true</code></strong></td><td class="wrap">Chrome omits background colours and images when printing; PDFMint turns them back on. Set <code>false</code> for the browser default.</td></tr>
 <tr><td><code>headerHtml</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Markup repeated at the top of every page. Alias: <code>headerTemplate</code>. See <a href="#options-hf">Headers and footers</a>.</td></tr>
@@ -1102,8 +1333,8 @@ properly. The three rules that matter:</p>
 </div>
 <p>Two sections, two pages — the <code>break-after: page</code> took effect. Add
 <code>orphans: 3; widows: 3</code> on <code>p</code> to stop single lines stranding at a page
-boundary, and remember to set a <code>margin</code>: the default is <code>0</code>, and content
-that runs to the paper edge is what most "my page breaks look wrong" reports turn out to be.</p>
+boundary. Remember that the default <code>margin</code> is 12&nbsp;mm — set <code>"margin": 0</code>
+if your own CSS is doing the page padding, or you get both.</p>
 
 <h3 id="recipe-chart">Waiting for a chart <a class="anchor" href="#recipe-chart">#</a></h3>
 <p>Have the drawing code append a marker element when it is done, then wait for that selector. It
@@ -1153,6 +1384,69 @@ happened. In your own page:</p>
 </div>
 <p>Opening <code>secret.pdf</code> asks for <code>s3cret</code>. Printing is allowed; selecting and
 copying text is not.</p>
+
+<h3 id="recipe-watermark">A DRAFT watermark on every page <a class="anchor" href="#recipe-watermark">#</a></h3>
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "html": "&lt;h1&gt;Contract&lt;/h1&gt;",
+        "watermark": { "text": "CONFIDENTIAL", "color": "#c0392b",
+                       "opacity": 0.12, "rotation": 30, "font": "times-roman" },
+        "output": "base64"
+      }'
+
+# {"filename":"document.pdf","pages":1,"size":6540,
+#  "duration_ms":47,"credits_remaining":274}</code></pre>
+</div>
+<p>Combine it with <a href="#password">encryption</a> when the point is that nobody removes it:</p>
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>"watermark": "DRAFT",
+"password": "s3cret",
+"allowCopying": false</code></pre>
+</div>
+
+<h3 id="recipe-async">A long render, answered by webhook <a class="anchor" href="#recipe-async">#</a></h3>
+<p>For a document that needs a real wait, hand over a webhook and stop holding the connection.
+The 202 comes back in milliseconds; the finished file arrives at your URL.</p>
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "url": "https://example.com/heavy-dashboard",
+        "waitFor": "#chart-ready",
+        "timeout": 90000,
+        "expiresInMinutes": 1440,
+        "webhookUrl": "https://your-n8n.example.com/webhook/pdf-done"
+      }'
+
+# 202 {"job_id":"job_…","status":"queued",
+#      "status_url":"https://pdfmint-b9tt.onrender.com/v1/jobs/job_…",
+#      "webhook_url":"https://your-n8n.example.com/webhook/pdf-done",
+#      "credits_remaining":271}</code></pre>
+</div>
+<p>Without a webhook, poll instead — this is the loop, measured against a live queue:</p>
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>API=https://pdfmint-b9tt.onrender.com
+ID=$(curl -s -X POST $API/v1/pdf \
+      -H "Authorization: Bearer $PDFMINT_API_KEY" -H "Content-Type: application/json" \
+      -d '{"html":"&lt;h1&gt;Async report&lt;/h1&gt;","filename":"async.pdf","async":true}' | jq -r .job_id)
+
+until [ "$(curl -s $API/v1/jobs/$ID -H "Authorization: Bearer $PDFMINT_API_KEY" | jq -r .status)" \
+        != "queued" ]; do sleep 1; done
+
+curl -s $API/v1/jobs/$ID -H "Authorization: Bearer $PDFMINT_API_KEY" | jq '{status, url, pages}'
+
+# { "status": "succeeded",
+#   "url": "https://pdfmint-b9tt.onrender.com/f/9xKR-JWGbkear8iiGJAVnBn9",
+#   "pages": 1 }</code></pre>
+</div>
 
 <h3 id="recipe-merge">Merging a cover page onto a document <a class="anchor" href="#recipe-merge">#</a></h3>
 <p>Generate the parts with <code>output: "url"</code>, then hand the links to
@@ -1217,7 +1511,7 @@ call in our logs.</p>
 <tr><td><code>missing_content</code></td><td>400</td><td class="wrap">No source field — or, on <code>PUT /v1/templates/{name}</code>, no <code>html</code>.</td><td class="wrap">Send one of <code>html</code>, <code>markdown</code>, <code>url</code>, <code>template</code>. See <a href="#input">Choosing an input</a>.</td></tr>
 <tr><td><code>ambiguous_content</code></td><td>400</td><td class="wrap">Two or more source fields were sent; the message names which.</td><td class="wrap">Keep one. For a template plus values, use <code>template</code> + <code>data</code>.</td></tr>
 <tr><td><code>unsupported_source</code></td><td>400</td><td class="wrap"><code>/v1/image</code> was asked to render a saved template.</td><td class="wrap">Use <code>html</code>, <code>markdown</code> or <code>url</code> on <a href="#image"><code>/v1/image</code></a>.</td></tr>
-<tr><td><code>invalid_option</code></td><td>400</td><td class="wrap">One option failed validation — an unknown <code>format</code>, <code>scale</code> outside 0.1–2, a bad length, <code>mediaType</code> other than print/screen, a non-boolean boolean, <code>output</code> outside binary/url/base64, image <code>type</code> other than png/jpeg, or <code>timeout</code> below 1000&nbsp;ms.</td><td class="wrap">The message names the field and the accepted values. See <a href="#options">PDF options</a>.</td></tr>
+<tr><td><code>invalid_option</code></td><td>400</td><td class="wrap">One option failed validation — an unknown <code>format</code>, <code>scale</code> outside 0.1–2, a bad length, <code>mediaType</code> other than print/screen, a non-boolean boolean, <code>output</code> outside binary/url/base64, image <code>type</code> other than png/jpeg, a <code>watermark</code> with no <code>text</code>, or <code>timeout</code> below 1000&nbsp;ms.</td><td class="wrap">The message names the field and the accepted values. See <a href="#options">PDF options</a>.</td></tr>
 <tr><td><code>invalid_data</code></td><td>400</td><td class="wrap"><code>data</code> was a string that is not valid JSON. <code>details.parse_error</code> says where.</td><td class="wrap">Send an object, or fix the JSON. In n8n use an expression such as <code>{{ $json }}</code>.</td></tr>
 <tr><td><code>unresolved_placeholders</code></td><td>400</td><td class="wrap">Only with <code>"strict": true</code>: placeholders had no value. <code>details.unresolved</code> lists them.</td><td class="wrap">Fix the spelling in <code>data</code>, or drop <code>strict</code> to render them empty with a warning. See <a href="#placeholders">Placeholders</a>.</td></tr>
 <tr><td><code>invalid_json</code></td><td>400</td><td class="wrap">The request body is not parseable JSON.</td><td class="wrap">Look for a trailing comma or an unescaped quote.</td></tr>
@@ -1250,6 +1544,8 @@ call in our logs.</p>
 <tr><td><code>encryption_unavailable</code></td><td>501</td><td class="wrap">This deployment has no <code>qpdf</code>, so it cannot encrypt. Not the case on the hosted API.</td><td class="wrap">Only reachable on a self-hosted instance — install <code>qpdf</code>, or drop <code>password</code>.</td></tr>
 <tr><td><code>encryption_failed</code></td><td>500</td><td class="wrap">Encryption was attempted and failed.</td><td class="wrap">Retry; if it persists, send us the <code>request_id</code>.</td></tr>
 
+<tr><td><code>job_not_found</code></td><td>404</td><td class="wrap">No job with that id on this account. Job ids look like <code>job_XXXX</code> and belong to the account that created them.</td><td class="wrap">Use the <code>job_id</code> from the 202 response, with the same API key. See <a href="#async">Async &amp; webhooks</a>.</td></tr>
+<tr><td><code>account_gone</code></td><td>404</td><td class="wrap">A queued job outlived the account that created it. Delivered on the job record, never as a live response.</td><td class="wrap">Nothing to do — requeue from a live account.</td></tr>
 <tr><td><code>unknown_endpoint</code></td><td>404</td><td class="wrap">No such route under <code>/v1/</code>. The hint lists the real ones.</td><td class="wrap">Check method and path — e.g. <code>POST</code>, not <code>GET</code>, on <code>/v1/pdf</code>.</td></tr>
 <tr><td><code>internal_error</code></td><td>500</td><td class="wrap">An unhandled failure on our side.</td><td class="wrap">Retry. If it repeats, send us the <code>request_id</code> from the response.</td></tr>
 
@@ -1291,6 +1587,9 @@ Stripe checkout flow and are never returned by a <code>/v1/</code> endpoint.</p>
 <tr><td class="wrap">Render queue depth</td><td>40</td><td><code>renderer_busy</code></td></tr>
 <tr><td class="wrap">Font loading wait, before printing</td><td>8&nbsp;s</td><td class="wrap">falls back to system fonts</td></tr>
 <tr><td class="wrap">Per-image wait, before printing</td><td>5&nbsp;s</td><td class="wrap">prints without that image</td></tr>
+<tr><td class="wrap">Webhook delivery attempts</td><td>3</td><td class="wrap">job stays <code>succeeded</code>/<code>failed</code>, poll it instead</td></tr>
+<tr><td class="wrap">Webhook request timeout</td><td>15&nbsp;s</td><td class="wrap">counts as a failed attempt</td></tr>
+<tr><td class="wrap">Job record retention after finishing</td><td>7&nbsp;days</td><td><code>job_not_found</code></td></tr>
 <tr><td class="wrap">Documents per month</td><td class="wrap">300 free · 5,000 Starter · 50,000 Pro · 250,000 Scale</td><td><code>quota_exceeded</code></td></tr>
 </tbody></table></div>
 

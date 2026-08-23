@@ -12,8 +12,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css">
-<link rel="stylesheet" href="/landing.css">
+<link rel="stylesheet" href="/app.css?v=7">
+<link rel="stylesheet" href="/landing.css?v=7">
 </head>
 <body>
 
@@ -98,13 +98,14 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
       <span class="tok-n">"name"</span>: <span class="tok-s">"PDFMint"</span>,
       <span class="tok-n">"type"</span>: <span class="tok-s">"n8n-nodes-pdfmint.pdfMint"</span>,
       <span class="tok-n">"typeVersion"</span>: 1,
+      <span class="tok-n">"position"</span>: [640, 300],
       <span class="tok-n">"parameters"</span>: {
         <span class="tok-n">"operation"</span>: <span class="tok-s">"pdf"</span>,
         <span class="tok-n">"source"</span>: <span class="tok-s">"markdown"</span>,
-        <span class="tok-n">"markdown"</span>: <span class="tok-s">"=# Invoice {{ $json.number }}\n\nTotal: {{ $json.total }}"</span>,
+        <span class="tok-n">"markdown"</span>: <span class="tok-s">"=# Invoice {{ $json.number }}"</span>,
         <span class="tok-n">"output"</span>: <span class="tok-s">"binary"</span>,
         <span class="tok-n">"fileName"</span>: <span class="tok-s">"=invoice-{{ $json.number }}.pdf"</span>,
-        <span class="tok-n">"options"</span>: { <span class="tok-n">"format"</span>: <span class="tok-s">"A4"</span>, <span class="tok-n">"margin"</span>: <span class="tok-s">"18mm"</span>, <span class="tok-n">"pageNumbers"</span>: <span class="tok-k">true</span> }
+        <span class="tok-n">"options"</span>: { <span class="tok-n">"margin"</span>: <span class="tok-s">"18mm"</span>, <span class="tok-n">"pageNumbers"</span>: <span class="tok-k">true</span> }
       }
     }
   ]
@@ -268,7 +269,7 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
       </div>
       <div class="tile">
         <h3><span class="ico"><svg viewBox="0 0 20 20" fill="none"><path d="M10 3l6 2.5V10c0 3.6-2.4 6-6 7-3.6-1-6-3.4-6-7V5.5L10 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>SSRF-guarded fetches</h3>
-        <p>Every URL you hand to <code>url</code> or <code>merge</code> is resolved and checked first. Private, loopback and link-local addresses are refused, redirects included.</p>
+        <p>Every URL you hand to <code>url</code> or <code>merge</code> has its DNS resolved before we fetch it, so a hostname pointing at <code>169.254.169.254</code> is caught too. Private, loopback and link-local addresses are refused, as are <code>file:</code> and <code>data:</code>.</p>
       </div>
       <div class="tile">
         <h3><span class="ico"><svg viewBox="0 0 20 20" fill="none"><path d="M4 6h12M4 10h12M4 14h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>Errors you can act on</h3>

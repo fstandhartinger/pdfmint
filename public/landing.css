@@ -26,12 +26,11 @@
     --l-tint:rgba(18,163,122,.14);
     --l-tint-strong:rgba(18,163,122,.22);
     --l-hero-a:rgba(18,163,122,.14);
-    --l-term:#0b0e13;
-    --l-term-ink:#dfe5ee;
-    --l-term-rule:#1e242e;
+    --l-term:#11151d;
+    --l-term-ink:#e2e8f1;
+    --l-term-rule:#2a323e;
   }
   a{color:#3ecfa4}
-  .l-btn-primary{color:#04140f}
 }
 
 body{overflow-x:hidden}
@@ -205,6 +204,11 @@ table.cmp thead .us{color:var(--accent-ink);background:var(--l-tint-strong)}
 @media (prefers-color-scheme:dark){table.cmp thead .us{color:#4bd9ae}}
 .scroll-hint{display:none;font-size:.78rem;color:var(--muted);margin:.55rem 0 0}
 @media (max-width:760px){.scroll-hint{display:block}}
+@media (max-width:760px){
+  table.cmp{min-width:560px;font-size:.85rem}
+  table.cmp th,table.cmp td{padding:.6rem .7rem}
+  table.cmp td:first-child{width:8.5rem}
+}
 .cmp-note{font-size:.8rem;color:var(--muted);margin:.85rem 0 0;line-height:1.6}
 
 /* ------------------------------------------------------------------ pricing */
