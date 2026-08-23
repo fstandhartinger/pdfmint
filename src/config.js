@@ -30,7 +30,7 @@ const config = {
 
 // Plans. `credits` is PDFs (or images) per calendar month.
 const PLANS = {
-  free:  { id: 'free',  name: 'Free',  credits: 100,     priceUsd: 0,   stripePriceEnv: null },
+  free:  { id: 'free',  name: 'Free',  credits: 300,     priceUsd: 0,   stripePriceEnv: null },
   starter:{ id: 'starter', name: 'Starter', credits: 5000,  priceUsd: 9,   stripePriceEnv: 'STRIPE_PRICE_STARTER' },
   pro:   { id: 'pro',   name: 'Pro',   credits: 50000,   priceUsd: 29,  stripePriceEnv: 'STRIPE_PRICE_PRO' },
   scale: { id: 'scale', name: 'Scale', credits: 250000,  priceUsd: 99,  stripePriceEnv: 'STRIPE_PRICE_SCALE' },

@@ -8,7 +8,7 @@ const STATEMENTS = [
      email          TEXT UNIQUE NOT NULL,
      password_hash  TEXT NOT NULL,
      plan           TEXT NOT NULL DEFAULT 'free',
-     credits_limit  INTEGER NOT NULL DEFAULT 100,
+     credits_limit  INTEGER NOT NULL DEFAULT 300,
      credits_used   INTEGER NOT NULL DEFAULT 0,
      period_start   TIMESTAMPTZ NOT NULL DEFAULT date_trunc('month', now()),
      stripe_customer_id     TEXT,
@@ -64,6 +64,8 @@ const STATEMENTS = [
      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
      expires_at  TIMESTAMPTZ NOT NULL
    )`,
+  // Existing free accounts get the newer, larger free allowance too.
+  `UPDATE accounts SET credits_limit = 300 WHERE plan = 'free' AND credits_limit = 100`,
   `CREATE TABLE IF NOT EXISTS stripe_events (
      id          TEXT PRIMARY KEY,
      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
