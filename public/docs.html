@@ -605,7 +605,7 @@ produces after that: charts, maps, tables filled by <code>fetch</code>.</p>
 <tr><td><code>"load"</code> / <code>"domcontentloaded"</code></td><td class="wrap">Wait for that lifecycle event. Rarely needed — <code>load</code> has already happened.</td></tr>
 </tbody></table></div>
 
-<p>A selector that never appears gives <code>400 wait_for_timeout</code> naming the selector, so you
+<p>A selector that never appears gives <code>504 wait_for_timeout</code> naming the selector, so you
 find out it was a typo instead of getting a half-drawn page:</p>
 <div class="code">
 <div class="cap">400 Bad Request</div>
@@ -745,7 +745,12 @@ as usual (default 60, max 7 days), so give yourself enough time to fetch it.</p>
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s https://pdfmint-b9tt.onrender.com/v1/jobs/job_z25FB4zf4nb55i7Z \
+<pre><code># JOB_ID comes from the 202 above:
+#   JOB_ID=$(curl -s -X POST $API/v1/pdf -H "Authorization: Bearer $PDFMINT_API_KEY" \
+#     -H "Content-Type: application/json" \
+#     -d '{"markdown":"# Report","async":true}' | jq -r .job_id)
+
+curl -s https://pdfmint-b9tt.onrender.com/v1/jobs/$JOB_ID \
   -H "Authorization: Bearer $PDFMINT_API_KEY"</code></pre>
 </div>
 <div class="code">
@@ -813,6 +818,52 @@ as usual (default 60, max 7 days), so give yourself enough time to fetch it.</p>
 
 <p>The queue lives in the database, not in process memory, so a redeploy mid-job does not lose it: a
 job left <code>running</code> for more than 10 minutes is requeued when the service comes back.</p>
+
+<h3 id="webhook-signing">Verifying a callback <a class="anchor" href="#webhook-signing">#</a></h3>
+
+<p>Anything that learns your webhook URL could otherwise POST a fake &ldquo;succeeded&rdquo; to it.
+Every callback is signed, so you can tell ours from theirs:</p>
+
+<pre><code>X-PDFMint-Timestamp: 1787500123
+X-PDFMint-Job-Id: job_kx5zzjIJ2fy-vN-U
+X-PDFMint-Signature: sha256=9f2c…</code></pre>
+
+<p>The signature is <code>HMAC-SHA256(secret, "&lt;timestamp&gt;." + rawBody)</code>, hex-encoded.
+The secret is per account and is shown on your <a href="/dashboard">dashboard</a>. Verify against
+the <em>raw</em> body, before any JSON parsing, and compare in constant time:</p>
+
+<div class="code"><span class="lang">Node.js</span><button class="copy" type="button">Copy</button>
+<pre><code>import crypto from 'node:crypto';
+
+// express.raw({ type: 'application/json' }) so req.body is a Buffer
+app.post('/pdf-ready', express.raw({ type: 'application/json' }), (req, res) =&gt; {
+  const timestamp = req.get('X-PDFMint-Timestamp');
+  const signature = req.get('X-PDFMint-Signature') || '';
+
+  // Reject anything older than five minutes, so a captured callback cannot be replayed.
+  if (Math.abs(Date.now() / 1000 - Number(timestamp)) &gt; 300) return res.sendStatus(400);
+
+  const expected = 'sha256=' + crypto
+    .createHmac('sha256', process.env.PDFMINT_WEBHOOK_SECRET)
+    .update(`${timestamp}.${req.body}`)
+    .digest('hex');
+
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return res.sendStatus(401);
+
+  const job = JSON.parse(req.body);
+  // job.status is "succeeded" or "failed"; job.url is the finished document.
+  res.sendStatus(200);
+});</code></pre></div>
+
+<p>In n8n, a Webhook node accepts the call without verifying it. If the workflow does anything
+consequential with the result, add a Code node that repeats the check above using the secret
+from your dashboard.</p>
+
+<p>Delivery is attempted three times with backoff, and each attempt is signed with a fresh
+timestamp. If all three fail the job is still <code>succeeded</code> — poll
+<code>GET /v1/jobs/{id}</code> to collect it.</p>
 </section>
 
 <!-- ================================================================ DEBUG -->
@@ -1071,17 +1122,18 @@ files go in.</p>
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/merge \
+<pre><code># Hosted links expire, so build the two documents first and merge what you just made.
+A=$(curl -s -X POST $API/v1/pdf -H "Authorization: Bearer $PDFMINT_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"markdown":"# Cover","output":"url"}' | jq -r .url)
+B=$(curl -s -X POST $API/v1/pdf -H "Authorization: Bearer $PDFMINT_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"markdown":"# Terms","output":"url"}' | jq -r .url)
+
+curl -s -X POST $API/v1/merge \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-        "files": [
-          "https://pdfmint-b9tt.onrender.com/f/z0n9ZTZvZHU-ilHOnqaUdxt-",
-          "https://pdfmint-b9tt.onrender.com/f/E_Sd_aR-C-ZEoW1CJ_GbFP7X"
-        ],
-        "filename": "contract.pdf",
-        "output": "url"
-      }'</code></pre>
+  -d "{\"files\": [\"$A\", \"$B\"], \"filename\": \"contract.pdf\", \"output\": \"url\"}"</code></pre>
 </div>
 <div class="code">
 <div class="cap">200 OK</div>
@@ -1416,16 +1468,21 @@ copying text is not.</p>
 The 202 comes back in milliseconds; the finished file arrives at your URL.</p>
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code># WEBHOOK_URL is the Production URL of your n8n Webhook node, or any public
+# endpoint you control. A host that does not resolve is refused with dns_failed
+# rather than queued, so set this before running the call.
+WEBHOOK_URL="https://your-n8n.example.com/webhook/pdf-done"
+
+curl -s -X POST $API/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-        "url": "https://example.com/heavy-dashboard",
-        "waitFor": "#chart-ready",
-        "timeout": 90000,
-        "expiresInMinutes": 1440,
-        "webhookUrl": "https://your-n8n.example.com/webhook/pdf-done"
-      }'
+  -d "{
+        \"url\": \"https://example.com/heavy-dashboard\",
+        \"waitFor\": \"#chart-ready\",
+        \"timeout\": 90000,
+        \"expiresInMinutes\": 1440,
+        \"webhookUrl\": \"$WEBHOOK_URL\"
+      }"
 
 # 202 {"job_id":"job_…","status":"queued",
 #      "status_url":"https://pdfmint-b9tt.onrender.com/v1/jobs/job_…",
@@ -1440,14 +1497,16 @@ ID=$(curl -s -X POST $API/v1/pdf \
       -H "Authorization: Bearer $PDFMINT_API_KEY" -H "Content-Type: application/json" \
       -d '{"html":"&lt;h1&gt;Async report&lt;/h1&gt;","filename":"async.pdf","async":true}' | jq -r .job_id)
 
-until [ "$(curl -s $API/v1/jobs/$ID -H "Authorization: Bearer $PDFMINT_API_KEY" | jq -r .status)" \
-        != "queued" ]; do sleep 1; done
-
-curl -s $API/v1/jobs/$ID -H "Authorization: Bearer $PDFMINT_API_KEY" | jq '{status, url, pages}'
-
-# { "status": "succeeded",
-#   "url": "https://pdfmint-b9tt.onrender.com/f/9xKR-JWGbkear8iiGJAVnBn9",
-#   "pages": 1 }</code></pre>
+# Poll until the job reaches a final state. "queued" and "running" are both
+# still in flight, so wait for succeeded or failed rather than for "not queued".
+while :; do
+  STATUS=$(curl -s $API/v1/jobs/$ID -H "Authorization: Bearer $PDFMINT_API_KEY" | jq -r .status)
+  case "$STATUS" in
+    succeeded|failed) break ;;
+  esac
+  sleep 2
+done
+curl -s $API/v1/jobs/$ID -H "Authorization: Bearer $PDFMINT_API_KEY" | jq .</code></pre>
 </div>
 
 <h3 id="recipe-merge">Merging a cover page onto a document <a class="anchor" href="#recipe-merge">#</a></h3>
@@ -1522,11 +1581,13 @@ call in our logs.</p>
 <tr><td><code>unsupported_url_scheme</code></td><td>400</td><td class="wrap">Not <code>http://</code> or <code>https://</code>.</td><td class="wrap"><code>file:</code>, <code>data:</code> and <code>ftp:</code> are refused — pass the content in <code>html</code>.</td></tr>
 <tr><td><code>private_address_blocked</code></td><td>400</td><td class="wrap">The URL points at localhost, a private/link-local range, or a hostname that resolves to one. See <a href="#url">Rendering a URL</a>.</td><td class="wrap">Fetch the page in your own workflow and send the markup in <code>html</code>.</td></tr>
 <tr><td><code>dns_failed</code></td><td>400</td><td class="wrap">The hostname does not resolve from our network.</td><td class="wrap">Check the spelling and that the host is publicly resolvable.</td></tr>
-<tr><td><code>url_unreachable</code></td><td>400</td><td class="wrap">DNS worked but the host refused, did not answer, or presented an invalid TLS certificate.</td><td class="wrap">Confirm the page is reachable from the public internet; otherwise send <code>html</code>.</td></tr>
-<tr><td><code>url_http_error</code></td><td>400</td><td class="wrap">The page answered HTTP 400 or above. 401/403 usually means it needs a login.</td><td class="wrap">Fetch it where you have the session and pass the markup in <code>html</code>.</td></tr>
+<tr><td><code>url_unreachable</code></td><td>502</td><td class="wrap">DNS worked but the host refused, did not answer, or presented an invalid TLS certificate.</td><td class="wrap">Confirm the page is reachable from the public internet; otherwise send <code>html</code>.</td></tr>
+<tr><td><code>url_http_error</code></td><td>502</td><td class="wrap">The page answered HTTP 400 or above. 401/403 usually means it needs a login.</td><td class="wrap">Fetch it where you have the session and pass the markup in <code>html</code>.</td></tr>
 
-<tr><td><code>wait_for_timeout</code></td><td>400</td><td class="wrap">The <code>waitFor</code> selector never appeared. The credit is refunded.</td><td class="wrap">Check the selector, or wait a fixed number of milliseconds. See <a href="#waitfor">waitFor</a>.</td></tr>
+<tr><td><code>wait_for_timeout</code></td><td>504</td><td class="wrap">The <code>waitFor</code> selector never appeared. The credit is refunded.</td><td class="wrap">Check the selector, or wait a fixed number of milliseconds. See <a href="#waitfor">waitFor</a>.</td></tr>
 <tr><td><code>render_timeout</code></td><td>504</td><td class="wrap">The render ran past <code>timeout</code>. Refunded.</td><td class="wrap">Raise <code>timeout</code> (up to 120000), or replace <code>networkidle</code> with a selector.</td></tr>
+<tr><td><code>unknown_field</code></td><td>400</td><td class="wrap">A field name the endpoint does not accept — usually a typo, sometimes another vendor's spelling.</td><td class="wrap">The hint names the field that was probably meant, for example <code>format</code> &rarr; <code>type</code> or <code>templateId</code> &rarr; <code>template</code>.</td></tr>
+<tr><td><code>template_too_large</code></td><td>400</td><td class="wrap">A stored template over 2&nbsp;MB.</td><td class="wrap">Reference images by URL rather than inlining them as base64.</td></tr>
 <tr><td><code>rate_limited</code></td><td>429</td><td class="wrap">More than 120 requests a minute, or more than 30 at once, from this account.</td><td class="wrap">Wait the number of seconds in <code>Retry-After</code>, then retry. See <a href="#rate-limits">Rate limits</a>.</td></tr>
 <tr><td><code>renderer_busy</code></td><td>503</td><td class="wrap">Both render slots are full and 40 jobs are already queued.</td><td class="wrap">Retry after a few seconds. In n8n, enable <em>Retry On Fail</em> on the node.</td></tr>
 <tr><td><code>renderer_crashed</code></td><td>500</td><td class="wrap">Chrome died mid-document — almost always a huge or pathological page. Refunded.</td><td class="wrap">Split the document, shrink the images, or lower <code>scale</code>.</td></tr>

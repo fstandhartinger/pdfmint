@@ -353,7 +353,7 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
             <td>Raw HTML &rarr; PDF endpoint</td>
             <td class="us">Yes — <code>html</code>, <code>markdown</code>, <code>url</code> or <code>template</code></td>
             <td>None. Every PDF endpoint in their OpenAPI spec requires a <code>template_id</code></td>
-            <td>Template-first</td>
+            <td>Yes — a separate <code>/html-to-pdf</code> endpoint alongside its templates</td>
           </tr>
           <tr>
             <td>Documents for $29/month</td>
@@ -370,7 +370,7 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
           <tr>
             <td>n8n node returns the file</td>
             <td class="us">Binary on the same node</td>
-            <td>—</td>
+            <td>Yes, when <code>export_type</code> is set to <code>file</code></td>
             <td>URL only — the node never calls <code>prepareBinaryData</code></td>
           </tr>
           <tr>
