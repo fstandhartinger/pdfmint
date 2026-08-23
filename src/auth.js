@@ -71,13 +71,13 @@ async function authenticate(req) {
   const key = extractKey(req);
   if (!key) {
     throw new ApiError(401, 'missing_api_key', 'No API key was sent with this request.', {
-      hint: 'Send it as the header "Authorization: Bearer pm_live_...". In n8n, open the node\'s Credential dropdown and pick your PDFMint credential.',
+      hint: 'Send the header "Authorization: Bearer <your key>".',
       docs: '/docs#authentication',
     });
   }
   if (!key.startsWith(KEY_PREFIX)) {
     throw new ApiError(401, 'invalid_api_key', 'That does not look like a PDFMint API key.', {
-      hint: `PDFMint keys start with "${KEY_PREFIX}". Copy yours from the dashboard at /dashboard.`,
+      hint: 'Copy the key from your dashboard at /dashboard.',
       docs: '/docs#authentication',
     });
   }
@@ -88,7 +88,7 @@ async function authenticate(req) {
   );
   if (!rows.length) {
     throw new ApiError(401, 'invalid_api_key', 'This API key is not valid, or it has been revoked.', {
-      hint: 'Check the key on your dashboard at /dashboard. If you rotated it, update the credential in n8n.',
+      hint: 'Check the key on your dashboard at /dashboard. If you rotated it, the old one stops working immediately.',
       docs: '/docs#authentication',
     });
   }
@@ -114,7 +114,7 @@ async function consumeCredits(accountId, n = 1) {
     const a = cur[0] || { credits_used: 0, credits_limit: 0, plan: 'free' };
     throw new ApiError(402, 'quota_exceeded',
       `You have used all ${a.credits_limit} documents included in your ${a.plan} plan this month.`, {
-        hint: 'Your quota resets on the 1st of next month. To raise it now, upgrade at /dashboard.',
+        hint: 'The quota resets on the 1st of next month. To raise it now, upgrade at /dashboard.',
         docs: '/docs#quota',
         details: { plan: a.plan, credits_used: a.credits_used, credits_limit: a.credits_limit },
       });

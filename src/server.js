@@ -72,7 +72,7 @@ app.use((req, res) => {
     return res.status(404).json({ error: {
       code: 'unknown_endpoint',
       message: `There is no ${req.method} ${req.path} endpoint.`,
-      hint: 'The endpoints are POST /v1/pdf, POST /v1/image, POST /v1/merge, GET /v1/me, GET /v1/jobs/{id}, POST /v1/keys and GET/PUT/DELETE /v1/templates.',
+      hint: 'The endpoint list is in the documentation.',
       docs: `${config.publicUrl}/docs`,
       request_id: req.id,
     } });
@@ -103,7 +103,8 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ error: {
       code: 'invalid_json',
       message: 'The request body is not valid JSON.',
-      hint: 'Check for a trailing comma or an unescaped quote. In n8n, use the JSON body mode rather than string concatenation.',
+      hint: 'Check for a trailing comma or an unescaped quote.',
+      docs: `${config.publicUrl}/docs`,
       request_id: req.id,
     } });
   }

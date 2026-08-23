@@ -28,7 +28,7 @@ function pickSource(body) {
   const given = ['html', 'url', 'markdown', 'template'].filter((k) => body[k] !== undefined && body[k] !== null && body[k] !== '');
   if (given.length === 0) {
     throw bad('missing_content', 'Nothing to render: send one of "html", "markdown", "url" or "template".', {
-      hint: 'For example: {"html": "<h1>Hello</h1>"}. In n8n, set the Source field and put your content in it.',
+      hint: 'For example: {"html": "<h1>Hello</h1>"}.',
       docs: '/docs#input',
     });
   }
@@ -48,7 +48,7 @@ function outputModeFor(body, allowed = OUTPUT_MODES) {
     const list = allowed.map((m) => `"${m}"`);
     const readable = list.length > 1 ? `${list.slice(0, -1).join(', ')} or ${list[list.length - 1]}` : list[0];
     throw bad('invalid_option', `"output" must be ${readable} — got ${JSON.stringify(body.output)}.`, {
-      hint: '"binary" returns the file itself in this response, which is what you usually want in n8n.',
+      hint: '"binary" returns the file itself in this response; "url" returns a temporary link; "base64" returns the bytes inside the JSON.',
       docs: '/docs#output',
     });
   }
@@ -134,7 +134,7 @@ function parseData(raw) {
   try { return JSON.parse(String(raw)); }
   catch (e) {
     throw bad('invalid_data', 'The "data" field is a string but is not valid JSON.', {
-      hint: 'In n8n use an expression such as {{ $json }} (an object), or make sure the JSON string is well formed.',
+      hint: '"data" must be a JSON object, or a string containing one.',
       details: { parse_error: String(e.message).slice(0, 160) },
       docs: '/docs#templates',
     });
@@ -434,7 +434,7 @@ router.post('/merge', withAuth, asyncRoute(async (req, res) => {
   const inputs = body.files || body.urls || body.pdfs;
   if (!Array.isArray(inputs) || inputs.length < 2) {
     throw bad('invalid_input', '"files" must be an array of at least two PDFs.', {
-      hint: 'Each entry is either a public URL string, or {"base64": "..."}. In n8n, chain two PDFMint nodes and pass both binaries in.',
+      hint: 'Each entry is either a public URL string, or {"base64": "..."}.',
       docs: '/docs#merge',
     });
   }

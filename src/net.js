@@ -41,8 +41,8 @@ function isPrivateAddress(ip) {
  * network (SSRF). Resolves DNS so that `evil.com -> 169.254.169.254` is caught too.
  */
 const REACHABILITY_HINT = (field) => (field.toLowerCase().includes('webhook')
-  ? 'PDFMint calls your webhook from our servers, so it has to be reachable from the public internet. In n8n, use the Production URL of a Webhook node, not localhost.'
-  : 'PDFMint renders on our servers, so the URL has to be reachable from the public internet. Fetch the page in your workflow and pass the result in "html" instead.');
+  ? 'PDFMint calls the webhook from its own servers, so the URL has to be reachable from the public internet.'
+  : 'PDFMint renders on its own servers, so the URL has to be reachable from the public internet. Fetch the page yourself and send the result as "html" instead.');
 
 async function assertPublicUrl(raw, field = 'url') {
   let u;

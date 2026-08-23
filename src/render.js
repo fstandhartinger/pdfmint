@@ -68,7 +68,7 @@ function acquire() {
   if (active < config.maxConcurrentRenders) { active += 1; return Promise.resolve(); }
   if (waiters.length >= config.renderQueueLimit) {
     return Promise.reject(new ApiError(503, 'renderer_busy', 'PDFMint is at capacity right now.', {
-      hint: 'Retry in a few seconds. The n8n node retries this automatically when "Retry On Fail" is enabled.',
+      hint: 'Retry in a few seconds.',
       docs: '/docs#limits',
     }));
   }
@@ -146,8 +146,8 @@ async function applyWait(page, waitFor, deadlineMs) {
   try {
     await page.waitForSelector(s, { timeout: deadlineMs, state: 'attached' });
   } catch {
-    throw bad('wait_for_timeout', `Timed out waiting for "${s}" to appear on the page.`, {
-      hint: 'Check the selector, or use a number of milliseconds instead (for example waitFor: 1000).',
+    throw new ApiError(504, 'wait_for_timeout', `Timed out waiting for "${s}" to appear on the page.`, {
+      hint: 'Check the selector, or pass a number of milliseconds instead, for example waitFor: 1000.',
       docs: '/docs#waitfor',
     });
   }
@@ -157,20 +157,22 @@ async function applyWait(page, waitFor, deadlineMs) {
 
 function normaliseChromeError(e, source) {
   const msg = String(e && e.message ? e.message : e);
+  // These are upstream failures, not malformed requests. 502 says so, and says
+  // it is worth retrying, which a 400 would not.
   if (/net::ERR_NAME_NOT_RESOLVED/.test(msg)) {
-    return bad('url_unreachable', 'The URL could not be resolved.', {
-      hint: 'Check the hostname. PDFMint fetches the page from our servers, so it must be publicly reachable.',
+    return new ApiError(502, 'url_unreachable', 'The URL could not be resolved.', {
+      hint: 'Check the hostname. PDFMint fetches the page from its own servers, so the host must be publicly resolvable.',
       docs: '/docs#url',
     });
   }
   if (/net::ERR_CONNECTION_REFUSED|net::ERR_CONNECTION_TIMED_OUT|net::ERR_ADDRESS_UNREACHABLE/.test(msg)) {
-    return bad('url_unreachable', 'The URL refused the connection or did not respond.', {
-      hint: 'PDFMint fetches the page from our servers. If the page is behind a login or a firewall, fetch it in your workflow and pass the result in "html" instead.',
+    return new ApiError(502, 'url_unreachable', 'The URL refused the connection or did not respond.', {
+      hint: 'PDFMint fetches the page from its own servers. If the page needs a login or sits behind a firewall, fetch it yourself and send the result as "html".',
       docs: '/docs#url',
     });
   }
   if (/net::ERR_CERT|SSL/.test(msg)) {
-    return bad('url_unreachable', 'The URL has an invalid TLS certificate.', { docs: '/docs#url' });
+    return new ApiError(502, 'url_unreachable', 'The URL has an invalid TLS certificate.', { docs: '/docs#url' });
   }
   if (/Timeout .* exceeded|page\.goto: Timeout|exceeded while waiting/i.test(msg)) {
     return new ApiError(504, 'render_timeout', `Rendering timed out${source ? ` while loading the ${source}` : ''}.`, {
@@ -219,9 +221,11 @@ async function render(job) {
     if (job.url) {
       const resp = await page.goto(job.url, { waitUntil: 'load', timeout: job.timeoutMs });
       if (resp && resp.status() >= 400) {
-        throw bad('url_http_error', `The URL returned HTTP ${resp.status()}.`, {
-          hint: 'PDFMint renders whatever the URL returns. A 401/403 usually means the page needs a login — fetch it in your workflow and pass the result in "html" instead.',
+        // The request was fine; the page we were pointed at was not.
+        throw new ApiError(502, 'url_http_error', `The URL returned HTTP ${resp.status()}.`, {
+          hint: 'PDFMint renders whatever the URL returns. A 401 or 403 usually means the page needs a login — fetch it yourself and send the result as "html".',
           docs: '/docs#url',
+          details: { upstream_status: resp.status() },
         });
       }
     } else {
