@@ -249,6 +249,7 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
     result = await render.render({
       html, url, options, timeoutMs, kind: 'pdf',
       waitFor: body.waitFor,
+      debug: asBool(body.debug, 'debug', false),
       javascript: body.javascript,
       emulateDarkMode: asBool(body.emulateDarkMode, 'emulateDarkMode', false),
       headers: body.headers && typeof body.headers === 'object' ? body.headers : undefined,
@@ -260,6 +261,10 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
   }
 
   let buffer = await render.applyMetadata(result.buffer, body.metadata);
+  if (body.watermark) {
+    const spec = typeof body.watermark === 'string' ? { text: body.watermark } : body.watermark;
+    buffer = await render.addWatermark(buffer, spec);
+  }
   if (body.password) {
     buffer = await render.encrypt(buffer, {
       password: String(body.password),
@@ -280,6 +285,9 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
   });
   if (pages) res.set('X-PDFMint-Pages', String(pages));
   if (options.warnings.length) res.set('X-PDFMint-Warning', options.warnings.join(' | '));
+  if (result.debug && result.debug.pageErrors.length) {
+    res.set('X-PDFMint-Page-Errors', result.debug.pageErrors.join(' | ').slice(0, 900));
+  }
 
   if (outputMode === 'binary') {
     res.set({
@@ -295,6 +303,7 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
       duration_ms: result.durationMs,
       credits_remaining: credits.remaining,
       warnings: options.warnings.length ? options.warnings : undefined,
+      debug: result.debug || undefined,
       base64: buffer.toString('base64'),
     });
   }
@@ -306,6 +315,7 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
     duration_ms: result.durationMs,
     credits_remaining: credits.remaining,
     warnings: options.warnings.length ? options.warnings : undefined,
+    debug: result.debug || undefined,
   });
 }));
 

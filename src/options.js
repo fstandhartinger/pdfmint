@@ -46,8 +46,18 @@ function asBool(value, field, dflt) {
   throw bad('invalid_option', `"${field}" must be true or false, got ${JSON.stringify(value)}.`);
 }
 
+/**
+ * Chrome's own print default is a non-zero margin and every other HTML-to-PDF
+ * service picks one too, because content rendered hard against the paper edge
+ * looks broken. Callers who want full bleed set margin: 0 explicitly.
+ */
+const DEFAULT_MARGIN = '12mm';
+
 function normaliseMargin(raw, field = 'margin') {
-  if (raw === undefined || raw === null || raw === '') return { top: '0', right: '0', bottom: '0', left: '0' };
+  if (raw === undefined || raw === null) {
+    return { top: DEFAULT_MARGIN, right: DEFAULT_MARGIN, bottom: DEFAULT_MARGIN, left: DEFAULT_MARGIN };
+  }
+  if (raw === '') return { top: '0', right: '0', bottom: '0', left: '0' };
   if (typeof raw === 'string' || typeof raw === 'number') {
     const all = asLength(raw, field);
     return { top: all, right: all, bottom: all, left: all };
@@ -171,4 +181,4 @@ function normalisePdfOptions(input = {}) {
   };
 }
 
-module.exports = { normalisePdfOptions, normaliseMargin, asLength, asBool, toMm, FORMATS };
+module.exports = { normalisePdfOptions, normaliseMargin, asLength, asBool, toMm, FORMATS, DEFAULT_MARGIN };

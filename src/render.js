@@ -1,7 +1,7 @@
 'use strict';
 
 const { chromium } = require('playwright');
-const { PDFDocument } = require('pdf-lib');
+const { PDFDocument, rgb, degrees } = require('pdf-lib');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const fs = require('node:fs/promises');
@@ -242,6 +242,14 @@ async function render(job) {
       return { buffer: buf, durationMs: Date.now() - started, consoleErrors };
     }
 
+    const debug = job.debug
+      ? {
+          renderedHtml: await page.content().catch(() => null),
+          finalUrl: page.url(),
+          pageErrors: consoleErrors,
+        }
+      : null;
+
     const o = job.options;
     if (o.mediaType === 'screen') await page.emulateMedia({ media: 'screen' });
     else await page.emulateMedia({ media: 'print' });
@@ -263,7 +271,7 @@ async function render(job) {
       outline: o.outline,
       timeout: remaining(),
     });
-    return { buffer: buf, durationMs: Date.now() - started, consoleErrors };
+    return { buffer: buf, durationMs: Date.now() - started, consoleErrors, debug };
   } catch (e) {
     if (e instanceof ApiError) throw e;
     const mapped = normaliseChromeError(e, job.url ? 'URL' : 'HTML');
@@ -342,6 +350,62 @@ async function encrypt(buffer, { password, ownerPassword, allowPrinting = true, 
   }
 }
 
+const WATERMARK_FONTS = {
+  helvetica: 'Helvetica',
+  'helvetica-bold': 'Helvetica-Bold',
+  'times-roman': 'Times-Roman',
+  courier: 'Courier',
+};
+
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) return { r: 0.6, g: 0.6, b: 0.6 };
+  const n = parseInt(m[1], 16);
+  return { r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255 };
+}
+
+/**
+ * Stamps diagonal text across every page. Done after rendering with pdf-lib so
+ * it also works on a document the caller merged rather than rendered.
+ */
+async function addWatermark(buffer, spec) {
+  const text = String(spec.text || '').trim();
+  if (!text) {
+    throw bad('invalid_option', '"watermark.text" is required when a watermark is requested.', {
+      hint: 'For example: {"watermark": {"text": "DRAFT"}}.',
+      docs: '/docs#watermark',
+    });
+  }
+  const doc = await PDFDocument.load(buffer, { updateMetadata: false });
+  const fontName = WATERMARK_FONTS[String(spec.font || 'helvetica-bold').toLowerCase()] || 'Helvetica-Bold';
+  const font = await doc.embedFont(fontName);
+  const { r, g, b } = hexToRgb(spec.color || '#9aa3b2');
+  const opacity = Math.min(Math.max(spec.opacity === undefined ? 0.18 : Number(spec.opacity), 0.01), 1);
+  const rotation = spec.rotation === undefined ? 45 : Number(spec.rotation);
+
+  for (const page of doc.getPages()) {
+    const { width, height } = page.getSize();
+    // Without an explicit size, size the text so its rotated bounding box fills
+    // 85% of the page. widthOfTextAtSize is linear in size, so one measurement
+    // is enough to solve for it.
+    const unitWidth = font.widthOfTextAtSize(text, 100) / 100;
+    const cos = Math.abs(Math.cos((rotation * Math.PI) / 180)) || 1e-6;
+    const sin = Math.abs(Math.sin((rotation * Math.PI) / 180)) || 1e-6;
+    const fitWidth = 0.85 * Math.min(width / cos, height / sin);
+    const size = spec.fontSize
+      ? Number(spec.fontSize)
+      : Math.max(14, fitWidth / Math.max(unitWidth, 0.01));
+    const textWidth = font.widthOfTextAtSize(text, size);
+    const capHeight = font.heightAtSize(size) * 0.36;
+    const rad = (rotation * Math.PI) / 180;
+    // Centre the rotated baseline on the page.
+    const x = width / 2 - (textWidth / 2) * Math.cos(rad) + capHeight * Math.sin(rad);
+    const y = height / 2 - (textWidth / 2) * Math.sin(rad) - capHeight * Math.cos(rad);
+    page.drawText(text, { x, y, size, font, color: rgb(r, g, b), opacity, rotate: degrees(rotation) });
+  }
+  return Buffer.from(await doc.save());
+}
+
 async function mergePdfs(buffers) {
   const out = await PDFDocument.create();
   for (let i = 0; i < buffers.length; i += 1) {
@@ -363,6 +427,6 @@ async function mergePdfs(buffers) {
 
 module.exports = {
   render, warmup, closeBrowser, getBrowser,
-  applyMetadata, countPages, encrypt, mergePdfs, hasQpdf,
+  applyMetadata, countPages, encrypt, mergePdfs, addWatermark, hasQpdf,
   stats, assertPublicUrl,
 };
