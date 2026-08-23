@@ -12,6 +12,7 @@ const api = require('./api');
 const billing = require('./billing');
 const web = require('./web');
 const render = require('./render');
+const jobs = require('./jobs');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -129,6 +130,8 @@ process.on('unhandledRejection', (reason) => {
 async function main() {
   await migrate();
   startReaper();
+  jobs.startJobReaper();
+  jobs.startWorker(api.runJob);
   const server = app.listen(config.port, () => {
     console.log(`[pdfmint] listening on :${config.port} (public url: ${config.publicUrl || 'not set'})`);
   });

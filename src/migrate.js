@@ -66,6 +66,22 @@ const STATEMENTS = [
    )`,
   // Existing free accounts get the newer, larger free allowance too.
   `UPDATE accounts SET credits_limit = 300 WHERE plan = 'free' AND credits_limit = 100`,
+  `CREATE TABLE IF NOT EXISTS jobs (
+     id           TEXT PRIMARY KEY,
+     account_id   BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+     kind         TEXT NOT NULL,
+     request      JSONB NOT NULL,
+     webhook_url  TEXT,
+     status       TEXT NOT NULL DEFAULT 'queued',
+     result       JSONB,
+     error        JSONB,
+     attempts     INTEGER NOT NULL DEFAULT 0,
+     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+     started_at   TIMESTAMPTZ,
+     finished_at  TIMESTAMPTZ
+   )`,
+  `CREATE INDEX IF NOT EXISTS jobs_queue_idx ON jobs(status, created_at)`,
+  `CREATE INDEX IF NOT EXISTS jobs_account_idx ON jobs(account_id, created_at DESC)`,
   `CREATE TABLE IF NOT EXISTS stripe_events (
      id          TEXT PRIMARY KEY,
      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()

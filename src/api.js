@@ -7,6 +7,7 @@ const { config, PLANS } = require('./config');
 const { ApiError, bad } = require('./errors');
 const { query } = require('./db');
 const { authenticate, consumeCredits, refundCredits, issueApiKey } = require('./auth');
+const jobs = require('./jobs');
 const { normalisePdfOptions, asBool } = require('./options');
 const { markdownToHtml } = require('./markdown');
 const render = require('./render');
@@ -171,8 +172,11 @@ router.get('/me', withAuth, asyncRoute(async (req, res) => {
 
 /* ----------------------------------------------------------------- /v1/pdf */
 
-router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
-  const body = req.body || {};
+/**
+ * Builds the render job from a request body. Shared by the synchronous route
+ * and the async worker so both behave identically.
+ */
+async function preparePdf(account, body) {
   const source = pickSource(body);
   const timeoutMs = timeoutFor(body);
   const options = normalisePdfOptions(body.options || body);
@@ -207,9 +211,9 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
   } else if (source === 'url') {
     url = (await assertPublicUrl(String(body.url), 'url')).toString();
   } else if (source === 'template') {
-    const { rows } = await query(`SELECT * FROM templates WHERE account_id = $1 AND name = $2`, [req.account.id, String(body.template)]);
+    const { rows } = await query(`SELECT * FROM templates WHERE account_id = $1 AND name = $2`, [account.id, String(body.template)]);
     if (!rows.length) {
-      const { rows: all } = await query(`SELECT name FROM templates WHERE account_id = $1 ORDER BY name LIMIT 10`, [req.account.id]);
+      const { rows: all } = await query(`SELECT name FROM templates WHERE account_id = $1 ORDER BY name LIMIT 10`, [account.id]);
       throw bad('template_not_found', `You have no template called "${body.template}".`, {
         hint: all.length
           ? `Templates on this account: ${all.map((t) => t.name).join(', ')}.`
@@ -243,22 +247,20 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
     });
   }
 
-  const credits = await consumeCredits(req.account.id, 1);
-  let result;
-  try {
-    result = await render.render({
-      html, url, options, timeoutMs, kind: 'pdf',
-      waitFor: body.waitFor,
-      debug: asBool(body.debug, 'debug', false),
-      javascript: body.javascript,
-      emulateDarkMode: asBool(body.emulateDarkMode, 'emulateDarkMode', false),
-      headers: body.headers && typeof body.headers === 'object' ? body.headers : undefined,
-    });
-  } catch (e) {
-    await refundCredits(req.account.id, 1);
-    logUsage(req.account.id, 'pdf', false, { errorCode: e.code });
-    throw e;
-  }
+  return { html, url, options, timeoutMs, outputMode };
+}
+
+/** Runs a prepared job and returns the finished buffer plus its facts. */
+async function producePdf(account, body, prepared) {
+  const { html, url, options, timeoutMs } = prepared;
+  const result = await render.render({
+    html, url, options, timeoutMs, kind: 'pdf',
+    waitFor: body.waitFor,
+    debug: asBool(body.debug, 'debug', false),
+    javascript: body.javascript,
+    emulateDarkMode: asBool(body.emulateDarkMode, 'emulateDarkMode', false),
+    headers: body.headers && typeof body.headers === 'object' ? body.headers : undefined,
+  });
 
   let buffer = await render.applyMetadata(result.buffer, body.metadata);
   if (body.watermark) {
@@ -273,21 +275,52 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
       allowCopying: asBool(body.allowCopying, 'allowCopying', false),
     });
   }
-
   const pages = body.password ? null : await render.countPages(buffer);
   const filename = sanitiseFilename(body.filename, 'document.pdf').replace(/(\.pdf)?$/i, '.pdf');
-  logUsage(req.account.id, 'pdf', true, { pages, durationMs: result.durationMs });
+  return { buffer, pages, filename, durationMs: result.durationMs, debug: result.debug };
+}
+
+router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
+  const body = req.body || {};
+  const webhookUrl = body.webhookUrl || body.webhook_url;
+  const wantsAsync = Boolean(webhookUrl) || asBool(body.async, 'async', false);
+
+  const prepared = await preparePdf(req.account, body);
+
+  if (wantsAsync) {
+    if (webhookUrl) await assertPublicUrl(String(webhookUrl), 'webhookUrl');
+    const credits = await consumeCredits(req.account.id, 1);
+    const jobId = await jobs.enqueue(req.account.id, 'pdf', body, webhookUrl ? String(webhookUrl) : null);
+    return res.status(202).json({
+      job_id: jobId,
+      status: 'queued',
+      status_url: `${config.publicUrl || ''}/v1/jobs/${jobId}`,
+      webhook_url: webhookUrl ? String(webhookUrl) : undefined,
+      credits_remaining: credits.remaining,
+    });
+  }
+
+  const { options, outputMode } = prepared;
+  const credits = await consumeCredits(req.account.id, 1);
+  let out;
+  try {
+    out = await producePdf(req.account, body, prepared);
+  } catch (e) {
+    await refundCredits(req.account.id, 1);
+    logUsage(req.account.id, 'pdf', false, { errorCode: e.code });
+    throw e;
+  }
+  const { buffer, pages, filename, durationMs, debug } = out;
+  logUsage(req.account.id, 'pdf', true, { pages, durationMs });
 
   res.set({
-    'X-PDFMint-Duration-Ms': String(result.durationMs),
+    'X-PDFMint-Duration-Ms': String(durationMs),
     'X-PDFMint-Credits-Remaining': String(credits.remaining),
     'X-PDFMint-Credits-Limit': String(credits.limit),
   });
   if (pages) res.set('X-PDFMint-Pages', String(pages));
   if (options.warnings.length) res.set('X-PDFMint-Warning', options.warnings.join(' | '));
-  if (result.debug && result.debug.pageErrors.length) {
-    res.set('X-PDFMint-Page-Errors', result.debug.pageErrors.join(' | ').slice(0, 900));
-  }
+  if (debug && debug.pageErrors.length) res.set('X-PDFMint-Page-Errors', debug.pageErrors.join(' | ').slice(0, 900));
 
   if (outputMode === 'binary') {
     res.set({
@@ -300,10 +333,10 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
   if (outputMode === 'base64') {
     return res.json({
       filename, pages, size: buffer.length,
-      duration_ms: result.durationMs,
+      duration_ms: durationMs,
       credits_remaining: credits.remaining,
       warnings: options.warnings.length ? options.warnings : undefined,
-      debug: result.debug || undefined,
+      debug: debug || undefined,
       base64: buffer.toString('base64'),
     });
   }
@@ -312,11 +345,15 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
     filename, pages, size: buffer.length,
     url: stored.url,
     expires_in_minutes: stored.expiresInMinutes,
-    duration_ms: result.durationMs,
+    duration_ms: durationMs,
     credits_remaining: credits.remaining,
     warnings: options.warnings.length ? options.warnings : undefined,
-    debug: result.debug || undefined,
+    debug: debug || undefined,
   });
+}));
+
+router.get('/jobs/:id', withAuth, asyncRoute(async (req, res) => {
+  res.json(await jobs.get(req.account.id, String(req.params.id)));
 }));
 
 /* --------------------------------------------------------------- /v1/image */
@@ -477,4 +514,29 @@ router.post('/keys', withAuth, asyncRoute(async (req, res) => {
   res.json({ api_key: key });
 }));
 
-module.exports = { router, fillTemplate, storeFile };
+async function runJob(job) {
+  const { rows } = await query(`SELECT * FROM accounts WHERE id = $1`, [job.account_id]);
+  const account = rows[0];
+  if (!account) throw new ApiError(404, 'account_gone', 'The account that queued this job no longer exists.');
+  const body = job.request;
+  const prepared = await preparePdf(account, body);
+  let out;
+  try {
+    out = await producePdf(account, body, prepared);
+  } catch (e) {
+    await refundCredits(account.id, 1);
+    logUsage(account.id, 'pdf', false, { errorCode: e.code });
+    throw e;
+  }
+  const { buffer, pages, filename, durationMs } = out;
+  logUsage(account.id, 'pdf', true, { pages, durationMs });
+  const stored = await storeFile(account.id, buffer, filename, 'application/pdf', body.expiresInMinutes ?? body.expiration);
+  return {
+    filename, pages, size: buffer.length,
+    url: stored.url,
+    expires_in_minutes: stored.expiresInMinutes,
+    duration_ms: durationMs,
+  };
+}
+
+module.exports = { router, fillTemplate, storeFile, runJob };

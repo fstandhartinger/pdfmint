@@ -40,6 +40,10 @@ function isPrivateAddress(ip) {
  * Rejects anything that would let a caller use our renderer to reach a private
  * network (SSRF). Resolves DNS so that `evil.com -> 169.254.169.254` is caught too.
  */
+const REACHABILITY_HINT = (field) => (field.toLowerCase().includes('webhook')
+  ? 'PDFMint calls your webhook from our servers, so it has to be reachable from the public internet. In n8n, use the Production URL of a Webhook node, not localhost.'
+  : 'PDFMint renders on our servers, so the URL has to be reachable from the public internet. Fetch the page in your workflow and pass the result in "html" instead.');
+
 async function assertPublicUrl(raw, field = 'url') {
   let u;
   try {
@@ -52,7 +56,7 @@ async function assertPublicUrl(raw, field = 'url') {
   }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') {
     throw bad('unsupported_url_scheme', `"${field}" must use http:// or https://, got ${u.protocol}//.`, {
-      hint: 'file://, data:// and ftp:// are not allowed. Pass the content in "html" instead.',
+      hint: 'file://, data:// and ftp:// are not allowed.',
       docs: '/docs#url',
     });
   }
@@ -61,14 +65,14 @@ async function assertPublicUrl(raw, field = 'url') {
   const host = u.hostname.replace(/^\[|\]$/g, '');
   if (BLOCKED_HOSTNAMES.has(host.toLowerCase())) {
     throw bad('private_address_blocked', `"${field}" points at ${host}, which is not reachable from PDFMint.`, {
-      hint: 'PDFMint renders on our servers, so the URL has to be reachable from the public internet. Fetch the page in your workflow and pass the result in "html" instead.',
+      hint: REACHABILITY_HINT(field),
       docs: '/docs#url',
     });
   }
   if (net.isIP(host)) {
     if (isPrivateAddress(host)) {
       throw bad('private_address_blocked', `"${field}" points at the private address ${host}.`, {
-        hint: 'PDFMint renders on our servers and cannot reach private networks. Fetch the page in your workflow and pass the result in "html" instead.',
+        hint: REACHABILITY_HINT(field),
         docs: '/docs#url',
       });
     }
@@ -85,7 +89,7 @@ async function assertPublicUrl(raw, field = 'url') {
   }
   if (!addrs.length || addrs.some((a) => isPrivateAddress(a.address))) {
     throw bad('private_address_blocked', `"${field}" resolves to a private address.`, {
-      hint: 'PDFMint renders on our servers and cannot reach private networks.',
+      hint: REACHABILITY_HINT(field),
       docs: '/docs#url',
     });
   }

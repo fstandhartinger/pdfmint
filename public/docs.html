@@ -1,1 +1,1496 @@
-<h1>Docs</h1>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PDFMint API reference — HTML, Markdown or a URL to PDF</title>
+<meta name="description" content="Full reference for the PDFMint API: POST /v1/pdf, /v1/image, /v1/merge, /v1/me and /v1/templates — every option, every error code, runnable curl, Node.js, Python and n8n examples.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/docs.css">
+</head>
+<body class="docs">
+
+<header class="docs-top">
+  <a class="logo" href="/">PDF<span>Mint</span></a>
+  <nav>
+    <a href="#quickstart">Quick start</a>
+    <a href="#errors">Errors</a>
+    <a href="#n8n">n8n</a>
+    <a href="/dashboard">Dashboard</a>
+    <a class="cta" href="/signup">Get an API key</a>
+  </nav>
+</header>
+
+<div class="layout">
+
+  <aside class="toc">
+    <button class="toc-toggle" id="tocToggle" aria-expanded="false" aria-controls="tocBody">On this page</button>
+    <div class="toc-body" id="tocBody">
+      <h2>Start here</h2>
+      <ul>
+        <li><a href="#quickstart">Your first PDF</a></li>
+        <li><a href="#authentication">Authentication</a></li>
+        <li><a href="#quota">Quota &amp; credits</a></li>
+      </ul>
+
+      <h2>Concepts</h2>
+      <ul>
+        <li><a href="#input">Choosing an input</a></li>
+        <li><a href="#placeholders" class="sub">Placeholders</a></li>
+        <li><a href="#url" class="sub">Rendering a URL</a></li>
+        <li><a href="#markdown" class="sub">Markdown styling</a></li>
+        <li><a href="#output">Output modes</a></li>
+        <li><a href="#timeout">Timeouts</a></li>
+        <li><a href="#waitfor">waitFor</a></li>
+        <li><a href="#password">Password protection</a></li>
+      </ul>
+
+      <h2>Endpoints</h2>
+      <ul>
+        <li><a href="#pdf">POST /v1/pdf</a></li>
+        <li><a href="#options" class="sub">PDF options</a></li>
+        <li><a href="#image">POST /v1/image</a></li>
+        <li><a href="#merge">POST /v1/merge</a></li>
+        <li><a href="#me">GET /v1/me</a></li>
+        <li><a href="#templates">/v1/templates</a></li>
+        <li><a href="#misc">Files &amp; health</a></li>
+      </ul>
+
+      <h2>Recipes</h2>
+      <ul>
+        <li><a href="#recipe-invoice">Invoice with line items</a></li>
+        <li><a href="#recipe-markdown">LLM output to report</a></li>
+        <li><a href="#recipe-header">Header/footer with a logo</a></li>
+        <li><a href="#recipe-breaks">Controlling page breaks</a></li>
+        <li><a href="#recipe-chart">Waiting for a chart</a></li>
+        <li><a href="#recipe-password">Password protection</a></li>
+        <li><a href="#recipe-merge">Merging documents</a></li>
+      </ul>
+
+      <h2>Reference</h2>
+      <ul>
+        <li><a href="#errors">Errors</a></li>
+        <li><a href="#limits">Limits</a></li>
+        <li><a href="#n8n">n8n node</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="content">
+
+<h1>PDFMint API reference</h1>
+<p class="lede">One HTTP call turns HTML, Markdown, a URL or a saved template into a PDF, and the
+bytes come back in the same response. No template editor, no second request to fetch the file.</p>
+
+<div class="cards">
+  <div class="c"><strong>Base URL</strong><span><code>https://pdfmint-b9tt.onrender.com</code></span></div>
+  <div class="c"><strong>Auth</strong><span><code>Authorization: Bearer pm_live_…</code></span></div>
+  <div class="c"><strong>Free plan</strong><span>300 documents per month, no card</span></div>
+</div>
+
+<!-- ================================================================ QUICK -->
+<section id="quickstart">
+<h2>Your first PDF <a class="anchor" href="#quickstart">#</a></h2>
+
+<p>Create an account at <a href="/signup">/signup</a> — the API key is shown immediately, with no
+email confirmation. Then paste this into a terminal:</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"html":"&lt;h1&gt;Hello from PDFMint&lt;/h1&gt;","options":{"margin":"20mm"}}' \
+  -o hello.pdf</code></pre>
+</div>
+
+<p>That is the whole thing. <code>hello.pdf</code> is on disk. The response also carries what
+happened, in headers:</p>
+
+<div class="code">
+<div class="cap">response headers</div>
+<button class="copy" type="button">Copy</button>
+<pre><code>HTTP/1.1 200 OK
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="document.pdf"
+X-PDFMint-Pages: 1
+X-PDFMint-Duration-Ms: 274
+X-PDFMint-Credits-Remaining: 299
+X-PDFMint-Credits-Limit: 300</code></pre>
+</div>
+
+<p class="muted" style="font-size:.9rem">Measured on 2026-08-23 against the live API: a one-page
+Markdown document rendered in 123–152&nbsp;ms of server time (0.55–0.64&nbsp;s wall clock from a
+laptop in Europe, network included). A one-page HTML document with a margin: 274&nbsp;ms.</p>
+
+<h3 id="quickstart-langs">The same call, four ways <a class="anchor" href="#quickstart-langs">#</a></h3>
+
+<div class="tabs" role="tablist" data-tabs="qs">
+  <button role="tab" aria-selected="true" data-panel="qs-curl">curl</button>
+  <button role="tab" aria-selected="false" data-panel="qs-node">Node.js</button>
+  <button role="tab" aria-selected="false" data-panel="qs-py">Python</button>
+  <button role="tab" aria-selected="false" data-panel="qs-n8n">n8n</button>
+</div>
+
+<div class="panel" id="qs-curl">
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "html": "&lt;h1&gt;Hello from PDFMint&lt;/h1&gt;",
+        "options": { "format": "A4", "margin": "20mm", "pageNumbers": true }
+      }' \
+  -o hello.pdf</code></pre>
+</div>
+</div>
+
+<div class="panel" id="qs-node" hidden>
+<div class="code">
+<div class="cap">hello.mjs — Node 18+, no dependencies</div>
+<button class="copy" type="button">Copy</button>
+<pre><code>import { writeFile } from 'node:fs/promises';
+
+const res = await fetch('https://pdfmint-b9tt.onrender.com/v1/pdf', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${process.env.PDFMINT_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    html: '&lt;h1&gt;Hello from Node&lt;/h1&gt;',
+    options: { format: 'A4', margin: '20mm', pageNumbers: true },
+  }),
+});
+
+if (!res.ok) {
+  const { error } = await res.json();
+  throw new Error(`${error.code}: ${error.message}${error.hint ? ` — ${error.hint}` : ''}`);
+}
+
+await writeFile('hello.pdf', Buffer.from(await res.arrayBuffer()));
+console.log('pages:', res.headers.get('x-pdfmint-pages'),
+            'ms:', res.headers.get('x-pdfmint-duration-ms'),
+            'credits left:', res.headers.get('x-pdfmint-credits-remaining'));</code></pre>
+</div>
+<p class="muted" style="font-size:.9rem">Run: <code>PDFMINT_API_KEY=pm_live_… node hello.mjs</code>
+→ <code>pages: 1 ms: 188 credits left: 281</code></p>
+</div>
+
+<div class="panel" id="qs-py" hidden>
+<div class="code">
+<div class="cap">hello.py — requests</div>
+<button class="copy" type="button">Copy</button>
+<pre><code>import os
+import requests
+
+resp = requests.post(
+    "https://pdfmint-b9tt.onrender.com/v1/pdf",
+    headers={"Authorization": f"Bearer {os.environ['PDFMINT_API_KEY']}"},
+    json={
+        "html": "&lt;h1&gt;Hello from Python&lt;/h1&gt;",
+        "options": {"format": "A4", "margin": "20mm", "pageNumbers": True},
+    },
+    timeout=60,
+)
+
+if resp.status_code != 200:
+    err = resp.json()["error"]
+    raise SystemExit(f"{err['code']}: {err['message']}\n{err.get('hint', '')}")
+
+with open("hello.pdf", "wb") as fh:
+    fh.write(resp.content)
+
+print("pages:", resp.headers["X-PDFMint-Pages"],
+      "ms:", resp.headers["X-PDFMint-Duration-Ms"],
+      "credits left:", resp.headers["X-PDFMint-Credits-Remaining"])</code></pre>
+</div>
+<p class="muted" style="font-size:.9rem">Run: <code>PDFMINT_API_KEY=pm_live_… python3 hello.py</code>
+→ <code>pages: 1 ms: 196 credits left: 280</code></p>
+</div>
+
+<div class="panel" id="qs-n8n" hidden>
+<p>Install the community node <code>n8n-nodes-pdfmint</code>
+(<a href="#n8n">full instructions below</a>), add a <strong>PDFMint</strong> node and set:</p>
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Credential</td><td class="wrap">Your <strong>PDFMint API</strong> credential (the key starting <code>pm_live_</code>)</td></tr>
+<tr><td>Operation</td><td>Generate PDF</td></tr>
+<tr><td>Source</td><td>HTML</td></tr>
+<tr><td>HTML</td><td class="wrap"><code>&lt;h1&gt;Hello from PDFMint&lt;/h1&gt;</code> — or an expression such as <code>{{ $json.html }}</code></td></tr>
+<tr><td>Output</td><td>File (Binary)</td></tr>
+<tr><td>Options → Margin</td><td><code>20mm</code></td></tr>
+<tr><td>Options → Page Numbers</td><td>on</td></tr>
+</tbody></table></div>
+<p>Execute the node. The PDF is on the output item's <code>data</code> binary field, ready for Gmail,
+Drive, S3 or Slack — no download step in between.</p>
+</div>
+</section>
+
+<!-- ================================================================= AUTH -->
+<section id="authentication">
+<h2>Authentication <a class="anchor" href="#authentication">#</a></h2>
+
+<p>Every <code>/v1/*</code> request needs an API key. Keys start with <code>pm_live_</code> and are
+created for you the moment you sign up.</p>
+
+<ol>
+  <li>Sign up at <a href="/signup">/signup</a> — email and a password of at least 8 characters. No card.</li>
+  <li>The key is shown once on the <a href="/dashboard">dashboard</a> right after signing up. Store it.</li>
+  <li>Send it on every request.</li>
+</ol>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>Authorization: Bearer pm_live_EeJ1QfIFMK25SU02d12iFjmwUuCOGNBu</code></pre>
+</div>
+
+<p>An <code>X-API-Key: pm_live_…</code> header works too, if a client makes that easier. Both are
+accepted on every endpoint.</p>
+
+<h3 id="auth-test">Testing a key <a class="anchor" href="#auth-test">#</a></h3>
+<p><span class="pill get">GET</span><span class="path">/v1/me</span> is the credential-test endpoint.
+It costs no credits, and the n8n credential uses exactly this call to tell you whether your key
+works before you build anything.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s https://pdfmint-b9tt.onrender.com/v1/me \
+  -H "Authorization: Bearer $PDFMINT_API_KEY"</code></pre>
+</div>
+<div class="code">
+<div class="cap">200 OK</div>
+<pre><code>{
+  "email": "you@example.com",
+  "plan": "free",
+  "plan_name": "Free",
+  "credits_limit": 300,
+  "credits_used": 1,
+  "credits_remaining": 299,
+  "period_resets_at": "2026-09-01T00:00:00.000Z",
+  "dashboard_url": "https://pdfmint-b9tt.onrender.com/dashboard"
+}</code></pre>
+</div>
+
+<h3 id="auth-more-keys">Additional keys <a class="anchor" href="#auth-more-keys">#</a></h3>
+<p><span class="pill post">POST</span><span class="path">/v1/keys</span> issues another key on the
+same account — useful when you want one per environment and want to be able to revoke them
+separately. <code>label</code> is optional (defaults to <code>default</code>, truncated to 40
+characters). Keys can also be created and listed on the <a href="/dashboard">dashboard</a>.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/keys \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"label":"n8n"}'
+
+# {"api_key":"pm_live_Q__YqxG9S_mJWXaF3QI8cNGYWS08NY7F"}</code></pre>
+</div>
+
+<div class="note warn">
+<p><strong>Two failure modes to expect.</strong> No key at all gives
+<code>401 missing_api_key</code>. A key that does not start with <code>pm_live_</code>, or one that
+was revoked, gives <code>401 invalid_api_key</code>. Both name the problem in
+<code>error.hint</code>.</p>
+</div>
+</section>
+
+<!-- ================================================================ QUOTA -->
+<section id="quota">
+<h2>Quota &amp; credits <a class="anchor" href="#quota">#</a></h2>
+
+<p>One credit is one document. A PDF, an image and a merge each cost <strong>1</strong>, no matter
+how many pages come out. <code>GET /v1/me</code> and <code>GET /v1/templates</code> are free.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Plan</th><th>Price</th><th>Documents / month</th></tr></thead>
+<tbody>
+<tr><td>Free</td><td>$0</td><td>300</td></tr>
+<tr><td>Starter</td><td>$9</td><td>5,000</td></tr>
+<tr><td>Pro</td><td>$29</td><td>50,000</td></tr>
+<tr><td>Scale</td><td>$99</td><td>250,000</td></tr>
+</tbody></table></div>
+
+<ul>
+  <li>The credit is reserved <em>before</em> rendering and <strong>refunded automatically if the
+      render fails</strong>, so a broken selector or an unreachable URL does not cost you anything.</li>
+  <li>Every successful render returns <code>X-PDFMint-Credits-Remaining</code> and
+      <code>X-PDFMint-Credits-Limit</code>. JSON output modes include
+      <code>credits_remaining</code> in the body.</li>
+  <li>The window is a calendar month in UTC. It rolls over on the 1st;
+      <code>period_resets_at</code> on <a href="#me"><code>/v1/me</code></a> gives you the exact
+      instant.</li>
+</ul>
+
+<p>When the quota is gone the API answers <code>402 quota_exceeded</code>:</p>
+<div class="code">
+<div class="cap">402 Payment Required</div>
+<pre><code>{
+  "error": {
+    "code": "quota_exceeded",
+    "message": "You have used all 300 documents included in your free plan this month.",
+    "hint": "Your quota resets on the 1st of next month. To raise it now, upgrade at /dashboard.",
+    "docs": "https://pdfmint-b9tt.onrender.com/docs#quota",
+    "details": { "plan": "free", "credits_used": 300, "credits_limit": 300 },
+    "request_id": "…"
+  }
+}</code></pre>
+</div>
+</section>
+
+<!-- ================================================================ INPUT -->
+<section id="input">
+<h2>Choosing an input <a class="anchor" href="#input">#</a></h2>
+
+<p>Send <strong>exactly one</strong> of these four fields. Sending none gives
+<code>missing_content</code>; sending two gives <code>ambiguous_content</code>.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>Type</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>html</code></td><td class="t">string</td><td class="wrap">Renders the markup as-is. A full document or a bare fragment both work — Chrome wraps a fragment for you. Your own <code>&lt;style&gt;</code> is the only stylesheet applied.</td></tr>
+<tr><td><code>markdown</code></td><td class="t">string</td><td class="wrap">Converts GitHub-flavoured Markdown and applies a <a href="#markdown">print stylesheet</a>. The short path for LLM output.</td></tr>
+<tr><td><code>url</code></td><td class="t">string</td><td class="wrap">Loads a publicly reachable page and prints it. See <a href="#url">Rendering a URL</a> for what is and is not reachable.</td></tr>
+<tr><td><code>template</code></td><td class="t">string</td><td class="wrap">The name of a template <a href="#templates">saved on your account</a>, filled with <code>data</code>. <span class="muted">PDF only — not supported by <code>/v1/image</code>.</span></td></tr>
+</tbody></table></div>
+
+<h3 id="placeholders">Placeholders <a class="anchor" href="#placeholders">#</a></h3>
+
+<p>Any of <code>html</code>, <code>markdown</code> and <code>template</code> can carry
+<code>{{placeholder}}</code> markers. Pass the values in <code>data</code> — either a JSON object,
+or a string containing JSON. The syntax is a small mustache subset:</p>
+
+<div class="tw"><table>
+<thead><tr><th>Syntax</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>{{name}}</code></td><td class="wrap">Insert the value, HTML-escaped</td></tr>
+<tr><td><code>{{customer.name}}</code></td><td class="wrap">Dotted path into a nested object</td></tr>
+<tr><td><code>{{{name}}}</code></td><td class="wrap">Insert the value <em>raw</em>, without escaping — for markup you built yourself</td></tr>
+<tr><td><code>{{#lines}}…{{/lines}}</code></td><td class="wrap">Repeat the block once per array item; inside it, keys resolve against the item first, then the outer object. Also works as an "if" for a truthy non-array value.</td></tr>
+<tr><td><code>{{^lines}}…{{/lines}}</code></td><td class="wrap">Render only when the value is missing, falsy or an empty array</td></tr>
+<tr><td><code>{{.}}</code></td><td class="wrap">The current item, inside a section over an array of strings or numbers</td></tr>
+</tbody></table></div>
+
+<div class="note">
+<p><strong>Placeholders never fail silently.</strong> If a marker has no matching value, the render
+still succeeds but the response carries
+<code>X-PDFMint-Warning: 1 placeholder(s) had no value and rendered empty: missing</code> (and a
+<code>warnings</code> array in the JSON output modes). Set <code>"strict": true</code> to turn that
+into a <code>400 unresolved_placeholders</code> instead — the error lists every missing name in
+<code>details.unresolved</code>.</p>
+</div>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "html": "&lt;h1&gt;{{title}}&lt;/h1&gt;&lt;p&gt;{{missing}}&lt;/p&gt;",
+        "data": { "title": "Hi" },
+        "strict": true
+      }'</code></pre>
+</div>
+<div class="code">
+<div class="cap">400 Bad Request</div>
+<pre><code>{
+  "error": {
+    "code": "unresolved_placeholders",
+    "message": "The template uses 1 placeholder that \"data\" does not provide: missing.",
+    "hint": "Check the spelling against your data, or set \"strict\": false to render them as empty instead.",
+    "docs": "https://pdfmint-b9tt.onrender.com/docs#templates",
+    "details": { "unresolved": ["missing"] },
+    "request_id": "5490af9e4a650d19"
+  }
+}</code></pre>
+</div>
+</section>
+
+<!-- ================================================================== URL -->
+<section id="url">
+<h2>Rendering a URL <a class="anchor" href="#url">#</a></h2>
+
+<p>PDFMint fetches the page <strong>from our servers</strong>, not from yours. That has two
+consequences worth knowing before you debug anything.</p>
+
+<p><strong>The page must be reachable from the public internet.</strong> Anything behind a login,
+a VPN, a firewall or <code>localhost</code> is not. The fix is always the same: fetch the page in
+your own workflow, where you have the session, and send the resulting markup in
+<code>html</code>.</p>
+
+<p><strong>Private and internal addresses are refused</strong>, before any request is made, to stop
+the renderer being used to reach someone's internal network. Hostnames are resolved through DNS
+first, so <code>evil.example.com → 169.254.169.254</code> is caught too. The same guard applies to
+every image, stylesheet and font the page tries to load.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Refused</th><th>Error code</th></tr></thead>
+<tbody>
+<tr><td class="wrap">Anything that is not <code>http://</code> or <code>https://</code> — <code>file:</code>, <code>data:</code>, <code>ftp:</code></td><td><code>unsupported_url_scheme</code></td></tr>
+<tr><td class="wrap">Not parseable as a URL (no scheme, spaces, …)</td><td><code>invalid_url</code></td></tr>
+<tr><td class="wrap"><code>localhost</code>, <code>localhost.localdomain</code>, <code>metadata.google.internal</code></td><td><code>private_address_blocked</code></td></tr>
+<tr><td class="wrap">IPv4 in <code>10/8</code>, <code>127/8</code>, <code>0/8</code>, <code>169.254/16</code>, <code>172.16–31</code>, <code>192.168/16</code>, <code>100.64–127</code> (CGNAT), or <code>224+</code> (multicast/reserved) — literal or via DNS</td><td><code>private_address_blocked</code></td></tr>
+<tr><td class="wrap">IPv6 <code>::1</code>, <code>::</code>, <code>fe80::/10</code>, <code>fc00::/7</code>, and IPv4-mapped equivalents</td><td><code>private_address_blocked</code></td></tr>
+<tr><td class="wrap">A hostname that does not resolve</td><td><code>dns_failed</code></td></tr>
+<tr><td class="wrap">A host that resolves but refuses, times out, or presents a bad certificate</td><td><code>url_unreachable</code></td></tr>
+<tr><td class="wrap">A page that answers with HTTP 400 or above</td><td><code>url_http_error</code></td></tr>
+</tbody></table></div>
+
+<h3 id="url-headers">Sending headers with the request <a class="anchor" href="#url-headers">#</a></h3>
+<p>The top-level <code>headers</code> object is attached to every request the browser makes for
+that render — the page itself and its subresources. Use it for an API token or a
+<code>Cookie</code> on a page that accepts one.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "url": "https://example.com",
+        "headers": { "X-Report-Token": "abc123" },
+        "options": { "format": "A4", "margin": "15mm", "pageNumbers": true },
+        "output": "base64"
+      }'
+
+# {"filename":"document.pdf","pages":1,"size":21097,
+#  "duration_ms":292,"credits_remaining":285,"base64":"JVBERi0…"}</code></pre>
+</div>
+</section>
+
+<!-- ============================================================= MARKDOWN -->
+<section id="markdown">
+<h2>Markdown styling <a class="anchor" href="#markdown">#</a></h2>
+
+<p>When you send <code>markdown</code>, PDFMint parses it as GitHub-flavoured Markdown (tables,
+fenced code, task lists; a single newline is <em>not</em> a line break) and wraps it in a print
+stylesheet built for paper. You write no CSS and still get a finished document:</p>
+
+<ul>
+  <li>11&nbsp;pt body text at 1.6 line height, Inter for prose and JetBrains Mono for code — both
+      installed in the render container, so nothing waits on a font download.</li>
+  <li><strong>Table headers repeat on every page</strong> (<code>thead { display: table-header-group }</code>)
+      and <strong>no row is split across a page break</strong> (<code>tr { break-inside: avoid }</code>).</li>
+  <li><strong>Headings never orphan</strong> at the foot of a page
+      (<code>break-after: avoid</code> on every heading level).</li>
+  <li><strong>Code blocks wrap instead of clipping</strong> (<code>white-space: pre-wrap</code>) and
+      stay on one page where they fit (<code>break-inside: avoid</code>).</li>
+  <li>Images are capped at <code>max-width: 100%</code>; blockquotes, rules and zebra-striped tables
+      are styled; links are coloured and break on long URLs.</li>
+  <li>Noto CJK and Noto Color Emoji are installed, so Chinese, Japanese, Korean, Greek, Cyrillic and
+      emoji come out as glyphs rather than boxes — verified on this deployment.</li>
+</ul>
+
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>css</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Extra CSS appended <em>after</em> the built-in stylesheet, so your rules win. Markdown source only.</td></tr>
+<tr><td><code>googleFonts</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">A Google Fonts family spec, exactly as it appears in the Google URL — e.g. <code>Playfair Display:wght@400;700</code>. Adds the stylesheet link for you. Markdown source only.</td></tr>
+<tr><td><code>metadata.title</code><br><code>title</code></td><td class="t">string</td><td class="t"><code>Document</code></td><td class="wrap">Becomes the HTML <code>&lt;title&gt;</code> — which is what <code>{title}</code> in a header/footer template prints.</td></tr>
+</tbody></table></div>
+
+<div class="note">
+<p><code>css</code> and <code>googleFonts</code> only apply to the <code>markdown</code> source. With
+<code>html</code> you already control the whole document, so put your styles in a
+<code>&lt;style&gt;</code> tag or a <code>&lt;link&gt;</code> to a public stylesheet.</p>
+</div>
+</section>
+
+<!-- =============================================================== OUTPUT -->
+<section id="output">
+<h2>Output modes <a class="anchor" href="#output">#</a></h2>
+
+<p>The top-level <code>output</code> field decides how you get the file back.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Value</th><th>Response</th><th>Use it when</th></tr></thead>
+<tbody>
+<tr><td><code>binary</code><br><span class="muted">default</span></td><td class="wrap"><code>application/pdf</code> (or <code>image/png</code> / <code>image/jpeg</code>) bytes, with <code>Content-Disposition: attachment</code>. Metadata rides in the <code>X-PDFMint-*</code> headers.</td><td class="wrap">Almost always. No size limit, one round trip.</td></tr>
+<tr><td><code>url</code></td><td class="wrap">JSON with a temporary hosted link: <code>{ filename, pages, size, url, expires_in_minutes, duration_ms, credits_remaining }</code></td><td class="wrap">You want to email or Slack a link instead of moving bytes. Capped at <strong>20&nbsp;MB</strong> per file.</td></tr>
+<tr><td><code>base64</code></td><td class="wrap">The same JSON plus a <code>base64</code> string. <span class="muted">Not supported by <code>/v1/merge</code>.</span></td><td class="wrap">Your client cannot deal with a binary body.</td></tr>
+</tbody></table></div>
+
+<h3 id="output-hosted">Hosted files <a class="anchor" href="#output-hosted">#</a></h3>
+<p><code>expiresInMinutes</code> (alias <code>expiration</code>) controls how long the link lives:
+default <strong>60</strong> minutes, minimum 1, maximum <strong>10080</strong> (7 days). Values
+above the maximum are clamped, not rejected. Expired files are deleted, and the link then shows an
+"expired" page rather than a stale document.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"html":"&lt;h1&gt;Hosted&lt;/h1&gt;","output":"url","expiresInMinutes":15}'</code></pre>
+</div>
+<div class="code">
+<div class="cap">200 OK</div>
+<pre><code>{
+  "filename": "document.pdf",
+  "pages": 1,
+  "size": 6668,
+  "url": "https://pdfmint-b9tt.onrender.com/f/8DWbNOQ4SKr4ClZ8_36k10pM",
+  "expires_in_minutes": 15,
+  "duration_ms": 133,
+  "credits_remaining": 296
+}</code></pre>
+</div>
+
+<div class="note warn">
+<p>A generated file larger than 20&nbsp;MB cannot be hosted — <code>output: "url"</code> returns
+<code>400 file_too_large</code>. The default <code>binary</code> mode has no such limit, so switch
+to it for very large documents.</p>
+</div>
+</section>
+
+<!-- ============================================================== TIMEOUT -->
+<section id="timeout">
+<h2>Timeouts <a class="anchor" href="#timeout">#</a></h2>
+
+<p><code>timeout</code> (alias <code>timeoutMs</code>) is the whole budget for one render, in
+milliseconds: loading, waiting, and printing.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Range</th></tr></thead>
+<tbody>
+<tr><td><code>timeout</code></td><td class="t">number (ms)</td><td class="t">30000</td><td class="wrap">Minimum 1000. Anything above <strong>120000</strong> is silently clamped to 120000; anything below 1000 is rejected with <code>invalid_option</code>.</td></tr>
+</tbody></table></div>
+
+<p>Running out of budget gives <code>504 render_timeout</code>:</p>
+<div class="code">
+<div class="cap">POST /v1/pdf → 504</div>
+<pre><code>{
+  "error": {
+    "code": "render_timeout",
+    "message": "Rendering timed out while loading the URL.",
+    "hint": "Raise \"timeout\", or set waitFor to a fixed number of milliseconds instead of \"networkidle\" if the page keeps polling in the background.",
+    "docs": "https://pdfmint-b9tt.onrender.com/docs#timeout",
+    "request_id": "935b22fbab54b64f"
+  }
+}</code></pre>
+</div>
+
+<p>The commonest cause is not a slow page but <code>waitFor: "networkidle"</code> on a page that
+polls forever in the background — it can never go idle. Use a selector or a fixed number of
+milliseconds instead.</p>
+</section>
+
+<!-- ============================================================== WAITFOR -->
+<section id="waitfor">
+<h2>waitFor <a class="anchor" href="#waitfor">#</a></h2>
+
+<p>By default PDFMint already waits for the <code>load</code> event, for every declared web font to
+download, and for every <code>&lt;img&gt;</code> to finish (or fail) — up to 5&nbsp;s per image and
+8&nbsp;s for the font set. So you only need <code>waitFor</code> for content that JavaScript
+produces after that: charts, maps, tables filled by <code>fetch</code>.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Value</th><th>Behaviour</th></tr></thead>
+<tbody>
+<tr><td><code>2000</code></td><td class="wrap">A number (or a numeric string): wait that many milliseconds. Blunt, but never fails. Capped at the remaining timeout budget.</td></tr>
+<tr><td><code>"#chart-ready"</code></td><td class="wrap">Any other string is treated as a <strong>CSS selector</strong> and waited on until the element is <em>attached</em> to the DOM. This is the good one — have your chart callback append a marker element.</td></tr>
+<tr><td><code>"networkidle"</code></td><td class="wrap">Wait until there has been no network activity for 500&nbsp;ms. Convenient, but a page that polls will never reach it.</td></tr>
+<tr><td><code>"load"</code> / <code>"domcontentloaded"</code></td><td class="wrap">Wait for that lifecycle event. Rarely needed — <code>load</code> has already happened.</td></tr>
+</tbody></table></div>
+
+<p>A selector that never appears gives <code>400 wait_for_timeout</code> naming the selector, so you
+find out it was a typo instead of getting a half-drawn page:</p>
+<div class="code">
+<div class="cap">400 Bad Request</div>
+<pre><code>{
+  "error": {
+    "code": "wait_for_timeout",
+    "message": "Timed out waiting for \"#never\" to appear on the page.",
+    "hint": "Check the selector, or use a number of milliseconds instead (for example waitFor: 1000).",
+    "docs": "https://pdfmint-b9tt.onrender.com/docs#waitfor",
+    "request_id": "8c78de2a7d723752"
+  }
+}</code></pre>
+</div>
+
+<p class="muted" style="font-size:.9rem">A failed <code>waitFor</code> is a failed render, so the
+credit is refunded.</p>
+</section>
+
+<!-- ============================================================= PASSWORD -->
+<section id="password">
+<h2>Password protection <a class="anchor" href="#password">#</a></h2>
+
+<p>Set <code>password</code> and the PDF comes back encrypted with <strong>AES-256</strong>. It is
+included on every plan, free ones too.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>password</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">The <em>user</em> password: required to open the document. Setting it turns encryption on.</td></tr>
+<tr><td><code>ownerPassword</code></td><td class="t">string</td><td class="t">random</td><td class="wrap">The <em>owner</em> password, which governs permissions. If you do not set one, a random secret is generated so nobody can lift the restrictions.</td></tr>
+<tr><td><code>allowPrinting</code></td><td class="t">boolean</td><td class="t"><code>true</code></td><td class="wrap">Whether the reader may print the document.</td></tr>
+<tr><td><code>allowCopying</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Whether the reader may extract text and images.</td></tr>
+</tbody></table></div>
+
+<div class="note warn">
+<p>An encrypted PDF cannot be counted, so <code>X-PDFMint-Pages</code> is omitted and
+<code>pages</code> comes back <code>null</code> in the JSON output modes. Everything else
+(duration, credits, size) is still reported.</p>
+</div>
+
+<p>See <a href="#recipe-password">the recipe</a> for a runnable example.</p>
+</section>
+
+<!-- ================================================================== PDF -->
+<section id="pdf">
+<h2><span class="pill post">POST</span><span class="path">/v1/pdf</span> <a class="anchor" href="#pdf">#</a></h2>
+
+<p>Renders one document. Costs 1 credit. Returns the PDF bytes by default.</p>
+
+<h3 id="pdf-body">Request body <a class="anchor" href="#pdf-body">#</a></h3>
+
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>html</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Markup to render. <a href="#input">Exactly one source</a> is required.</td></tr>
+<tr><td><code>markdown</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Markdown to typeset with the <a href="#markdown">built-in print stylesheet</a>.</td></tr>
+<tr><td><code>url</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Public page to load and print. See <a href="#url">Rendering a URL</a>.</td></tr>
+<tr><td><code>template</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Name of a <a href="#templates">saved template</a>. Its stored options are merged under the ones you send here.</td></tr>
+<tr><td><code>data</code></td><td class="t">object &#124; string</td><td class="t">—</td><td class="wrap">Values for <a href="#placeholders"><code>{{placeholders}}</code></a>. A string must contain valid JSON, or you get <code>invalid_data</code>.</td></tr>
+<tr><td><code>strict</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Fail with <code>unresolved_placeholders</code> instead of rendering an unmatched placeholder empty.</td></tr>
+<tr><td><code>options</code></td><td class="t">object</td><td class="t"><code>{}</code></td><td class="wrap">Page setup — see the <a href="#options">PDF options reference</a>. If you omit this object entirely, the option names are also read from the top level of the body.</td></tr>
+<tr><td><code>output</code></td><td class="t">string</td><td class="t"><code>binary</code></td><td class="wrap"><code>binary</code>, <code>url</code> or <code>base64</code>. See <a href="#output">Output modes</a>.</td></tr>
+<tr><td><code>filename</code></td><td class="t">string</td><td class="t"><code>document.pdf</code></td><td class="wrap">Name in <code>Content-Disposition</code> and in the JSON response. <code>\ / : * ? " &lt; &gt; |</code> and newlines are replaced with <code>_</code>, the name is cut to 120 characters, and <code>.pdf</code> is appended if missing.</td></tr>
+<tr><td><code>expiresInMinutes</code></td><td class="t">number</td><td class="t">60</td><td class="wrap">Lifetime of a hosted link, 1–10080. Alias: <code>expiration</code>. Only used with <code>output: "url"</code>.</td></tr>
+<tr><td><code>timeout</code></td><td class="t">number (ms)</td><td class="t">30000</td><td class="wrap">Whole render budget, 1000–120000. Alias: <code>timeoutMs</code>. See <a href="#timeout">Timeouts</a>.</td></tr>
+<tr><td><code>waitFor</code></td><td class="t">number &#124; string</td><td class="t">—</td><td class="wrap">Milliseconds, a CSS selector, or <code>networkidle</code>. See <a href="#waitfor">waitFor</a>.</td></tr>
+<tr><td><code>javascript</code></td><td class="t">boolean</td><td class="t"><code>true</code></td><td class="wrap">Set <code>false</code> to render with JavaScript disabled — faster and safer for untrusted markup.</td></tr>
+<tr><td><code>emulateDarkMode</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Report <code>prefers-color-scheme: dark</code> to the page.</td></tr>
+<tr><td><code>headers</code></td><td class="t">object</td><td class="t">—</td><td class="wrap">Extra HTTP headers sent with every request the page makes. See <a href="#url-headers">Sending headers</a>.</td></tr>
+<tr><td><code>css</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Extra CSS. Markdown source only.</td></tr>
+<tr><td><code>googleFonts</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Google Fonts family spec. Markdown source only.</td></tr>
+<tr><td><code>metadata</code></td><td class="t">object</td><td class="t">—</td><td class="wrap">Document properties: <code>title</code>, <code>author</code>, <code>subject</code>, <code>keywords</code> (array or comma-separated string), <code>creator</code>. Producer is always set to <code>PDFMint</code>. Metadata is written best-effort — a failure here never fails the render.</td></tr>
+<tr><td><code>password</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Encrypt with AES-256. See <a href="#password">Password protection</a>.</td></tr>
+<tr><td><code>ownerPassword</code></td><td class="t">string</td><td class="t">random</td><td class="wrap">Owner password governing permissions.</td></tr>
+<tr><td><code>allowPrinting</code></td><td class="t">boolean</td><td class="t"><code>true</code></td><td class="wrap">Printing permission on an encrypted PDF.</td></tr>
+<tr><td><code>allowCopying</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Text/image extraction permission on an encrypted PDF.</td></tr>
+</tbody></table></div>
+
+<p class="muted" style="font-size:.9rem">Booleans accept real booleans and the strings/numbers
+<code>true</code>, <code>false</code>, <code>1</code>, <code>0</code>. Anything else is
+<code>invalid_option</code>. An empty string always means "not set".</p>
+
+<h3 id="pdf-response">Response <a class="anchor" href="#pdf-response">#</a></h3>
+
+<div class="tw"><table>
+<thead><tr><th>Header</th><th>When</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>X-PDFMint-Pages</code></td><td class="wrap">Unless encrypted</td><td class="wrap">Page count of the finished document</td></tr>
+<tr><td><code>X-PDFMint-Duration-Ms</code></td><td class="wrap">Always</td><td class="wrap">Server-side render time in milliseconds</td></tr>
+<tr><td><code>X-PDFMint-Credits-Remaining</code></td><td class="wrap">Always</td><td class="wrap">Credits left this month</td></tr>
+<tr><td><code>X-PDFMint-Credits-Limit</code></td><td class="wrap">Always</td><td class="wrap">Credits included in the plan</td></tr>
+<tr><td><code>X-PDFMint-Warning</code></td><td class="wrap">If anything was odd</td><td class="wrap">Non-fatal notes, joined with <code>&#124;</code> — unresolved placeholders, conflicting page-size options</td></tr>
+<tr><td><code>X-Request-Id</code></td><td class="wrap">Always, every endpoint</td><td class="wrap">Quote this if you report a problem</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============================================================== OPTIONS -->
+<section id="options">
+<h2>PDF options reference <a class="anchor" href="#options">#</a></h2>
+
+<p>Everything below goes inside <code>options</code>. (If you send no <code>options</code> object at
+all, these names are read from the top level of the body instead — handy for a quick curl.)</p>
+
+<div class="tw"><table>
+<thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>format</code></td><td class="t">string</td><td class="t"><code>A4</code></td><td class="wrap">Paper size: <code>A0</code>, <code>A1</code>, <code>A2</code>, <code>A3</code>, <code>A4</code>, <code>A5</code>, <code>A6</code>, <code>Letter</code>, <code>Legal</code>, <code>Tabloid</code>, <code>Ledger</code>. Case-insensitive. Anything else is <code>invalid_option</code>.</td></tr>
+<tr><td><code>width</code><br><code>height</code></td><td class="t">length</td><td class="t">—</td><td class="wrap">Custom page size. Both are required together, or you get <code>invalid_option</code>. If given, they override <code>format</code> and a warning says so.</td></tr>
+<tr><td><code>landscape</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Rotate the page.</td></tr>
+<tr><td><code>margin</code></td><td class="t">length &#124; object</td><td class="t"><code>0</code></td><td class="wrap">One length for all four sides, or <code>{ "top": …, "right": …, "bottom": …, "left": … }</code> — any side you leave out is <code>0</code>. The default is 0 so your own CSS decides the spacing.</td></tr>
+<tr><td><code>scale</code></td><td class="t">number</td><td class="t"><code>1</code></td><td class="wrap">Print scale, 0.1–2. Use <code>0.8</code> to fit a wide table. Outside the range: <code>invalid_option</code>.</td></tr>
+<tr><td><code>printBackground</code></td><td class="t">boolean</td><td class="t"><strong><code>true</code></strong></td><td class="wrap">Chrome omits background colours and images when printing; PDFMint turns them back on. Set <code>false</code> for the browser default.</td></tr>
+<tr><td><code>headerHtml</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Markup repeated at the top of every page. Alias: <code>headerTemplate</code>. See <a href="#options-hf">Headers and footers</a>.</td></tr>
+<tr><td><code>footerHtml</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Markup repeated at the bottom of every page. Alias: <code>footerTemplate</code>.</td></tr>
+<tr><td><code>pageNumbers</code></td><td class="t">boolean &#124; string</td><td class="t"><code>false</code></td><td class="wrap"><code>true</code> gives a centred <code>Page {page} of {total}</code> footer. A string is used as the format. Ignored if you already set <code>footerHtml</code>.</td></tr>
+<tr><td><code>pageRanges</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Keep only these pages, e.g. <code>1-3, 8</code>.</td></tr>
+<tr><td><code>mediaType</code></td><td class="t">string</td><td class="t"><code>print</code></td><td class="wrap"><code>print</code> or <code>screen</code>. Use <code>screen</code> when your CSS was written for the browser and <code>@media print</code> rules would hide things.</td></tr>
+<tr><td><code>preferCssPageSize</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Let an <code>@page { size: … }</code> rule in your CSS win over <code>format</code>. Alias: <code>preferCSSPageSize</code>.</td></tr>
+<tr><td><code>tagged</code></td><td class="t">boolean</td><td class="t"><strong><code>true</code></strong></td><td class="wrap">Emit a tagged (accessible) PDF with document structure. Set <code>false</code> for a slightly smaller file.</td></tr>
+<tr><td><code>outline</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Build a PDF bookmark outline from the document headings.</td></tr>
+</tbody></table></div>
+
+<h3 id="options-length">Lengths <a class="anchor" href="#options-length">#</a></h3>
+<p>Anywhere a length is accepted, give a number with a CSS unit — <code>px</code>, <code>in</code>,
+<code>cm</code>, <code>mm</code>, <code>pt</code> or <code>pc</code>. A bare number is read as
+pixels at 96&nbsp;dpi. Anything else (<code>"20 furlongs"</code>, <code>"2em"</code>,
+<code>"50%"</code>) is rejected with <code>invalid_option</code> rather than silently ignored.</p>
+
+<h3 id="options-hf">Headers and footers <a class="anchor" href="#options-hf">#</a></h3>
+
+<p>Chrome renders header and footer templates in a separate document with a default font-size of
+<em>zero</em> and no page padding — which is why so many PDF tools give you a blank strip where
+your header should be. PDFMint fixes both for you:</p>
+
+<ul>
+  <li>Your markup is wrapped in a container with a readable 9&nbsp;pt sans-serif at
+      <code>color:#555</code>, and <code>print-color-adjust: exact</code> so backgrounds show.
+      Styles you set on your own elements still win — they are nested inside.</li>
+  <li>The wrapper gets side padding of at least <strong>12&nbsp;mm</strong> so the header lines up
+      with the body text instead of running to the paper edge.</li>
+  <li>Chrome silently clips a header or footer that does not fit in the page margin, so PDFMint
+      raises the relevant margin to at least <strong>15&nbsp;mm</strong> when you set one. Your
+      larger margin is kept as-is.</li>
+</ul>
+
+<p>Inside a header or footer, Chrome substitutes these classes:
+<code>&lt;span class="pageNumber"&gt;</code>, <code>totalPages</code>, <code>date</code>,
+<code>title</code>, <code>url</code>. The <code>pageNumbers</code> shorthand writes them for you
+from a format string:</p>
+
+<div class="tw"><table>
+<thead><tr><th>Token in <code>pageNumbers</code></th><th>Becomes</th></tr></thead>
+<tbody>
+<tr><td><code>{page}</code></td><td>Current page number</td></tr>
+<tr><td><code>{total}</code></td><td>Total page count</td></tr>
+<tr><td><code>{date}</code></td><td>Print date</td></tr>
+<tr><td><code>{title}</code></td><td>Document title (from <code>metadata.title</code> for Markdown, or the <code>&lt;title&gt;</code> in your HTML)</td></tr>
+<tr><td><code>{url}</code></td><td>Source URL</td></tr>
+</tbody></table></div>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>"options": {
+  "margin": "18mm",
+  "pageNumbers": "Invoice 2026-014 — page {page} of {total}"
+}</code></pre>
+</div>
+</section>
+
+<!-- ================================================================ IMAGE -->
+<section id="image">
+<h2><span class="pill post">POST</span><span class="path">/v1/image</span> <a class="anchor" href="#image">#</a></h2>
+
+<p>The same renderer, screenshotted instead of printed. Costs 1 credit. Sources are
+<code>html</code>, <code>markdown</code> or <code>url</code> — a saved <code>template</code> is
+<strong>not</strong> supported here and gives <code>unsupported_source</code>. Placeholder
+<code>data</code> is not applied on this endpoint either.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>type</code></td><td class="t">string</td><td class="t"><code>png</code></td><td class="wrap"><code>png</code> or <code>jpeg</code>. Anything else is <code>invalid_option</code>.</td></tr>
+<tr><td><code>quality</code></td><td class="t">number</td><td class="t">85</td><td class="wrap">JPEG quality 1–100. Ignored for PNG.</td></tr>
+<tr><td><code>width</code></td><td class="t">number (px)</td><td class="t">1280</td><td class="wrap">Viewport width.</td></tr>
+<tr><td><code>height</code></td><td class="t">number (px)</td><td class="t">800</td><td class="wrap">Viewport height. Only bounds the image when <code>fullPage</code> is off.</td></tr>
+<tr><td><code>deviceScaleFactor</code></td><td class="t">number</td><td class="t">2</td><td class="wrap">Pixel density multiplier. <code>2</code> gives a retina-sharp image at twice the pixel dimensions.</td></tr>
+<tr><td><code>fullPage</code></td><td class="t">boolean</td><td class="t"><code>true</code></td><td class="wrap">Capture the whole scrollable page rather than just the viewport.</td></tr>
+<tr><td><code>omitBackground</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Leave the page background transparent instead of white. PNG only, in practice.</td></tr>
+<tr><td><code>filename</code></td><td class="t">string</td><td class="t"><code>image.&lt;type&gt;</code></td><td class="wrap">Same sanitising as for PDFs, but no extension is forced.</td></tr>
+<tr><td><code>output</code></td><td class="t">string</td><td class="t"><code>binary</code></td><td class="wrap"><code>binary</code>, <code>url</code> or <code>base64</code>.</td></tr>
+<tr><td><code>waitFor</code>, <code>timeout</code>, <code>javascript</code>,<br><code>css</code>, <code>googleFonts</code>, <code>expiresInMinutes</code></td><td class="t">—</td><td class="t">—</td><td class="wrap">Behave exactly as on <a href="#pdf"><code>/v1/pdf</code></a>.</td></tr>
+</tbody></table></div>
+
+<p>Responses carry <code>X-PDFMint-Duration-Ms</code> and
+<code>X-PDFMint-Credits-Remaining</code>.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/image \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "html": "&lt;div style=\"font:600 48px sans-serif;padding:60px\"&gt;Chart&lt;/div&gt;",
+        "type": "png", "width": 800, "height": 400, "fullPage": false,
+        "output": "base64"
+      }'
+
+# {"filename":"image.png","size":11234,"base64":"iVBORw0KGgo…","credits_remaining":297}</code></pre>
+</div>
+</section>
+
+<!-- ================================================================ MERGE -->
+<section id="merge">
+<h2><span class="pill post">POST</span><span class="path">/v1/merge</span> <a class="anchor" href="#merge">#</a></h2>
+
+<p>Joins 2–50 PDFs into one, in the order given. Costs 1 credit for the whole call, however many
+files go in.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>files</code></td><td class="t">array</td><td class="t">required</td><td class="wrap">2–50 entries. Each is a public <code>http(s)</code> URL string, an object <code>{"base64": "…"}</code>, or a bare base64 string. Aliases for this field: <code>urls</code>, <code>pdfs</code>.</td></tr>
+<tr><td><code>filename</code></td><td class="t">string</td><td class="t"><code>merged.pdf</code></td><td class="wrap"><code>.pdf</code> appended if missing.</td></tr>
+<tr><td><code>output</code></td><td class="t">string</td><td class="t"><code>binary</code></td><td class="wrap"><code>binary</code> or <code>url</code>. <code>base64</code> is <strong>not</strong> supported here.</td></tr>
+<tr><td><code>metadata</code></td><td class="t">object</td><td class="t">—</td><td class="wrap">Title, author, subject, keywords, creator for the merged document.</td></tr>
+<tr><td><code>expiresInMinutes</code></td><td class="t">number</td><td class="t">60</td><td class="wrap">Only with <code>output: "url"</code>.</td></tr>
+</tbody></table></div>
+
+<ul>
+  <li>URLs go through the same <a href="#url">SSRF checks</a> as a rendered URL, and each download
+      gets 30&nbsp;seconds.</li>
+  <li>A download that fails or answers non-2xx gives <code>download_failed</code>, naming the index:
+      <code>files[0]</code>.</li>
+  <li>An entry that is not a readable PDF gives <code>invalid_pdf</code> naming the position — the
+      usual cause is a URL that returned an HTML error page.</li>
+  <li>Encrypted inputs are read where possible, but a password-protected file may still fail.</li>
+</ul>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/merge \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "files": [
+          "https://pdfmint-b9tt.onrender.com/f/z0n9ZTZvZHU-ilHOnqaUdxt-",
+          "https://pdfmint-b9tt.onrender.com/f/E_Sd_aR-C-ZEoW1CJ_GbFP7X"
+        ],
+        "filename": "contract.pdf",
+        "output": "url"
+      }'</code></pre>
+</div>
+<div class="code">
+<div class="cap">200 OK</div>
+<pre><code>{
+  "filename": "contract.pdf",
+  "pages": 2,
+  "size": 10140,
+  "url": "https://pdfmint-b9tt.onrender.com/f/e4AJQ048aQPLrLc5chiZsvIO",
+  "expires_in_minutes": 60,
+  "credits_remaining": 290
+}</code></pre>
+</div>
+</section>
+
+<!-- =================================================================== ME -->
+<section id="me">
+<h2><span class="pill get">GET</span><span class="path">/v1/me</span> <a class="anchor" href="#me">#</a></h2>
+
+<p>Plan and quota for the key you authenticated with. Free — it costs no credits, which is why it
+doubles as the credential test.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>email</code></td><td class="t">string</td><td class="wrap">Account the key belongs to</td></tr>
+<tr><td><code>plan</code></td><td class="t">string</td><td class="wrap"><code>free</code>, <code>starter</code>, <code>pro</code> or <code>scale</code></td></tr>
+<tr><td><code>plan_name</code></td><td class="t">string</td><td class="wrap">Human-readable plan name</td></tr>
+<tr><td><code>credits_limit</code></td><td class="t">number</td><td class="wrap">Documents included this month</td></tr>
+<tr><td><code>credits_used</code></td><td class="t">number</td><td class="wrap">Documents used so far this month</td></tr>
+<tr><td><code>credits_remaining</code></td><td class="t">number</td><td class="wrap">What is left, never below 0</td></tr>
+<tr><td><code>period_resets_at</code></td><td class="t">string</td><td class="wrap">ISO 8601 UTC instant when the counter goes back to zero</td></tr>
+<tr><td><code>dashboard_url</code></td><td class="t">string</td><td class="wrap">Link to the account dashboard</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============================================================ TEMPLATES -->
+<section id="templates">
+<h2><span class="path">/v1/templates</span> <a class="anchor" href="#templates">#</a></h2>
+
+<p>Templates are optional. They exist so you can keep a piece of HTML on your account and render it
+by <strong>name</strong> — not by an opaque id you have to copy out of a web app. You never need
+one: sending <code>html</code> or <code>markdown</code> directly works just as well.</p>
+
+<p>Template names match <code>^[A-Za-z0-9][A-Za-z0-9 _.-]{0,63}$</code> — 1–64 characters, starting
+with a letter or digit, then letters, digits, spaces, dots, dashes and underscores. Anything else
+gives <code>invalid_template_name</code>. All template endpoints are free.</p>
+
+<h3 id="templates-put"><span class="pill put">PUT</span><span class="path">/v1/templates/{name}</span> <a class="anchor" href="#templates-put">#</a></h3>
+<p>Creates or replaces a template. Body: <code>html</code> (required) and an optional
+<code>options</code> object, which is validated immediately — a bad option is rejected now rather
+than at render time. When you later render the template, options you send on the render request
+override the stored ones.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X PUT https://pdfmint-b9tt.onrender.com/v1/templates/invoice \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "html": "&lt;h1&gt;Invoice {{number}}&lt;/h1&gt;&lt;p&gt;For {{customer.name}}&lt;/p&gt;",
+        "options": { "format": "A4", "margin": "18mm" }
+      }'
+
+# {"template":{"name":"invoice","updated_at":"2026-08-23T14:57:06.125Z"},
+#  "usage":{"template":"invoice","data":{"example":"value"}}}</code></pre>
+</div>
+
+<h3 id="templates-render">Rendering one <a class="anchor" href="#templates-render">#</a></h3>
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "template": "invoice",
+        "data": { "number": "2026-014", "customer": { "name": "Acme GmbH" } },
+        "output": "base64"
+      }'
+
+# {"filename":"document.pdf","pages":1,"size":13997,
+#  "duration_ms":64,"credits_remaining":295,"base64":"JVBERi0…"}</code></pre>
+</div>
+
+<h3 id="templates-list"><span class="pill get">GET</span><span class="path">/v1/templates</span> <a class="anchor" href="#templates-list">#</a></h3>
+<p>Lists every template on the account, alphabetically. This is what fills the template dropdown in
+the n8n node.</p>
+<div class="code">
+<pre><code>{"templates":[{"name":"invoice","options":{"format":"A4","margin":"18mm"},
+               "html_bytes":55,"updated_at":"2026-08-23T14:57:06.125Z"}]}</code></pre>
+</div>
+
+<h3 id="templates-get"><span class="pill get">GET</span><span class="path">/v1/templates/{name}</span> <a class="anchor" href="#templates-get">#</a></h3>
+<p>Returns <code>{ name, html, options, updated_at }</code> — the full body included. Unknown name:
+<code>400 template_not_found</code>.</p>
+
+<h3 id="templates-delete"><span class="pill del">DELETE</span><span class="path">/v1/templates/{name}</span> <a class="anchor" href="#templates-delete">#</a></h3>
+<p>Returns <code>{"deleted":"invoice"}</code>. Unknown name: <code>400 template_not_found</code>.</p>
+
+<div class="note">
+<p>When you render a template that does not exist, the error lists the templates you
+<em>do</em> have — so a typo is obvious from the response alone.</p>
+</div>
+</section>
+
+<!-- ================================================================= MISC -->
+<section id="misc">
+<h2>Hosted files &amp; health <a class="anchor" href="#misc">#</a></h2>
+
+<p><span class="pill get">GET</span><span class="path">/f/{token}</span> — serves a file created by
+<code>output: "url"</code>. No authentication: the token is the secret. Served inline with
+<code>Cache-Control: private, max-age=300</code>. After expiry the file is deleted and the link
+shows an "expired" page.</p>
+
+<p><span class="pill get">GET</span><span class="path">/healthz</span> — no authentication, no
+credits. <code>{"ok":true,"active":0,"queued":0}</code>: how many renders are running and how many
+are queued behind them right now.</p>
+</section>
+
+<!-- ============================================================== RECIPES -->
+<section id="recipes">
+<h2>Recipes <a class="anchor" href="#recipes">#</a></h2>
+<p>Every one of these was executed against the live API while writing this page. Set
+<code>PDFMINT_API_KEY</code> and paste.</p>
+
+<h3 id="recipe-invoice">An invoice with a line-item table and page numbers <a class="anchor" href="#recipe-invoice">#</a></h3>
+<p>The pattern: a <code>{{#lines}}</code> section for the rows, <code>tr { break-inside: avoid }</code>
+so no row is cut in half by a page break, and <code>pageNumbers</code> with a custom format so a
+multi-page invoice is still identifiable page by page.</p>
+
+<div class="code">
+<div class="cap">invoice.json</div>
+<button class="copy" type="button">Copy</button>
+<pre><code>{
+  "html": "&lt;style&gt;body{font:13px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a}h1{font-size:26px;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:18px}th{text-align:left;border-bottom:2px solid #12a37a;padding:8px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}td{padding:8px 6px;border-bottom:1px solid #e3e6ec}tr{break-inside:avoid}.r{text-align:right}tfoot td{font-weight:700;border-bottom:0;border-top:2px solid #12a37a}&lt;/style&gt;&lt;h1&gt;Invoice {{number}}&lt;/h1&gt;&lt;p&gt;{{customer.name}} &amp;middot; {{date}}&lt;/p&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Description&lt;/th&gt;&lt;th class=r&gt;Qty&lt;/th&gt;&lt;th class=r&gt;Unit&lt;/th&gt;&lt;th class=r&gt;Amount&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;{{#lines}}&lt;tr&gt;&lt;td&gt;{{desc}}&lt;/td&gt;&lt;td class=r&gt;{{qty}}&lt;/td&gt;&lt;td class=r&gt;{{unit}}&lt;/td&gt;&lt;td class=r&gt;{{amount}}&lt;/td&gt;&lt;/tr&gt;{{/lines}}&lt;/tbody&gt;&lt;tfoot&gt;&lt;tr&gt;&lt;td colspan=3 class=r&gt;Total&lt;/td&gt;&lt;td class=r&gt;{{total}}&lt;/td&gt;&lt;/tr&gt;&lt;/tfoot&gt;&lt;/table&gt;",
+  "data": {
+    "number": "2026-014",
+    "date": "23 August 2026",
+    "customer": { "name": "Acme GmbH" },
+    "lines": [
+      { "desc": "Design retainer", "qty": 1,  "unit": "€2,400.00", "amount": "€2,400.00" },
+      { "desc": "Implementation",  "qty": 12, "unit": "€150.00",   "amount": "€1,800.00" }
+    ],
+    "total": "€4,200.00"
+  },
+  "filename": "invoice-2026-014.pdf",
+  "options": {
+    "format": "A4",
+    "margin": "18mm",
+    "pageNumbers": "Invoice 2026-014 — page {page} of {total}"
+  },
+  "metadata": { "title": "Invoice 2026-014", "author": "Acme GmbH" }
+}</code></pre>
+</div>
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @invoice.json \
+  -o invoice.pdf -D - | grep -i x-pdfmint
+
+# x-pdfmint-pages: 1
+# x-pdfmint-duration-ms: 168
+# x-pdfmint-credits-remaining: 288</code></pre>
+</div>
+
+<h3 id="recipe-markdown">A report straight from LLM output <a class="anchor" href="#recipe-markdown">#</a></h3>
+<p>An LLM emits Markdown. Send it as-is — no HTML templating step, no CSS. The
+<a href="#markdown">built-in stylesheet</a> keeps table rows and headings intact across page
+breaks.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "markdown": "# Quarterly Report\n\nRevenue grew **18%**.\n\n| Region | Revenue |\n|---|---|\n| EMEA | 1.2M |\n| AMER | 2.4M |\n",
+        "output": "base64",
+        "options": { "margin": "18mm", "pageNumbers": true }
+      }'
+
+# {"filename":"document.pdf","pages":1,"size":48919,
+#  "duration_ms":256,"credits_remaining":298,"base64":"JVBERi0xLjQ…"}</code></pre>
+</div>
+<p>To brand it, add <code>googleFonts</code> and a few lines of <code>css</code> — they land after
+the built-in rules, so they win:</p>
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>"googleFonts": "Playfair Display:wght@400;700",
+"css": "h1{font-family:'Playfair Display',serif;color:#0b7a5b} h2{border-bottom-color:#12a37a}"</code></pre>
+</div>
+
+<h3 id="recipe-header">A header with a logo, and a footer with page numbers <a class="anchor" href="#recipe-header">#</a></h3>
+<p>Reference the logo by public URL (inline base64 works but bloats the request). PDFMint reserves
+the margin for you, so the header cannot be clipped — the explicit <code>28mm</code> top margin
+below simply gives it more room than the 15&nbsp;mm minimum.</p>
+
+<div class="code">
+<div class="cap">header.json</div>
+<button class="copy" type="button">Copy</button>
+<pre><code>{
+  "html": "&lt;h1&gt;Annual report&lt;/h1&gt;&lt;p&gt;Body text.&lt;/p&gt;",
+  "options": {
+    "margin": { "top": "28mm", "bottom": "20mm", "left": "18mm", "right": "18mm" },
+    "headerHtml": "&lt;div style='display:flex;justify-content:space-between;align-items:center;width:100%'&gt;&lt;img src='https://pdfmint-b9tt.onrender.com/favicon.svg' style='height:14px'&gt;&lt;span&gt;Annual report 2026&lt;/span&gt;&lt;/div&gt;",
+    "footerHtml": "&lt;div style='text-align:center;width:100%'&gt;Page &lt;span class='pageNumber'&gt;&lt;/span&gt; of &lt;span class='totalPages'&gt;&lt;/span&gt;&lt;/div&gt;"
+  }
+}</code></pre>
+</div>
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @header.json -o report.pdf -w "%{http_code}\n"
+
+# 200</code></pre>
+</div>
+<div class="note warn">
+<p>Header and footer markup is rendered by Chrome in its own little document — <strong>your page's
+stylesheet does not reach it</strong>. Style it with inline <code>style=</code> attributes, as
+above.</p>
+</div>
+
+<h3 id="recipe-breaks">Controlling page breaks with CSS <a class="anchor" href="#recipe-breaks">#</a></h3>
+<p>Page breaks are pure CSS — PDFMint has no options for them because the browser already does it
+properly. The three rules that matter:</p>
+
+<div class="tw"><table>
+<thead><tr><th>Rule</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>break-inside: avoid</code></td><td class="wrap">Keep this element on one page if it fits — cards, table rows, figures, code blocks</td></tr>
+<tr><td><code>break-after: page</code></td><td class="wrap">Start whatever comes next on a fresh page — chapters, one-invoice-per-page batches</td></tr>
+<tr><td><code>break-before: page</code></td><td class="wrap">Start <em>this</em> element on a fresh page</td></tr>
+</tbody></table></div>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "html": "&lt;style&gt;.card{break-inside:avoid;padding:12px;border:1px solid #ccc;margin:8px 0}.chapter{break-after:page}&lt;/style&gt;&lt;section class=chapter&gt;&lt;h1&gt;One&lt;/h1&gt;&lt;div class=card&gt;Kept together&lt;/div&gt;&lt;/section&gt;&lt;section&gt;&lt;h1&gt;Two&lt;/h1&gt;&lt;/section&gt;",
+        "options": { "margin": "15mm" },
+        "output": "base64"
+      }'
+
+# {"filename":"document.pdf","pages":2,"size":13990,
+#  "duration_ms":48,"credits_remaining":286}</code></pre>
+</div>
+<p>Two sections, two pages — the <code>break-after: page</code> took effect. Add
+<code>orphans: 3; widows: 3</code> on <code>p</code> to stop single lines stranding at a page
+boundary, and remember to set a <code>margin</code>: the default is <code>0</code>, and content
+that runs to the paper edge is what most "my page breaks look wrong" reports turn out to be.</p>
+
+<h3 id="recipe-chart">Waiting for a chart <a class="anchor" href="#recipe-chart">#</a></h3>
+<p>Have the drawing code append a marker element when it is done, then wait for that selector. It
+is exact, and it fails loudly with <code>wait_for_timeout</code> if the chart never renders —
+instead of handing you a blank rectangle.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "html": "&lt;div id=\"chart\"&gt;&lt;/div&gt;&lt;script&gt;setTimeout(function(){document.getElementById(\"chart\").innerHTML=\"&lt;b&gt;rendered&lt;/b&gt;\";document.body.insertAdjacentHTML(\"beforeend\",\"&lt;div id=chart-ready&gt;&lt;/div&gt;\");},800)&lt;/script&gt;",
+        "waitFor": "#chart-ready",
+        "output": "base64"
+      }'
+
+# {"filename":"document.pdf","pages":1,"size":6373,
+#  "duration_ms":1037,"credits_remaining":289}</code></pre>
+</div>
+<p>The 1037&nbsp;ms duration is the 800&nbsp;ms chart plus the render — proof the wait actually
+happened. In your own page:</p>
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>myChart.render().then(() =&gt; {
+  document.body.insertAdjacentHTML('beforeend', '&lt;div id="chart-ready"&gt;&lt;/div&gt;');
+});</code></pre>
+</div>
+
+<h3 id="recipe-password">A password-protected document <a class="anchor" href="#recipe-password">#</a></h3>
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "html": "&lt;h1&gt;Confidential&lt;/h1&gt;",
+        "password": "s3cret",
+        "allowPrinting": true,
+        "allowCopying": false
+      }' \
+  -o secret.pdf -D - | grep -i x-pdfmint
+
+# x-pdfmint-duration-ms: 71
+# x-pdfmint-credits-remaining: 293
+# (no x-pdfmint-pages — an encrypted document cannot be counted)</code></pre>
+</div>
+<p>Opening <code>secret.pdf</code> asks for <code>s3cret</code>. Printing is allowed; selecting and
+copying text is not.</p>
+
+<h3 id="recipe-merge">Merging a cover page onto a document <a class="anchor" href="#recipe-merge">#</a></h3>
+<p>Generate the parts with <code>output: "url"</code>, then hand the links to
+<a href="#merge"><code>/v1/merge</code></a>. Three calls, three credits.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>API=https://pdfmint-b9tt.onrender.com
+AUTH="Authorization: Bearer $PDFMINT_API_KEY"
+JSON="Content-Type: application/json"
+
+U1=$(curl -s -X POST $API/v1/pdf -H "$AUTH" -H "$JSON" \
+     -d '{"html":"&lt;h1&gt;Cover&lt;/h1&gt;","output":"url"}' | jq -r .url)
+U2=$(curl -s -X POST $API/v1/pdf -H "$AUTH" -H "$JSON" \
+     -d '{"html":"&lt;h1&gt;Terms&lt;/h1&gt;","output":"url"}' | jq -r .url)
+
+curl -s -X POST $API/v1/merge -H "$AUTH" -H "$JSON" \
+  -d "{\"files\":[\"$U1\",\"$U2\"],\"filename\":\"contract.pdf\",\"output\":\"url\"}"
+
+# {"filename":"contract.pdf","pages":2,"size":10140,
+#  "url":"https://pdfmint-b9tt.onrender.com/f/e4AJQ048aQPLrLc5chiZsvIO",
+#  "expires_in_minutes":60,"credits_remaining":290}</code></pre>
+</div>
+<p>If the parts are already in memory, skip the hosting step and send
+<code>{"base64": "…"}</code> entries instead.</p>
+</section>
+
+<!-- =============================================================== ERRORS -->
+<section id="errors">
+<h2>Errors <a class="anchor" href="#errors">#</a></h2>
+
+<p>Every failure has the same shape. <code>code</code> is stable and safe to branch on;
+<code>message</code> names what happened; <code>hint</code> says what to change;
+<code>docs</code> links to the section that explains it; <code>request_id</code> identifies the
+call in our logs.</p>
+
+<div class="code">
+<pre><code>{
+  "error": {
+    "code": "invalid_option",
+    "message": "\"format\" must be one of A0, A1, A2, A3, A4, A5, A6, Letter, Legal, Tabloid, Ledger — got \"A9\".",
+    "hint": "Use \"A4\" for metric paper or \"Letter\" for US paper. To use a custom size, set \"width\" and \"height\" instead of \"format\".",
+    "docs": "https://pdfmint-b9tt.onrender.com/docs#options",
+    "details": { },
+    "request_id": "2a9310a5d2dd1281"
+  }
+}</code></pre>
+</div>
+<p class="muted" style="font-size:.9rem"><code>hint</code>, <code>docs</code> and
+<code>details</code> are only present when they add something.</p>
+
+<h3 id="errors-table">Every code the API can return <a class="anchor" href="#errors-table">#</a></h3>
+
+<div class="tw"><table>
+<thead><tr><th>Code</th><th>HTTP</th><th>What it means</th><th>What to change</th></tr></thead>
+<tbody>
+
+<tr><td><code>missing_api_key</code></td><td>401</td><td class="wrap">No <code>Authorization</code> or <code>X-API-Key</code> header.</td><td class="wrap">Send <code>Authorization: Bearer pm_live_…</code>. In n8n, pick the credential on the node.</td></tr>
+<tr><td><code>invalid_api_key</code></td><td>401</td><td class="wrap">The key does not start with <code>pm_live_</code>, is unknown, or was revoked.</td><td class="wrap">Copy the current key from <a href="/dashboard">/dashboard</a>.</td></tr>
+<tr><td><code>quota_exceeded</code></td><td>402</td><td class="wrap">All documents for this month are used. <code>details</code> carries plan, used and limit.</td><td class="wrap">Wait for the 1st, or upgrade on the dashboard. See <a href="#quota">Quota</a>.</td></tr>
+
+<tr><td><code>missing_content</code></td><td>400</td><td class="wrap">No source field — or, on <code>PUT /v1/templates/{name}</code>, no <code>html</code>.</td><td class="wrap">Send one of <code>html</code>, <code>markdown</code>, <code>url</code>, <code>template</code>. See <a href="#input">Choosing an input</a>.</td></tr>
+<tr><td><code>ambiguous_content</code></td><td>400</td><td class="wrap">Two or more source fields were sent; the message names which.</td><td class="wrap">Keep one. For a template plus values, use <code>template</code> + <code>data</code>.</td></tr>
+<tr><td><code>unsupported_source</code></td><td>400</td><td class="wrap"><code>/v1/image</code> was asked to render a saved template.</td><td class="wrap">Use <code>html</code>, <code>markdown</code> or <code>url</code> on <a href="#image"><code>/v1/image</code></a>.</td></tr>
+<tr><td><code>invalid_option</code></td><td>400</td><td class="wrap">One option failed validation — an unknown <code>format</code>, <code>scale</code> outside 0.1–2, a bad length, <code>mediaType</code> other than print/screen, a non-boolean boolean, <code>output</code> outside binary/url/base64, image <code>type</code> other than png/jpeg, or <code>timeout</code> below 1000&nbsp;ms.</td><td class="wrap">The message names the field and the accepted values. See <a href="#options">PDF options</a>.</td></tr>
+<tr><td><code>invalid_data</code></td><td>400</td><td class="wrap"><code>data</code> was a string that is not valid JSON. <code>details.parse_error</code> says where.</td><td class="wrap">Send an object, or fix the JSON. In n8n use an expression such as <code>{{ $json }}</code>.</td></tr>
+<tr><td><code>unresolved_placeholders</code></td><td>400</td><td class="wrap">Only with <code>"strict": true</code>: placeholders had no value. <code>details.unresolved</code> lists them.</td><td class="wrap">Fix the spelling in <code>data</code>, or drop <code>strict</code> to render them empty with a warning. See <a href="#placeholders">Placeholders</a>.</td></tr>
+<tr><td><code>invalid_json</code></td><td>400</td><td class="wrap">The request body is not parseable JSON.</td><td class="wrap">Look for a trailing comma or an unescaped quote.</td></tr>
+
+<tr><td><code>invalid_url</code></td><td>400</td><td class="wrap">The <code>url</code> could not be parsed.</td><td class="wrap">Include the scheme: <code>https://example.com/report</code>.</td></tr>
+<tr><td><code>unsupported_url_scheme</code></td><td>400</td><td class="wrap">Not <code>http://</code> or <code>https://</code>.</td><td class="wrap"><code>file:</code>, <code>data:</code> and <code>ftp:</code> are refused — pass the content in <code>html</code>.</td></tr>
+<tr><td><code>private_address_blocked</code></td><td>400</td><td class="wrap">The URL points at localhost, a private/link-local range, or a hostname that resolves to one. See <a href="#url">Rendering a URL</a>.</td><td class="wrap">Fetch the page in your own workflow and send the markup in <code>html</code>.</td></tr>
+<tr><td><code>dns_failed</code></td><td>400</td><td class="wrap">The hostname does not resolve from our network.</td><td class="wrap">Check the spelling and that the host is publicly resolvable.</td></tr>
+<tr><td><code>url_unreachable</code></td><td>400</td><td class="wrap">DNS worked but the host refused, did not answer, or presented an invalid TLS certificate.</td><td class="wrap">Confirm the page is reachable from the public internet; otherwise send <code>html</code>.</td></tr>
+<tr><td><code>url_http_error</code></td><td>400</td><td class="wrap">The page answered HTTP 400 or above. 401/403 usually means it needs a login.</td><td class="wrap">Fetch it where you have the session and pass the markup in <code>html</code>.</td></tr>
+
+<tr><td><code>wait_for_timeout</code></td><td>400</td><td class="wrap">The <code>waitFor</code> selector never appeared. The credit is refunded.</td><td class="wrap">Check the selector, or wait a fixed number of milliseconds. See <a href="#waitfor">waitFor</a>.</td></tr>
+<tr><td><code>render_timeout</code></td><td>504</td><td class="wrap">The render ran past <code>timeout</code>. Refunded.</td><td class="wrap">Raise <code>timeout</code> (up to 120000), or replace <code>networkidle</code> with a selector.</td></tr>
+<tr><td><code>renderer_busy</code></td><td>503</td><td class="wrap">Both render slots are full and 40 jobs are already queued.</td><td class="wrap">Retry after a few seconds. In n8n, enable <em>Retry On Fail</em> on the node.</td></tr>
+<tr><td><code>renderer_crashed</code></td><td>500</td><td class="wrap">Chrome died mid-document — almost always a huge or pathological page. Refunded.</td><td class="wrap">Split the document, shrink the images, or lower <code>scale</code>.</td></tr>
+<tr><td><code>render_failed</code></td><td>500</td><td class="wrap">A rendering failure that did not match any of the specific cases above; the browser's own message is included. Refunded.</td><td class="wrap">Read the message — it names the failing resource. If it looks like ours, send us the <code>request_id</code>.</td></tr>
+
+<tr><td><code>html_too_large</code></td><td>400</td><td class="wrap">The assembled HTML is over 10&nbsp;MB.</td><td class="wrap">Inline base64 images are the usual cause. Host them and reference by URL.</td></tr>
+<tr><td><code>request_too_large</code></td><td>413</td><td class="wrap">The whole request body is over 12&nbsp;MB.</td><td class="wrap">Same fix — get the images out of the JSON.</td></tr>
+<tr><td><code>file_too_large</code></td><td>400</td><td class="wrap">The generated file is over 20&nbsp;MB, so it cannot be hosted.</td><td class="wrap">Use <code>output: "binary"</code>, which has no size limit. See <a href="#output">Output modes</a>.</td></tr>
+
+<tr><td><code>invalid_input</code></td><td>400</td><td class="wrap"><code>/v1/merge</code>: <code>files</code> is not an array of at least two entries, or an entry is neither a URL nor <code>{"base64": …}</code>.</td><td class="wrap">See <a href="#merge"><code>/v1/merge</code></a>.</td></tr>
+<tr><td><code>too_many_files</code></td><td>400</td><td class="wrap">More than 50 files in one merge.</td><td class="wrap">Merge in batches of 50, then merge the results.</td></tr>
+<tr><td><code>download_failed</code></td><td>400</td><td class="wrap">A merge input could not be downloaded, or answered non-2xx. The message names the index.</td><td class="wrap">Check that the URL is public and still alive — hosted PDFMint links expire.</td></tr>
+<tr><td><code>invalid_pdf</code></td><td>400</td><td class="wrap">A merge input is not a readable PDF. The message names its position.</td><td class="wrap">Usually the URL returned an HTML error page. Check what it actually serves.</td></tr>
+
+<tr><td><code>template_not_found</code></td><td>400</td><td class="wrap">No template with that name on this account. On a render, the hint lists the names you do have.</td><td class="wrap">Check the name, or create it with <code>PUT /v1/templates/{name}</code>.</td></tr>
+<tr><td><code>invalid_template_name</code></td><td>400</td><td class="wrap">The name does not match <code>^[A-Za-z0-9][A-Za-z0-9 _.-]{0,63}$</code>.</td><td class="wrap">1–64 characters: start with a letter or digit, then letters, digits, spaces, dot, dash, underscore.</td></tr>
+
+<tr><td><code>encryption_unavailable</code></td><td>501</td><td class="wrap">This deployment has no <code>qpdf</code>, so it cannot encrypt. Not the case on the hosted API.</td><td class="wrap">Only reachable on a self-hosted instance — install <code>qpdf</code>, or drop <code>password</code>.</td></tr>
+<tr><td><code>encryption_failed</code></td><td>500</td><td class="wrap">Encryption was attempted and failed.</td><td class="wrap">Retry; if it persists, send us the <code>request_id</code>.</td></tr>
+
+<tr><td><code>unknown_endpoint</code></td><td>404</td><td class="wrap">No such route under <code>/v1/</code>. The hint lists the real ones.</td><td class="wrap">Check method and path — e.g. <code>POST</code>, not <code>GET</code>, on <code>/v1/pdf</code>.</td></tr>
+<tr><td><code>internal_error</code></td><td>500</td><td class="wrap">An unhandled failure on our side.</td><td class="wrap">Retry. If it repeats, send us the <code>request_id</code> from the response.</td></tr>
+
+</tbody></table></div>
+
+<p class="muted" style="font-size:.9rem">Three further codes — <code>unknown_plan</code>,
+<code>no_subscription</code> and <code>billing_unavailable</code> — belong to the dashboard's
+Stripe checkout flow and are never returned by a <code>/v1/</code> endpoint.</p>
+
+<h3 id="errors-retry">What is worth retrying <a class="anchor" href="#errors-retry">#</a></h3>
+<ul>
+  <li><strong>Retry:</strong> <code>renderer_busy</code> (503), <code>internal_error</code> (500),
+      <code>render_timeout</code> (504) if you also raise <code>timeout</code>.</li>
+  <li><strong>Do not retry</strong> any 400 or 401 — the request itself needs changing; a retry
+      fails identically.</li>
+  <li><strong>402</strong> only clears on the 1st of the month, or on an upgrade.</li>
+</ul>
+</section>
+
+<!-- =============================================================== LIMITS -->
+<section id="limits">
+<h2>Limits <a class="anchor" href="#limits">#</a></h2>
+
+<div class="tw"><table>
+<thead><tr><th>Limit</th><th>Value</th><th>Exceeding it gives</th></tr></thead>
+<tbody>
+<tr><td class="wrap">Assembled HTML, per render</td><td>10&nbsp;MB</td><td><code>html_too_large</code></td></tr>
+<tr><td class="wrap">Request body</td><td>12&nbsp;MB</td><td><code>request_too_large</code></td></tr>
+<tr><td class="wrap">Hosted file size (<code>output: "url"</code>)</td><td>20&nbsp;MB</td><td><code>file_too_large</code></td></tr>
+<tr><td class="wrap">Binary output size</td><td>no limit</td><td>—</td></tr>
+<tr><td class="wrap">Render timeout, default</td><td>30&nbsp;s</td><td><code>render_timeout</code></td></tr>
+<tr><td class="wrap">Render timeout, maximum</td><td>120&nbsp;s</td><td class="wrap">higher values are clamped</td></tr>
+<tr><td class="wrap">Minimum <code>timeout</code></td><td>1000&nbsp;ms</td><td><code>invalid_option</code></td></tr>
+<tr><td class="wrap">Hosted link lifetime, default / max</td><td>60&nbsp;min / 7&nbsp;days</td><td class="wrap">out-of-range values are clamped</td></tr>
+<tr><td class="wrap">Files per merge</td><td>2–50</td><td><code>invalid_input</code> / <code>too_many_files</code></td></tr>
+<tr><td class="wrap">Per-file download during a merge</td><td>30&nbsp;s</td><td><code>download_failed</code></td></tr>
+<tr><td class="wrap">Template name</td><td>1–64 chars</td><td><code>invalid_template_name</code></td></tr>
+<tr><td class="wrap">Concurrent renders per instance</td><td>2</td><td>—</td></tr>
+<tr><td class="wrap">Render queue depth</td><td>40</td><td><code>renderer_busy</code></td></tr>
+<tr><td class="wrap">Font loading wait, before printing</td><td>8&nbsp;s</td><td class="wrap">falls back to system fonts</td></tr>
+<tr><td class="wrap">Per-image wait, before printing</td><td>5&nbsp;s</td><td class="wrap">prints without that image</td></tr>
+<tr><td class="wrap">Documents per month</td><td class="wrap">300 free · 5,000 Starter · 50,000 Pro · 250,000 Scale</td><td><code>quota_exceeded</code></td></tr>
+</tbody></table></div>
+
+<p>Two renders run at once per instance and up to 40 more can queue. <code>GET /healthz</code>
+reports both numbers live, so you can see whether a slow response is your page or the queue.</p>
+
+<p>Pages behind a login, on a VPN, or on a private IP range are not reachable — see
+<a href="#url">Rendering a URL</a> for the full list and the workaround.</p>
+</section>
+
+<!-- ================================================================== N8N -->
+<section id="n8n">
+<h2>The n8n node <a class="anchor" href="#n8n">#</a></h2>
+
+<p><code>n8n-nodes-pdfmint</code> is a thin client over this API with <strong>zero runtime
+dependencies</strong>, built and tested against n8n 2.35 on Node.js 20 and 22. It is marked
+<code>usableAsTool</code>, so an n8n AI Agent can call it directly.</p>
+
+<h3 id="n8n-install">Install <a class="anchor" href="#n8n-install">#</a></h3>
+<p><strong>n8n Cloud and self-hosted (n8n 1.x and later):</strong> Settings → Community Nodes →
+Install → <code>n8n-nodes-pdfmint</code>.</p>
+<p><strong>Self-hosted, from the CLI:</strong></p>
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>cd ~/.n8n/nodes
+npm install n8n-nodes-pdfmint</code></pre>
+</div>
+<p>Then restart n8n.</p>
+
+<h3 id="n8n-credential">Credential <a class="anchor" href="#n8n-credential">#</a></h3>
+<ol>
+  <li>Create an account at <a href="/signup">/signup</a> — the key is shown immediately.</li>
+  <li>In n8n, add a <strong>PDFMint API</strong> credential and paste the key (it starts with
+      <code>pm_live_</code>).</li>
+  <li><strong>Base URL</strong> defaults to <code>https://pdfmint-b9tt.onrender.com</code>. Change it
+      only if you run your own instance.</li>
+  <li>The credential tests itself with <code>GET /v1/me</code>, so you know immediately whether the
+      key works.</li>
+</ol>
+
+<h3 id="n8n-operations">The four operations <a class="anchor" href="#n8n-operations">#</a></h3>
+<div class="tw"><table>
+<thead><tr><th>Operation</th><th>Calls</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><strong>Generate PDF</strong></td><td><code>POST /v1/pdf</code></td><td class="wrap">Source: HTML, Markdown, URL or Saved Template. Runs once per input item.</td></tr>
+<tr><td><strong>Generate Image</strong></td><td><code>POST /v1/image</code></td><td class="wrap">PNG or JPEG. No Saved Template source.</td></tr>
+<tr><td><strong>Merge PDFs</strong></td><td><code>POST /v1/merge</code></td><td class="wrap">Runs <strong>once for the whole branch</strong>, not once per item.</td></tr>
+<tr><td><strong>Get Usage</strong></td><td><code>GET /v1/me</code></td><td class="wrap">Plan, quota and documents remaining, on <code>json</code>.</td></tr>
+</tbody></table></div>
+
+<h3 id="n8n-binary">How the file comes out <a class="anchor" href="#n8n-binary">#</a></h3>
+<p>With the default <strong>File (Binary)</strong> output, the node attaches the file to the output
+item's binary field — <code>data</code> unless you change <em>Put Output File in Field</em> — so
+Gmail, Drive, S3, Slack and HTTP Request nodes can consume it directly. No download step.</p>
+<p>Alongside it, on <code>json</code>:</p>
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>From</th></tr></thead>
+<tbody>
+<tr><td><code>fileName</code>, <code>mimeType</code>, <code>size</code></td><td class="wrap">The request and the response body</td></tr>
+<tr><td><code>pages</code></td><td><code>X-PDFMint-Pages</code></td></tr>
+<tr><td><code>durationMs</code></td><td><code>X-PDFMint-Duration-Ms</code></td></tr>
+<tr><td><code>creditsRemaining</code></td><td><code>X-PDFMint-Credits-Remaining</code></td></tr>
+<tr><td><code>warning</code></td><td class="wrap"><code>X-PDFMint-Warning</code> — present when a placeholder went unfilled</td></tr>
+</tbody></table></div>
+<p>Choose <strong>Hosted URL</strong> or <strong>Base64 in JSON</strong> instead and the item carries
+the API's JSON response with no binary attached.</p>
+
+<h3 id="n8n-merge">Merging in a workflow <a class="anchor" href="#n8n-merge">#</a></h3>
+<p><strong>All Input Items</strong> takes one PDF from the named binary field of each incoming item
+and merges them in order — so a loop that generates several documents can be joined by wiring it
+straight into this node. <strong>List of URLs</strong> takes one public PDF URL per line. If an item
+has no such binary field, the error names the fields it does have.</p>
+
+<h3 id="n8n-errors">Errors in n8n <a class="anchor" href="#n8n-errors">#</a></h3>
+<p>The node unpacks the API's error body: <code>message</code> becomes the error title, and
+<code>hint</code>, the docs link and the <code>request_id</code> become the description. So the red
+box tells you what to change instead of <code>Request failed with status code 400</code>. Turn on
+<em>Settings → Continue On Fail</em> to route failed items down the error branch instead.</p>
+
+<p class="muted" style="font-size:.9rem">Package: <a href="https://www.npmjs.com/package/n8n-nodes-pdfmint">n8n-nodes-pdfmint</a> ·
+Issues: <a href="https://github.com/fstandhartinger/n8n-nodes-pdfmint/issues">GitHub</a></p>
+</section>
+
+<p class="muted" style="margin-top:3.5rem;padding-top:1.5rem;border-top:1px solid var(--rule);font-size:.9rem">
+Something here not matching what the API does? Send us the <code>request_id</code> from the
+response — it identifies the exact call. · <a href="/">Home</a> · <a href="/dashboard">Dashboard</a>
+</p>
+
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------------------------------------------------------- copy buttons */
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.code .copy');
+    if (!btn) return;
+    var pre = btn.closest('.code').querySelector('pre');
+    if (!pre) return;
+    var text = pre.innerText;
+    var done = function () {
+      var old = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(function () { btn.textContent = old; }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else {
+      fallback(text, done);
+    }
+  });
+
+  function fallback(text, done) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (err) { /* nothing to do */ }
+    document.body.removeChild(ta);
+  }
+
+  /* ------------------------------------------------------------------ tabs */
+  document.querySelectorAll('.tabs').forEach(function (group) {
+    var buttons = Array.prototype.slice.call(group.querySelectorAll('button'));
+    group.addEventListener('click', function (e) {
+      var btn = e.target.closest('button');
+      if (!btn) return;
+      buttons.forEach(function (b) {
+        var on = b === btn;
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        var panel = document.getElementById(b.dataset.panel);
+        if (panel) panel.hidden = !on;
+      });
+    });
+  });
+
+  /* -------------------------------------------------------- mobile TOC toggle */
+  var toggle = document.getElementById('tocToggle');
+  var tocBody = document.getElementById('tocBody');
+  var mobile = window.matchMedia('(max-width: 960px)');
+
+  function syncToc() {
+    if (mobile.matches) {
+      tocBody.hidden = toggle.getAttribute('aria-expanded') !== 'true';
+    } else {
+      tocBody.hidden = false;
+    }
+  }
+  toggle.addEventListener('click', function () {
+    toggle.setAttribute('aria-expanded', toggle.getAttribute('aria-expanded') === 'true' ? 'false' : 'true');
+    syncToc();
+  });
+  tocBody.addEventListener('click', function (e) {
+    if (e.target.tagName === 'A' && mobile.matches) {
+      toggle.setAttribute('aria-expanded', 'false');
+      syncToc();
+    }
+  });
+  if (mobile.addEventListener) mobile.addEventListener('change', syncToc);
+  syncToc();
+
+  /* ---------------------------------------------------- active TOC highlight */
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  var byId = {};
+  var targets = [];
+  links.forEach(function (a) {
+    var el = document.getElementById(a.getAttribute('href').slice(1));
+    if (!el) return;
+    byId[el.id] = a;
+    targets.push(el);
+  });
+
+  var current = null;
+  function setActive(id) {
+    if (id === current) return;
+    if (current && byId[current]) byId[current].classList.remove('active');
+    current = id;
+    if (byId[id]) byId[id].classList.add('active');
+  }
+
+  if ('IntersectionObserver' in window) {
+    var visible = {};
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) visible[entry.target.id] = true;
+        else delete visible[entry.target.id];
+      });
+      for (var i = 0; i < targets.length; i++) {
+        if (visible[targets[i].id]) { setActive(targets[i].id); return; }
+      }
+    }, { rootMargin: '-70px 0px -70% 0px' });
+    targets.forEach(function (t) { io.observe(t); });
+  }
+})();
+</script>
+
+</body>
+</html>
