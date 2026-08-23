@@ -2,6 +2,7 @@
 
 const express = require('express');
 const path = require('node:path');
+const dns = require('node:dns/promises');
 const fs = require('node:fs');
 const { config, PLANS, planPriceId } = require('./config');
 const { query } = require('./db');
@@ -73,12 +74,62 @@ router.get('/login', asyncRoute(async (req, res) => {
   res.type('html').send(authForm('login', null));
 }));
 
+
+/**
+ * Refuses an address whose domain cannot receive mail at all.
+ *
+ * This does NOT verify that the mailbox exists — nothing short of sending mail
+ * can, and this service sends none. What it does close is the hole that made the
+ * free tier free to mint: signup accepted anything, so three accounts on
+ * `@example.invalid` and 900 credits took about ten seconds. A domain with no MX
+ * and no address record cannot belong to a real user.
+ *
+ * Reserved test TLDs are refused in production and allowed elsewhere, so the
+ * test suite can still sign up throwaway accounts.
+ */
+const RESERVED_TLDS = ['.test', '.invalid', '.example', '.localhost'];
+
+async function emailIsDeliverable(email) {
+  const at = email.lastIndexOf('@');
+  if (at < 1 || at === email.length - 1) return { ok: false, why: 'That does not look like an email address.' };
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  // The local part must be a single unquoted atom: no second @, no whitespace.
+  if (local.length > 64 || /[@\s]/.test(local) || /^\.|\.$|\.\./.test(local)) {
+    return { ok: false, why: 'That does not look like an email address.' };
+  }
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain)) {
+    return { ok: false, why: 'That does not look like an email address.' };
+  }
+  if (RESERVED_TLDS.some((t) => domain.endsWith(t))) {
+    return config.origin === 'production'
+      ? { ok: false, why: 'That domain is reserved for testing and cannot receive mail. Use a real address.' }
+      : { ok: true };
+  }
+  try {
+    const mx = await dns.resolveMx(domain);
+    if (mx && mx.length) return { ok: true };
+  } catch { /* fall through to the address-record check */ }
+  // RFC 5321: a domain with an address record but no MX still accepts mail.
+  try {
+    await dns.lookup(domain);
+    return { ok: true };
+  } catch {
+    return { ok: false, why: `No mail server is published for "${domain}", so that address cannot receive mail. Check the spelling.` };
+  }
+}
+
 router.post('/signup', asyncRoute(async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password || String(password).length < 8) {
     return res.status(400).type('html').send(authForm('signup', 'Enter an email address and a password of at least 8 characters.', { email }));
   }
-  const { rows } = await query(`SELECT id FROM accounts WHERE email = $1`, [String(email).trim().toLowerCase()]);
+  const normalised = String(email).trim().toLowerCase();
+  const deliverable = await emailIsDeliverable(normalised);
+  if (!deliverable.ok) {
+    return res.status(400).type('html').send(authForm('signup', deliverable.why, { email }));
+  }
+  const { rows } = await query(`SELECT id FROM accounts WHERE email = $1`, [normalised]);
   if (rows.length) {
     return res.status(409).type('html').send(authForm('signup', 'That email already has an account. Sign in instead.', { email }));
   }
