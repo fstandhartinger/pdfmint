@@ -318,6 +318,36 @@ describe('refusals', () => {
   });
 });
 
+describe('typos', () => {
+  test('an unknown field is refused, not ignored', async () => {
+    const { res, json } = await req('/v1/pdf', { method: 'POST', key, body: { html: '<p>x</p>', bogusField: 123 } });
+    assert.equal(res.status, 400);
+    assert.equal(json.error.code, 'unknown_field');
+    assert.deepEqual(json.error.details.unknown, ['bogusField']);
+  });
+
+  test('a near-miss field names the one that was probably meant', async () => {
+    const cases = [
+      ['/v1/image', { html: '<p>x</p>', format: 'jpeg' }, 'type'],
+      ['/v1/pdf', { html: '<p>x</p>', templateId: 'abc' }, 'template'],
+      ['/v1/pdf', { html: '<p>x</p>', waitUntil: 'load' }, 'waitFor'],
+      ['/v1/pdf', { html: '<p>x</p>', fileName: 'a.pdf' }, 'filename'],
+    ];
+    for (const [path, body, expected] of cases) {
+      const { res, json } = await req(path, { method: 'POST', key, body });
+      assert.equal(res.status, 400, `${path} ${JSON.stringify(body)}`);
+      assert.equal(json.error.code, 'unknown_field');
+      assert.match(json.error.hint, new RegExp(`Did you mean "${expected}"`), JSON.stringify(body));
+    }
+  });
+
+  test('a timeout above the maximum is clamped and says so', async () => {
+    const { res } = await req('/v1/pdf', { method: 'POST', key, raw: true, body: { html: '<p>x</p>', timeout: 999999 } });
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('x-pdfmint-warning') || '', /120000 ms was used/);
+  });
+});
+
 describe('quota', () => {
   test('a successful render consumes exactly one credit and a failed one consumes none', async () => {
     const { key: k2 } = await newAccount();
@@ -389,6 +419,55 @@ describe('rate limiting', () => {
     await new Promise((r) => setTimeout(r, (Number(one.headers.get('retry-after')) + 1) * 1000));
     const after = await fetch(`${require('./helpers').BASE}/v1/me`, { headers: { Authorization: `Bearer ${k}` } });
     assert.equal(after.status, 200, 'the limit must lift after Retry-After');
+  });
+});
+
+describe('webhooks', () => {
+  test('the callback is signed with the account secret and is verifiable', async () => {
+    const crypto = require('node:crypto');
+    const http = require('node:http');
+
+    const { key: k, cookie } = await newAccount();
+    const dash = await fetch(`${require('./helpers').BASE}/dashboard`, { headers: { cookie } });
+    const secret = ((await dash.text()).match(/id="whs">([0-9a-f]{32,})</) || [])[1];
+    assert.ok(secret, 'the dashboard must show the webhook signing secret');
+
+    const received = new Promise((resolve) => {
+      const server = http.createServer((rq, rs) => {
+        let raw = '';
+        rq.on('data', (c) => { raw += c; });
+        rq.on('end', () => {
+          rs.end('ok');
+          server.close();
+          resolve({ headers: rq.headers, raw });
+        });
+      });
+      server.listen(0, '127.0.0.1', () => { received.port = server.address().port; });
+    });
+    // Give the listener a moment to bind and expose its port.
+    await new Promise((r) => setTimeout(r, 300));
+    const port = received.port;
+
+    const queued = await req('/v1/pdf', {
+      method: 'POST', key: k,
+      body: { markdown: '# signed', webhookUrl: `http://127.0.0.1:${port}/hook` },
+    });
+    if (queued.res.status !== 202) {
+      // The SSRF guard refuses a loopback webhook unless the deployment allows it.
+      assert.equal(queued.json.error.code, 'private_address_blocked');
+      return;
+    }
+
+    const hit = await Promise.race([received, new Promise((r) => setTimeout(() => r(null), 45000))]);
+    assert.ok(hit, 'the webhook must be delivered');
+    const signature = hit.headers['x-pdfmint-signature'];
+    const timestamp = hit.headers['x-pdfmint-timestamp'];
+    assert.ok(signature && timestamp, 'the callback must carry a signature and a timestamp');
+
+    const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${hit.raw}`).digest('hex');
+    assert.equal(signature, expected, 'the signature must verify against the account secret');
+    assert.ok(Math.abs(Date.now() / 1000 - Number(timestamp)) < 300, 'the timestamp must be recent');
+    assert.equal(JSON.parse(hit.raw).status, 'succeeded');
   });
 });
 

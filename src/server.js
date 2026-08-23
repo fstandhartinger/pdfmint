@@ -83,8 +83,38 @@ app.use((req, res) => {
     <p class="alt"><a href="/">Home</a> · <a href="/docs">Docs</a></p></main>`));
 });
 
+/**
+ * Someone who clicked a button in a browser must get a page, not a JSON blob.
+ * The request id stays visible so support can still find the log line.
+ */
+function wantsHtml(req) {
+  if (req.path.startsWith('/v1/') || req.path.startsWith('/stripe/')) return false;
+  return (req.get('accept') || '').includes('text/html');
+}
+
+function errorPage(req, res, status, title, message, opts = {}) {
+  const rid = req.id;
+  return res.status(status).type('html').send(web.shell(title, `
+    <main class="auth">
+      <a class="logo" href="/">PDF<span>Mint</span></a>
+      <h1>${web.escape(title)}</h1>
+      <p class="sub">${web.escape(message)}</p>
+      ${opts.hint ? `<p class="sub">${web.escape(opts.hint)}</p>` : ''}
+      <p class="alt">
+        <a href="${opts.back || '/dashboard'}">${web.escape(opts.backLabel || 'Back to the dashboard')}</a>
+        &middot; <a href="/docs">Docs</a>
+        &middot; <a href="https://github.com/fstandhartinger/pdfmint/issues" rel="noopener">Report this</a>
+      </p>
+      <p class="alt" style="font-size:.8rem">Quote this if you get in touch: <code>${web.escape(rid)}</code></p>
+    </main>`));
+}
+
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
+  if (err instanceof ApiError && wantsHtml(req)) {
+    if (err.status >= 500) console.error(`[error] id=${req.id}`, err);
+    return errorPage(req, res, err.status, err.status >= 500 ? 'Something went wrong' : 'That did not work', err.message, { hint: err.hint });
+  }
   if (err instanceof ApiError) {
     const body = err.toJSON(req.id);
     if (body.error.docs && body.error.docs.startsWith('/')) body.error.docs = `${config.publicUrl}${body.error.docs}`;
@@ -109,6 +139,11 @@ app.use((err, req, res, next) => {
     } });
   }
   console.error(`[error] id=${req.id}`, err);
+  if (wantsHtml(req)) {
+    return errorPage(req, res, 500, 'Something went wrong', 'This one is on us, not on you. Nothing was charged.', {
+      hint: 'Try again in a moment. If it keeps happening, open an issue with the reference below and we can find the exact request in the log.',
+    });
+  }
   res.status(500).json({ error: {
     code: 'internal_error',
     message: 'Something went wrong on our side.',
@@ -134,7 +169,18 @@ async function main() {
   await migrate();
   startReaper();
   jobs.startJobReaper();
-  jobs.startWorker(api.runJob);
+  // A customer id stored here can stop existing in Stripe. Clear the dead ones at
+  // boot so nobody meets a 500 on the way to paying.
+  billing.healStaleCustomers().catch((e) => console.warn('[stripe] health check failed:', e.message));
+  // The queue lives in the database, so any process pointed at that database would
+  // otherwise pick up its jobs — including a developer's laptop, which would stamp
+  // its own host onto the result. Only a process that says it is the worker runs it.
+  if (process.env.JOBS_WORKER !== '0') {
+    jobs.startWorker(api.runJob);
+    console.log('[pdfmint] job worker running');
+  } else {
+    console.log('[pdfmint] job worker disabled (JOBS_WORKER=0)');
+  }
   const server = app.listen(config.port, () => {
     console.log(`[pdfmint] listening on :${config.port} (public url: ${config.publicUrl || 'not set'})`);
   });

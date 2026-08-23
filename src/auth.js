@@ -20,8 +20,8 @@ async function createAccount(email, password) {
   const hash = await bcrypt.hash(String(password), 10);
   const plan = PLANS.free;
   const { rows } = await query(
-    `INSERT INTO accounts (email, password_hash, plan, credits_limit)
-     VALUES ($1, $2, 'free', $3) RETURNING *`,
+    `INSERT INTO accounts (email, password_hash, plan, credits_limit, webhook_secret)
+     VALUES ($1, $2, 'free', $3, encode(gen_random_bytes(24), 'hex')) RETURNING *`,
     [normalised, hash, plan.credits],
   );
   const account = rows[0];
@@ -77,7 +77,7 @@ async function authenticate(req) {
   }
   if (!key.startsWith(KEY_PREFIX)) {
     throw new ApiError(401, 'invalid_api_key', 'That does not look like a PDFMint API key.', {
-      hint: 'Copy the key from your dashboard at /dashboard.',
+      hint: 'PDFMint keys start with "pm_live_". If you no longer have yours, create a new one on your dashboard at /dashboard — keys are only shown once, so an existing key cannot be read back.',
       docs: '/docs#authentication',
     });
   }
@@ -88,7 +88,7 @@ async function authenticate(req) {
   );
   if (!rows.length) {
     throw new ApiError(401, 'invalid_api_key', 'This API key is not valid, or it has been revoked.', {
-      hint: 'Check the key on your dashboard at /dashboard. If you rotated it, the old one stops working immediately.',
+      hint: 'Keys are only shown once and cannot be read back, so if you have lost it, create a new one on your dashboard at /dashboard. Revoked keys stop working immediately.',
       docs: '/docs#authentication',
     });
   }
@@ -134,6 +134,25 @@ async function createSession(accountId) {
   return id;
 }
 
+/**
+ * A freshly-minted key is handed to the dashboard once, through the session row
+ * rather than the URL. A key in a query string ends up in browser history, in
+ * Referer headers and in every proxy log between here and the user.
+ */
+const pendingKeys = new Map();
+
+function stashKeyForSession(sessionId, key) {
+  pendingKeys.set(sessionId, { key, at: Date.now() });
+  setTimeout(() => pendingKeys.delete(sessionId), 10 * 60 * 1000).unref();
+}
+
+function takeKeyForSession(sessionId) {
+  const entry = pendingKeys.get(sessionId);
+  if (!entry) return null;
+  pendingKeys.delete(sessionId);
+  return Date.now() - entry.at < 10 * 60 * 1000 ? entry.key : null;
+}
+
 async function accountForSession(sessionId) {
   if (!sessionId) return null;
   const { rows } = await query(
@@ -149,4 +168,5 @@ const destroySession = (id) => query(`DELETE FROM sessions WHERE id = $1`, [id])
 module.exports = {
   createAccount, issueApiKey, verifyLogin, authenticate, consumeCredits, refundCredits,
   createSession, accountForSession, destroySession, hashKey, newApiKey, KEY_PREFIX,
+  stashKeyForSession, takeKeyForSession,
 };

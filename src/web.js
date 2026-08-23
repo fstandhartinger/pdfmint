@@ -6,7 +6,8 @@ const fs = require('node:fs');
 const { config, PLANS, planPriceId } = require('./config');
 const { query } = require('./db');
 const bcrypt = require('bcryptjs');
-const { createAccount, verifyLogin, createSession, accountForSession, destroySession, issueApiKey } = require('./auth');
+const { createAccount, verifyLogin, createSession, accountForSession, destroySession, issueApiKey,
+        stashKeyForSession, takeKeyForSession } = require('./auth');
 const billing = require('./billing');
 const { escapeHtml } = require('./markdown');
 
@@ -23,10 +24,15 @@ function setSessionCookie(res, id) {
   });
 }
 
-async function currentAccount(req) {
+function sessionIdFrom(req) {
   const raw = req.headers.cookie || '';
   const m = new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`).exec(raw);
-  return m ? accountForSession(decodeURIComponent(m[1])) : null;
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+async function currentAccount(req) {
+  const id = sessionIdFrom(req);
+  return id ? accountForSession(id) : null;
 }
 
 function shell(title, body, opts = {}) {
@@ -77,8 +83,10 @@ router.post('/signup', asyncRoute(async (req, res) => {
     return res.status(409).type('html').send(authForm('signup', 'That email already has an account. Sign in instead.', { email }));
   }
   const { account, apiKey } = await createAccount(email, password);
-  setSessionCookie(res, await createSession(account.id));
-  res.redirect(`/dashboard?welcome=1&key=${encodeURIComponent(apiKey)}`);
+  const sessionId = await createSession(account.id);
+  setSessionCookie(res, sessionId);
+  stashKeyForSession(sessionId, apiKey);
+  res.redirect('/dashboard?welcome=1');
 }));
 
 router.post('/login', asyncRoute(async (req, res) => {
@@ -108,7 +116,8 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
     `SELECT kind, pages, duration_ms, ok, error_code, created_at FROM usage_events WHERE account_id = $1 ORDER BY created_at DESC LIMIT 10`,
     [account.id],
   );
-  const fullKey = req.query.key ? String(req.query.key) : null;
+  // Handed over through the session, never through the URL.
+  const fullKey = takeKeyForSession(sessionIdFrom(req));
   const plan = PLANS[account.plan] || PLANS.free;
   const pct = Math.min(100, Math.round((account.credits_used / Math.max(1, account.credits_limit)) * 100));
   const purchasable = Object.values(PLANS).filter((p) => planPriceId(p.id));
@@ -124,7 +133,9 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
   <section class="card">
     <h2>API key</h2>
     ${fullKey ? `<p class="keybox"><code id="k">${escapeHtml(fullKey)}</code><button class="copy" data-target="k">Copy</button></p>
-      <p class="muted">This is shown once. Store it somewhere safe.</p>` : ''}
+      <p class="muted">This is shown once and cannot be read back — not here, not by support. Store it now.
+      If you lose it, create another key below; the old one keeps working until you revoke it.</p>` : ''}
+    ${req.query.newkey && !fullKey ? '<div class="error">That key has already been shown. Create another one if you need it.</div>' : ''}
     <table class="rows">
       <tr><th>Key</th><th>Label</th><th>Created</th><th>Last used</th></tr>
       ${keys.map((k) => `<tr><td><code>${escapeHtml(k.key_prefix)}…</code></td><td>${escapeHtml(k.label)}</td>
@@ -133,6 +144,18 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
     </table>
     <form method="post" action="/dashboard/keys"><button>Create another key</button></form>
     <p class="muted">A new key does not revoke the old ones. Keys are shown once.</p>
+  </section>
+
+  <section class="card">
+    <h2>Webhook signing</h2>
+    <p class="muted">When PDFMint POSTs a finished asynchronous job to your webhook, it signs the
+      request so you can tell a real callback from anyone who has learned your URL. The headers are
+      <code>X-PDFMint-Timestamp</code>, <code>X-PDFMint-Job-Id</code> and
+      <code>X-PDFMint-Signature: sha256=&lt;hex&gt;</code>, where the signature is
+      <code>HMAC-SHA256(secret, "&lt;timestamp&gt;." + rawBody)</code>.</p>
+    <p class="keybox"><code id="whs">${escapeHtml(account.webhook_secret || '(not set)')}</code><button class="copy" data-target="whs">Copy</button></p>
+    <p class="muted">Verify it with a constant-time compare, and reject a timestamp more than five
+      minutes old. <a href="/docs#async">Worked example in the docs</a>.</p>
   </section>
 
   <section class="card">
@@ -186,7 +209,8 @@ router.post('/dashboard/keys', asyncRoute(async (req, res) => {
   const account = await currentAccount(req);
   if (!account) return res.redirect('/login');
   const key = await issueApiKey(account.id, 'n8n');
-  res.redirect(`/dashboard?key=${encodeURIComponent(key)}`);
+  stashKeyForSession(sessionIdFrom(req), key);
+  res.redirect('/dashboard?newkey=1');
 }));
 
 router.post('/dashboard/password', asyncRoute(async (req, res) => {
@@ -214,4 +238,4 @@ router.post('/dashboard/portal', asyncRoute(async (req, res) => {
   res.redirect(303, session.url);
 }));
 
-module.exports = { router, currentAccount, shell };
+module.exports = { router, currentAccount, shell, escape: escapeHtml };

@@ -62,12 +62,30 @@ async function claim() {
 
 async function deliver(job, payload) {
   if (!job.webhook_url) return;
+  const body = JSON.stringify(payload);
+
+  // Anything that learns a webhook URL could otherwise forge a "succeeded" call.
+  // The signature is HMAC-SHA256 over `timestamp.body` with the account's webhook
+  // secret, so a receiver can verify both the sender and that it is not a replay.
+  const { rows } = await query(`SELECT webhook_secret FROM accounts WHERE id = $1`, [job.account_id]).catch(() => ({ rows: [] }));
+  const secret = rows[0] && rows[0].webhook_secret;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const headers = {
+    'Content-Type': 'application/json',
+    'User-Agent': 'PDFMint-Webhook/1',
+    'X-PDFMint-Timestamp': String(timestamp),
+    'X-PDFMint-Job-Id': job.id,
+  };
+  if (secret) {
+    headers['X-PDFMint-Signature'] = `sha256=${crypto.createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex')}`;
+  }
+
   for (let attempt = 1; attempt <= MAX_WEBHOOK_ATTEMPTS; attempt += 1) {
     try {
       const res = await fetch(job.webhook_url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'User-Agent': 'PDFMint-Webhook/1' },
-        body: JSON.stringify(payload),
+        headers,
+        body,
         signal: AbortSignal.timeout(15000),
       });
       if (res.ok) {
@@ -99,7 +117,15 @@ function startWorker(runner) {
         const result = await runner(job);
         await query(`UPDATE jobs SET status = 'succeeded', result = $2, finished_at = now() WHERE id = $1`,
           [job.id, JSON.stringify(result)]);
-        await deliver(job, { job_id: job.id, status: 'succeeded', ...result });
+        // The webhook has no request to take a host from, so it uses the configured
+        // public URL. The stored path stays relative for GET /v1/jobs/{id}.
+        const { file_path: filePath, ...rest } = result;
+        await deliver(job, {
+          job_id: job.id,
+          status: 'succeeded',
+          ...rest,
+          ...(filePath ? { url: `${(config.publicUrl || '').replace(/\/$/, '')}${filePath}` } : {}),
+        });
       }
     } catch (e) {
       if (job) {

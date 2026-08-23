@@ -35,10 +35,16 @@ async function newAccount() {
     body: new URLSearchParams({ email, password: 'testpassword123' }).toString(),
     redirect: 'manual',
   });
-  const location = res.headers.get('location') || '';
-  const key = decodeURIComponent((location.match(/key=([^&]+)/) || [])[1] || '');
-  if (!key) throw new Error(`signup did not return a key (status ${res.status}, location ${location})`);
-  return { email, key };
+  const cookie = (res.headers.getSetCookie ? res.headers.getSetCookie() : [res.headers.get('set-cookie')])
+    .filter(Boolean).map((c) => c.split(';')[0]).join('; ');
+  if (!cookie) throw new Error(`signup set no session cookie (status ${res.status})`);
+
+  // The key is shown once on the dashboard and never travels in a URL.
+  const dash = await fetch(`${BASE}/dashboard`, { headers: { cookie } });
+  const html = await dash.text();
+  const key = (html.match(/pm_live_[A-Za-z0-9_-]{20,}/) || [])[0];
+  if (!key) throw new Error(`the dashboard did not show a new key (status ${dash.status})`);
+  return { email, key, cookie };
 }
 
 const isPdf = (buf) => buf.subarray(0, 5).toString('latin1') === '%PDF-';

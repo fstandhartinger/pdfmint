@@ -45,6 +45,96 @@ function pickSource(body) {
   return given[0];
 }
 
+/**
+ * An API that refuses two content fields but silently ignores a typo'd option is
+ * inconsistent, and the typo is the case that actually costs someone an hour.
+ * Unknown fields are refused, with the closest known field named.
+ */
+function levenshtein(a, b) {
+  const m = a.length; const n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i += 1) {
+    const cur = [i];
+    for (let j = 1; j <= n; j += 1) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+
+/** Confusions worth naming outright, because edit distance will never catch them. */
+const FIELD_ALIASES = {
+  format: 'type',           // /v1/image: the image format is "type"
+  imageType: 'type',
+  fileName: 'filename',
+  file_name: 'filename',
+  name: 'filename',
+  header: 'headerHtml',
+  footer: 'footerHtml',
+  waitUntil: 'waitFor',
+  wait: 'waitFor',
+  delay: 'waitFor',
+  pageNumber: 'pageNumbers',
+  paperFormat: 'format',
+  pageSize: 'format',
+  orientation: 'landscape',
+  background: 'printBackground',
+  variables: 'data',
+  context: 'data',
+  templateId: 'template',
+  template_id: 'template',
+  callback: 'webhookUrl',
+  callbackUrl: 'webhookUrl',
+  webhook: 'webhookUrl',
+  content: 'html',
+  body: 'html',
+  source: 'html',
+  encrypt: 'password',
+};
+
+function rejectUnknownFields(body, known, where) {
+  const unknown = Object.keys(body || {}).filter((k) => !known.has(k));
+  if (!unknown.length) return;
+  const field = unknown[0];
+  const lower = field.toLowerCase();
+  const alias = FIELD_ALIASES[field] && known.has(FIELD_ALIASES[field]) ? FIELD_ALIASES[field] : null;
+  const near = alias ? { k: alias } : [...known]
+    .map((k) => ({ k, d: levenshtein(lower, k.toLowerCase()) }))
+    .filter((x) => x.d <= Math.max(2, Math.floor(field.length / 3)))
+    .sort((a, b) => a.d - b.d)[0];
+  throw bad('unknown_field',
+    `"${field}" is not a field ${where} accepts${unknown.length > 1 ? ` (nor ${unknown.slice(1, 4).map((u) => `"${u}"`).join(', ')})` : ''}.`, {
+      hint: near
+        ? `Did you mean "${near.k}"?`
+        : `Accepted fields: ${[...known].sort().join(', ')}.`,
+      details: { unknown },
+      docs: '/docs#options',
+    });
+}
+
+const PDF_FIELDS = new Set([
+  'html', 'markdown', 'url', 'template', 'data', 'strict', 'options', 'output', 'filename',
+  'timeout', 'timeoutMs', 'waitFor', 'javascript', 'emulateDarkMode', 'headers', 'css',
+  'googleFonts', 'metadata', 'password', 'ownerPassword', 'allowPrinting', 'allowCopying',
+  'watermark', 'debug', 'expiresInMinutes', 'expiration', 'async', 'webhookUrl', 'webhook_url',
+  'title',
+  // page options are also accepted at the top level, not only inside "options"
+  'format', 'width', 'height', 'landscape', 'margin', 'scale', 'printBackground',
+  'headerHtml', 'footerHtml', 'headerTemplate', 'footerTemplate', 'pageNumbers', 'pageRanges',
+  'mediaType', 'preferCssPageSize', 'preferCSSPageSize', 'tagged', 'outline',
+]);
+
+const IMAGE_FIELDS = new Set([
+  'html', 'markdown', 'url', 'type', 'output', 'filename', 'quality', 'width', 'height',
+  'deviceScaleFactor', 'fullPage', 'omitBackground', 'waitFor', 'timeout', 'timeoutMs',
+  'javascript', 'css', 'googleFonts', 'expiresInMinutes',
+]);
+
+const MERGE_FIELDS = new Set(['files', 'urls', 'pdfs', 'output', 'filename', 'metadata', 'expiresInMinutes']);
+
 const OUTPUT_MODES = ['binary', 'url', 'base64'];
 function outputModeFor(body, allowed = OUTPUT_MODES) {
   const mode = String(body.output || 'binary').toLowerCase();
@@ -69,6 +159,14 @@ function timeoutFor(body) {
     });
   }
   return Math.min(n, config.maxTimeoutMs);
+}
+
+function timeoutWarning(body) {
+  const raw = Number(body.timeout ?? body.timeoutMs);
+  if (Number.isFinite(raw) && raw > config.maxTimeoutMs) {
+    return `"timeout" was ${raw} ms, above the ${config.maxTimeoutMs} ms maximum, so ${config.maxTimeoutMs} ms was used.`;
+  }
+  return null;
 }
 
 function sanitiseFilename(name, fallback) {
@@ -159,7 +257,18 @@ async function storeFile(accountId, buffer, filename, contentType, ttlMinutes) {
      VALUES ($1, $2, $3, $4, $5, $6, now() + ($7 || ' minutes')::interval)`,
     [token, accountId, filename, contentType, buffer, buffer.length, String(ttl)],
   );
-  return { token, url: `${config.publicUrl || ''}/f/${token}`, expiresInMinutes: ttl };
+  // Only the path is stored. The absolute URL is built per response from the host
+  // that is actually answering, so a link can never point at whichever instance
+  // happened to do the rendering.
+  return { token, path: `/f/${token}`, expiresInMinutes: ttl };
+}
+
+/** Turns a stored path into an absolute URL for the request currently being answered. */
+function absoluteUrl(req, pathname) {
+  if (config.publicUrl) return `${config.publicUrl}${pathname}`;
+  const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+  const host = req.get('x-forwarded-host') || req.get('host');
+  return host ? `${proto}://${host}${pathname}` : pathname;
 }
 
 function logUsage(accountId, kind, ok, extra = {}) {
@@ -195,6 +304,7 @@ router.get('/me', withAuth, asyncRoute(async (req, res) => {
  * and the async worker so both behave identically.
  */
 async function preparePdf(account, body) {
+  rejectUnknownFields(body, PDF_FIELDS, 'POST /v1/pdf');
   const source = pickSource(body);
   const timeoutMs = timeoutFor(body);
   const options = normalisePdfOptions(body.options || body);
@@ -259,6 +369,9 @@ async function preparePdf(account, body) {
     });
   }
 
+  const clamped = timeoutWarning(body);
+  if (clamped) options.warnings.push(clamped);
+
   return { html, url, options, timeoutMs, outputMode };
 }
 
@@ -306,7 +419,7 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
     return res.status(202).json({
       job_id: jobId,
       status: 'queued',
-      status_url: `${config.publicUrl || ''}/v1/jobs/${jobId}`,
+      status_url: absoluteUrl(req, `/v1/jobs/${jobId}`),
       webhook_url: webhookUrl ? String(webhookUrl) : undefined,
       credits_remaining: credits.remaining,
     });
@@ -364,7 +477,7 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
   const stored = await refundOnFailure(() => storeFile(req.account.id, buffer, filename, 'application/pdf', body.expiresInMinutes ?? body.expiration));
   return res.json({
     filename, pages, size: buffer.length,
-    url: stored.url,
+    url: absoluteUrl(req, stored.path),
     expires_in_minutes: stored.expiresInMinutes,
     duration_ms: durationMs,
     credits_remaining: credits.remaining,
@@ -374,7 +487,12 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
 }));
 
 router.get('/jobs/:id', withAuth, asyncRoute(async (req, res) => {
-  res.json(await jobs.get(req.account.id, String(req.params.id)));
+  const job = await jobs.get(req.account.id, String(req.params.id));
+  if (job.file_path) {
+    job.url = absoluteUrl(req, job.file_path);
+    delete job.file_path;
+  }
+  res.json(job);
 }));
 
 /* --------------------------------------------------------------- /v1/image */
@@ -384,6 +502,7 @@ router.post('/image', withAuth, asyncRoute(async (req, res) => {
   const source = pickSource(body);
   if (source === 'template') throw bad('unsupported_source', 'Images can be rendered from "html", "markdown" or "url", not from a saved template.', { docs: '/docs#image' });
   const timeoutMs = timeoutFor(body);
+  rejectUnknownFields(body, IMAGE_FIELDS, 'POST /v1/image');
   const imageOutputMode = outputModeFor(body);
   const type = String(body.type || 'png').toLowerCase();
   if (!['png', 'jpeg'].includes(type)) {
@@ -422,7 +541,7 @@ router.post('/image', withAuth, asyncRoute(async (req, res) => {
   res.set({ 'X-PDFMint-Duration-Ms': String(result.durationMs), 'X-PDFMint-Credits-Remaining': String(credits.remaining) });
   if (outputMode === 'url') {
     const stored = await storeFile(req.account.id, result.buffer, filename, `image/${type}`, body.expiresInMinutes);
-    return res.json({ filename, size: result.buffer.length, url: stored.url, expires_in_minutes: stored.expiresInMinutes, credits_remaining: credits.remaining });
+    return res.json({ filename, size: result.buffer.length, url: absoluteUrl(req, stored.path), expires_in_minutes: stored.expiresInMinutes, credits_remaining: credits.remaining });
   }
   if (outputMode === 'base64') {
     return res.json({ filename, size: result.buffer.length, base64: result.buffer.toString('base64'), credits_remaining: credits.remaining });
@@ -435,6 +554,7 @@ router.post('/image', withAuth, asyncRoute(async (req, res) => {
 
 router.post('/merge', withAuth, asyncRoute(async (req, res) => {
   const body = req.body || {};
+  rejectUnknownFields(body, MERGE_FIELDS, 'POST /v1/merge');
   const inputs = body.files || body.urls || body.pdfs;
   if (!Array.isArray(inputs) || inputs.length < 2) {
     throw bad('invalid_input', '"files" must be an array of at least two PDFs.', {
@@ -479,7 +599,7 @@ router.post('/merge', withAuth, asyncRoute(async (req, res) => {
   res.set({ 'X-PDFMint-Pages': String(pages), 'X-PDFMint-Credits-Remaining': String(credits.remaining) });
   if (mergeOutputMode === 'url') {
     const stored = await storeFile(req.account.id, merged, filename, 'application/pdf', body.expiresInMinutes);
-    return res.json({ filename, pages, size: merged.length, url: stored.url, expires_in_minutes: stored.expiresInMinutes, credits_remaining: credits.remaining });
+    return res.json({ filename, pages, size: merged.length, url: absoluteUrl(req, stored.path), expires_in_minutes: stored.expiresInMinutes, credits_remaining: credits.remaining });
   }
   if (mergeOutputMode === 'base64') {
     return res.json({ filename, pages, size: merged.length, base64: merged.toString('base64'), credits_remaining: credits.remaining });
@@ -566,10 +686,10 @@ async function runJob(job) {
   const stored = await storeFile(account.id, buffer, filename, 'application/pdf', body.expiresInMinutes ?? body.expiration);
   return {
     filename, pages, size: buffer.length,
-    url: stored.url,
+    file_path: stored.path,
     expires_in_minutes: stored.expiresInMinutes,
     duration_ms: durationMs,
   };
 }
 
-module.exports = { router, fillTemplate, storeFile, runJob };
+module.exports = { router, fillTemplate, storeFile, runJob, absoluteUrl };

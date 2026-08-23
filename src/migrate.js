@@ -3,6 +3,8 @@
 const { query } = require('./db');
 
 const STATEMENTS = [
+  // gen_random_bytes lives in pgcrypto; gen_random_uuid is core but this is not.
+  `CREATE EXTENSION IF NOT EXISTS pgcrypto`,
   `CREATE TABLE IF NOT EXISTS accounts (
      id             BIGSERIAL PRIMARY KEY,
      email          TEXT UNIQUE NOT NULL,
@@ -64,6 +66,8 @@ const STATEMENTS = [
      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
      expires_at  TIMESTAMPTZ NOT NULL
    )`,
+  `ALTER TABLE accounts ADD COLUMN IF NOT EXISTS webhook_secret TEXT`,
+  `UPDATE accounts SET webhook_secret = encode(gen_random_bytes(24), 'hex') WHERE webhook_secret IS NULL`,
   // Existing free accounts get the newer, larger free allowance too.
   `UPDATE accounts SET credits_limit = 300 WHERE plan = 'free' AND credits_limit = 100`,
   `CREATE TABLE IF NOT EXISTS jobs (
