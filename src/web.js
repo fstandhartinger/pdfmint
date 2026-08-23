@@ -5,6 +5,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { config, PLANS, planPriceId } = require('./config');
 const { query } = require('./db');
+const bcrypt = require('bcryptjs');
 const { createAccount, verifyLogin, createSession, accountForSession, destroySession, issueApiKey } = require('./auth');
 const billing = require('./billing');
 const { escapeHtml } = require('./markdown');
@@ -45,6 +46,7 @@ function authForm(kind, error, values = {}) {
   <a class="logo" href="/">PDF<span>Mint</span></a>
   <h1>${isSignup ? 'Create your account' : 'Sign in'}</h1>
   <p class="sub">${isSignup ? '300 documents a month, free, no card.' : 'Welcome back.'}</p>
+  ${isSignup ? '<p class="warnbox">There is no password reset yet, and no confirmation email, so nothing can be sent to you if you forget. Put the password in your password manager now.</p>' : ''}
   ${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}
   <form method="post" action="/${kind}">
     <label>Email<input type="email" name="email" required autocomplete="email" value="${escapeHtml(values.email || '')}"></label>
@@ -130,6 +132,20 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
         <td>${k.last_used_at ? new Date(k.last_used_at).toISOString().replace('T', ' ').slice(0, 16) : 'never'}</td></tr>`).join('')}
     </table>
     <form method="post" action="/dashboard/keys"><button>Create another key</button></form>
+    <p class="muted">A new key does not revoke the old ones. Keys are shown once.</p>
+  </section>
+
+  <section class="card">
+    <h2>Password</h2>
+    ${req.query.pw === 'ok' ? '<div class="notice ok">Password changed.</div>' : ''}
+    ${req.query.pw === 'wrong' ? '<div class="error">That is not your current password.</div>' : ''}
+    ${req.query.pw === 'short' ? '<div class="error">The new password must be at least 8 characters.</div>' : ''}
+    <p class="muted">There is no password reset by email &mdash; PDFMint does not send email at all. Change it here while you are signed in.</p>
+    <form method="post" action="/dashboard/password" class="inline">
+      <label>Current password<input type="password" name="current" required autocomplete="current-password"></label>
+      <label>New password<input type="password" name="next" required minlength="8" autocomplete="new-password"></label>
+      <button>Change password</button>
+    </form>
   </section>
 
   <section class="card">
@@ -171,6 +187,17 @@ router.post('/dashboard/keys', asyncRoute(async (req, res) => {
   if (!account) return res.redirect('/login');
   const key = await issueApiKey(account.id, 'n8n');
   res.redirect(`/dashboard?key=${encodeURIComponent(key)}`);
+}));
+
+router.post('/dashboard/password', asyncRoute(async (req, res) => {
+  const account = await currentAccount(req);
+  if (!account) return res.redirect('/login');
+  const { current, next } = req.body || {};
+  const ok = await bcrypt.compare(String(current || ''), account.password_hash);
+  if (!ok) return res.redirect('/dashboard?pw=wrong');
+  if (!next || String(next).length < 8) return res.redirect('/dashboard?pw=short');
+  await query(`UPDATE accounts SET password_hash = $2 WHERE id = $1`, [account.id, await bcrypt.hash(String(next), 10)]);
+  res.redirect('/dashboard?pw=ok');
 }));
 
 router.post('/dashboard/checkout', asyncRoute(async (req, res) => {

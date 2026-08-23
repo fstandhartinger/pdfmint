@@ -179,6 +179,7 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
         <p class="eyebrow">n8n community node</p>
         <h2 class="sec-title">The file comes back on the node</h2>
         <p class="lead">Install <code>n8n-nodes-pdfmint</code>, paste your API key once, and the PDF arrives as binary data on the PDFMint node itself.</p>
+        <p class="lead" style="font-size:.92rem"><strong>Not on npm yet.</strong> The node is built and running &mdash; the screenshots below are of it &mdash; but publication is waiting on an npm token, so for now only a self-hosted n8n can install it, from the <a href="https://github.com/fstandhartinger/n8n-nodes-pdfmint/releases/tag/snapshot" rel="noopener">release build</a>.</p>
         <ul class="checks">
           <li>
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -480,7 +481,7 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
       </details>
       <details>
         <summary>Where do I install the n8n node?</summary>
-        <p>In n8n, open <em>Settings &rarr; Community nodes &rarr; Install</em> and enter <code>n8n-nodes-pdfmint</code>. Add a PDFMint credential with your API key, and the node appears in the node panel. The source is on <a href="https://github.com/fstandhartinger/n8n-nodes-pdfmint" rel="noopener">GitHub</a>.</p>
+        <p>The package is <strong>not on npm yet</strong>, so <em>Settings &rarr; Community nodes &rarr; Install</em> will not find it and n8n Cloud cannot install it at all. On a self-hosted n8n, run <code>cd ~/.n8n/nodes &amp;&amp; npm install https://github.com/fstandhartinger/n8n-nodes-pdfmint/releases/download/snapshot/n8n-nodes-pdfmint-0.1.0.tgz</code> and restart. Add a PDFMint credential with your API key and the node appears in the node panel. The source is on <a href="https://github.com/fstandhartinger/n8n-nodes-pdfmint" rel="noopener">GitHub</a>.</p>
       </details>
     </div>
   </div>

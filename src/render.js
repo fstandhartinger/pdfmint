@@ -255,6 +255,12 @@ async function render(job) {
       : null;
 
     const o = job.options;
+    if (o.displayHeaderFooter) {
+      // Costs nothing when the header has no image, and this is the last point
+      // at which the header markup is still ours to change.
+      const notes = await inlineHeaderFooterImages(o);
+      if (notes.length && Array.isArray(o.warnings)) o.warnings.push(...notes);
+    }
     if (o.mediaType === 'screen') await page.emulateMedia({ media: 'screen' });
     else await page.emulateMedia({ media: 'print' });
 
@@ -287,6 +293,69 @@ async function render(job) {
     if (context) await context.close().catch(() => {});
     release();
   }
+}
+
+/* ------------------------------------------- header and footer image inlining */
+
+const MAX_INLINE_IMAGE_BYTES = 2 * 1024 * 1024;
+const IMG_SRC_RE = /(<img\b[^>]*?\bsrc\s*=\s*)(["'])(https?:\/\/[^"']+)\2/gi;
+const CSS_URL_RE = /(url\(\s*)(["']?)(https?:\/\/[^)"']+)\2(\s*\))/gi;
+
+const MIME_BY_EXT = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+  '.webp': 'image/webp', '.svg': 'image/svg+xml', '.avif': 'image/avif',
+};
+
+async function fetchAsDataUri(url) {
+  await assertPublicUrl(url, 'header/footer image');
+  const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const declared = (res.headers.get('content-type') || '').split(';')[0].trim();
+  const ext = (new URL(url).pathname.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase();
+  const type = declared.startsWith('image/') ? declared : (MIME_BY_EXT[ext] || 'application/octet-stream');
+  if (!type.startsWith('image/')) throw new Error(`not an image (${type})`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > MAX_INLINE_IMAGE_BYTES) throw new Error(`${(buf.length / 1048576).toFixed(1)} MB is over the 2 MB limit for header images`);
+  return `data:${type};base64,${buf.toString('base64')}`;
+}
+
+/**
+ * Chrome renders header and footer templates in a separate document that cannot
+ * load external resources, so <img src="https://…"> in a header silently draws
+ * nothing. This is one of the most-hit traps in headless-Chrome PDF generation.
+ * We fetch those images ourselves and inline them as data URIs, so a logo in a
+ * header behaves the way everyone expects it to.
+ */
+async function inlineHeaderFooterImages(options) {
+  const notes = [];
+  const cache = new Map();
+
+  const resolve = async (url) => {
+    if (!cache.has(url)) {
+      cache.set(url, fetchAsDataUri(url).catch((e) => {
+        notes.push(`Could not inline the header/footer image ${url}: ${String(e.message).slice(0, 120)}`);
+        return null;
+      }));
+    }
+    return cache.get(url);
+  };
+
+  const rewrite = async (html) => {
+    if (!html) return html;
+    const urls = new Set();
+    for (const m of html.matchAll(IMG_SRC_RE)) urls.add(m[3]);
+    for (const m of html.matchAll(CSS_URL_RE)) urls.add(m[3]);
+    if (!urls.size) return html;
+    const resolved = new Map();
+    await Promise.all([...urls].map(async (u) => resolved.set(u, await resolve(u))));
+    return html
+      .replace(IMG_SRC_RE, (full, head, q, url) => (resolved.get(url) ? `${head}${q}${resolved.get(url)}${q}` : full))
+      .replace(CSS_URL_RE, (full, head, q, url, tail) => (resolved.get(url) ? `${head}${q}${resolved.get(url)}${q}${tail}` : full));
+  };
+
+  options.headerTemplate = await rewrite(options.headerTemplate);
+  options.footerTemplate = await rewrite(options.footerTemplate);
+  return notes;
 }
 
 /* ------------------------------------------------------------ post-process */
@@ -431,6 +500,6 @@ async function mergePdfs(buffers) {
 
 module.exports = {
   render, warmup, closeBrowser, getBrowser,
-  applyMetadata, countPages, encrypt, mergePdfs, addWatermark, hasQpdf,
+  applyMetadata, countPages, encrypt, mergePdfs, addWatermark, hasQpdf, inlineHeaderFooterImages,
   stats, assertPublicUrl,
 };
