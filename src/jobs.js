@@ -146,10 +146,40 @@ function startWorker(runner) {
   };
   setTimeout(tick, 3000).unref();
 
-  // Anything left 'running' when the process died is retried once on boot.
-  query(`UPDATE jobs SET status = 'queued', started_at = NULL
-         WHERE status = 'running' AND started_at < now() - interval '10 minutes'`)
-    .then((r) => { if (r.rowCount) console.log(`[jobs] requeued ${r.rowCount} stalled job(s)`); })
+  // Anything left 'running' when the process died is retried ONCE, then failed.
+  //
+  // Without the attempts guard this is a crash loop: a document that exhausts
+  // the renderer's memory kills the process before any catch block runs, so the
+  // job stays 'running', gets requeued on the next boot, and takes the service
+  // down again on a timer. One caller's document then becomes everyone's outage.
+  query(`UPDATE jobs
+            SET status      = CASE WHEN attempts >= 1 THEN 'failed' ELSE 'queued' END,
+                started_at  = NULL,
+                attempts    = attempts + 1,
+                finished_at = CASE WHEN attempts >= 1 THEN now() ELSE NULL END,
+                error       = CASE WHEN attempts >= 1 THEN
+                  jsonb_build_object(
+                    'code', 'renderer_crashed',
+                    'message', 'The renderer stopped before this job finished, twice. The document is most likely too large to render.',
+                    'hint', 'Split the document, or lower the page count, and try again.')
+                  ELSE error END
+          WHERE status = 'running' AND started_at < now() - interval '10 minutes'
+          RETURNING id, status`)
+    .then(async (r) => {
+      if (!r.rowCount) return;
+      const failed = r.rows.filter((j) => j.status === 'failed');
+      // A crash kills the process before the in-flight catch can refund, so the
+      // credit is given back here instead. Without this the caller is billed for
+      // exactly the failure the docs promise is free.
+      for (const j of failed) {
+        await query(
+          `UPDATE accounts SET credits_used = GREATEST(0, credits_used - 1)
+             WHERE id = (SELECT account_id FROM jobs WHERE id = $1)`, [j.id],
+        ).catch(() => {});
+      }
+      console.log(`[jobs] recovered ${r.rowCount} stalled job(s): ${r.rowCount - failed.length} requeued, `
+        + `${failed.length} failed for good and refunded`);
+    })
     .catch(() => {});
 
   return () => { stopped = true; };

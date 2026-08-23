@@ -297,6 +297,34 @@ characters). Keys can also be created and listed on the <a href="/dashboard">das
 # {"api_key":"pm_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}</code></pre>
 </div>
 
+<p><span class="pill get">GET</span><span class="path">/v1/keys</span> lists the active keys on the
+account — prefix, label, when it was created and when it was last used. Never the key itself: it is
+stored as a hash and cannot be read back by anyone, including support.</p>
+
+<p><span class="pill del">DELETE</span><span class="path">/v1/keys/{key_prefix}</span> revokes one
+key. It stops working on the <em>very next request</em> — there is no cache to wait for — and any
+call still using it gets <code>401 invalid_api_key</code>. Use the <code>key_prefix</code> exactly
+as <code>GET /v1/keys</code> reports it. This is what to reach for the moment a key leaks: create a
+replacement, move your workflows over, then revoke the old one. The
+<a href="/dashboard">dashboard</a> has a Revoke button for the same thing.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s https://pdfmint-b9tt.onrender.com/v1/keys \
+  -H "Authorization: Bearer $PDFMINT_API_KEY"
+
+# {"keys":[{"key_prefix":"pm_live_ab12cd34","label":"n8n","created_at":"...","last_used_at":"..."}]}
+
+curl -s -X DELETE https://pdfmint-b9tt.onrender.com/v1/keys/pm_live_ab12cd34 \
+  -H "Authorization: Bearer $PDFMINT_API_KEY"
+
+# {"revoked":"pm_live_ab12cd34"}</code></pre>
+</div>
+
+<p>The account's <strong>last remaining key cannot be revoked</strong> — that would lock you out of
+your own API with no way back in — so it answers <code>409 last_key</code>. Create the replacement
+first.</p>
+
 <div class="note warn">
 <p><strong>Two failure modes to expect.</strong> No key at all gives
 <code>401 missing_api_key</code>. A key that does not start with <code>pm_live_</code>, or one that
@@ -323,7 +351,14 @@ how many pages come out. <code>GET /v1/me</code> and <code>GET /v1/templates</co
 
 <ul>
   <li>The credit is reserved <em>before</em> rendering and <strong>refunded automatically if the
-      render fails</strong>, so a broken selector or an unreachable URL does not cost you anything.</li>
+      render fails</strong>, so a broken selector, an unreachable URL or a timeout does not cost you
+      anything. One honest exception: if the renderer process is killed outright — a document large
+      enough to exhaust its memory can do this — a <em>synchronous</em> request dies with it and the
+      refund cannot run, because nothing is left to run it. Send documents that large with
+      <code>"async": true</code>: a job that dies this way is retried once, then failed with
+      <code>renderer_crashed</code> <strong>and refunded</strong> when the service comes back. If a
+      synchronous call ever costs you a credit it should not have, quote the
+      <code>request_id</code>.</li>
   <li>Every successful render returns <code>X-PDFMint-Credits-Remaining</code> and
       <code>X-PDFMint-Credits-Limit</code>. JSON output modes include
       <code>credits_remaining</code> in the body.</li>

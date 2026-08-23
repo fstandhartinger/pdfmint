@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const { config, PLANS } = require('./config');
 const { ApiError, bad } = require('./errors');
 const { query } = require('./db');
-const { authenticate, consumeCredits, refundCredits, issueApiKey } = require('./auth');
+const { authenticate, consumeCredits, refundCredits, issueApiKey, revokeApiKey } = require('./auth');
 const jobs = require('./jobs');
 const { normalisePdfOptions, asBool } = require('./options');
 const { rateLimit } = require('./ratelimit');
@@ -666,6 +666,32 @@ router.delete('/templates/:name', withAuth, asyncRoute(async (req, res) => {
 router.post('/keys', withAuth, asyncRoute(async (req, res) => {
   const key = await issueApiKey(req.account.id, String(req.body?.label || 'default').slice(0, 40));
   res.json({ api_key: key });
+}));
+
+router.get('/keys', withAuth, asyncRoute(async (req, res) => {
+  const { rows } = await query(
+    `SELECT key_prefix, label, created_at, last_used_at FROM api_keys
+     WHERE account_id = $1 AND revoked_at IS NULL ORDER BY created_at`,
+    [req.account.id],
+  );
+  res.json({ keys: rows.map((k) => ({
+    key_prefix: k.key_prefix, label: k.label,
+    created_at: k.created_at, last_used_at: k.last_used_at,
+  })) });
+}));
+
+// Revoking takes effect on the next request: authenticate() already filters on
+// revoked_at IS NULL, so there is no cache to invalidate.
+router.delete('/keys/:prefix', withAuth, asyncRoute(async (req, res) => {
+  const prefix = String(req.params.prefix || '');
+  const revoked = await revokeApiKey(req.account.id, prefix);
+  if (!revoked) {
+    throw new ApiError(404, 'key_not_found', `No active key on this account starts with "${prefix}".`, {
+      hint: 'List your keys with GET /v1/keys and use the key_prefix exactly as shown.',
+      docs: '/docs#auth-more-keys',
+    });
+  }
+  res.json({ revoked: prefix });
 }));
 
 async function runJob(job) {

@@ -38,6 +38,31 @@ async function issueApiKey(accountId, label = 'default') {
   return key;
 }
 
+/**
+ * Revokes one key by its prefix. Returns the number of keys revoked.
+ *
+ * Refuses to revoke the account's last remaining key: a key you cannot replace
+ * without one is a lockout, and the dashboard is the only other way in.
+ */
+async function revokeApiKey(accountId, keyPrefix) {
+  const { rows: live } = await query(
+    `SELECT key_prefix FROM api_keys WHERE account_id = $1 AND revoked_at IS NULL`,
+    [accountId],
+  );
+  if (live.length <= 1) {
+    throw new ApiError(409, 'last_key', 'This is the only key on the account, so revoking it would lock you out.', {
+      hint: 'Create a replacement key first, then revoke this one.',
+      docs: '/docs#auth-more-keys',
+    });
+  }
+  const { rowCount } = await query(
+    `UPDATE api_keys SET revoked_at = now()
+     WHERE account_id = $1 AND key_prefix = $2 AND revoked_at IS NULL`,
+    [accountId, keyPrefix],
+  );
+  return rowCount;
+}
+
 async function verifyLogin(email, password) {
   const { rows } = await query(`SELECT * FROM accounts WHERE email = $1`, [String(email).trim().toLowerCase()]);
   if (!rows.length) return null;
@@ -166,7 +191,7 @@ async function accountForSession(sessionId) {
 const destroySession = (id) => query(`DELETE FROM sessions WHERE id = $1`, [id]).catch(() => {});
 
 module.exports = {
-  createAccount, issueApiKey, verifyLogin, authenticate, consumeCredits, refundCredits,
+  createAccount, issueApiKey, revokeApiKey, verifyLogin, authenticate, consumeCredits, refundCredits,
   createSession, accountForSession, destroySession, hashKey, newApiKey, KEY_PREFIX,
   stashKeyForSession, takeKeyForSession,
 };

@@ -7,7 +7,7 @@ const { config, PLANS, planPriceId } = require('./config');
 const { query } = require('./db');
 const bcrypt = require('bcryptjs');
 const { createAccount, verifyLogin, createSession, accountForSession, destroySession, issueApiKey,
-        stashKeyForSession, takeKeyForSession } = require('./auth');
+        stashKeyForSession, takeKeyForSession, revokeApiKey } = require('./auth');
 const billing = require('./billing');
 const { escapeHtml } = require('./markdown');
 
@@ -137,13 +137,20 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
       If you lose it, create another key below; the old one keeps working until you revoke it.</p>` : ''}
     ${req.query.newkey && !fullKey ? '<div class="error">That key has already been shown. Create another one if you need it.</div>' : ''}
     <table class="rows">
-      <tr><th>Key</th><th>Label</th><th>Created</th><th>Last used</th></tr>
+      <tr><th>Key</th><th>Label</th><th>Created</th><th>Last used</th><th></th></tr>
       ${keys.map((k) => `<tr><td><code>${escapeHtml(k.key_prefix)}…</code></td><td>${escapeHtml(k.label)}</td>
         <td>${new Date(k.created_at).toISOString().slice(0, 10)}</td>
-        <td>${k.last_used_at ? new Date(k.last_used_at).toISOString().replace('T', ' ').slice(0, 16) : 'never'}</td></tr>`).join('')}
+        <td>${k.last_used_at ? new Date(k.last_used_at).toISOString().replace('T', ' ').slice(0, 16) : 'never'}</td>
+        <td>${keys.length > 1 ? `<form method="post" action="/dashboard/keys/revoke" class="inline"
+          onsubmit="return confirm('Revoke ${escapeHtml(k.key_prefix)}…? Anything still using this key stops working immediately.')">
+          <input type="hidden" name="prefix" value="${escapeHtml(k.key_prefix)}">
+          <button class="link danger">Revoke</button></form>` : '<span class="muted">only key</span>'}</td></tr>`).join('')}
     </table>
+    ${req.query.revoked ? `<div class="notice ok"><strong>Key revoked.</strong> ${escapeHtml(String(req.query.revoked))}… stopped working immediately.</div>` : ''}
+    ${req.query.keyerror ? `<div class="error">${escapeHtml(String(req.query.keyerror))}</div>` : ''}
     <form method="post" action="/dashboard/keys"><button>Create another key</button></form>
-    <p class="muted">A new key does not revoke the old ones. Keys are shown once.</p>
+    <p class="muted">A new key does not revoke the old ones. Keys are shown once.
+      Revoking takes effect on the very next request; you cannot revoke your last remaining key.</p>
   </section>
 
   <section class="card">
@@ -211,6 +218,19 @@ router.post('/dashboard/keys', asyncRoute(async (req, res) => {
   const key = await issueApiKey(account.id, 'n8n');
   stashKeyForSession(sessionIdFrom(req), key);
   res.redirect('/dashboard?newkey=1');
+}));
+
+router.post('/dashboard/keys/revoke', asyncRoute(async (req, res) => {
+  const account = await currentAccount(req);
+  if (!account) return res.redirect('/login');
+  const prefix = String(req.body?.prefix || '');
+  try {
+    const n = await revokeApiKey(account.id, prefix);
+    if (!n) return res.redirect('/dashboard?keyerror=' + encodeURIComponent('That key is not active on this account.'));
+    return res.redirect('/dashboard?revoked=' + encodeURIComponent(prefix));
+  } catch (e) {
+    return res.redirect('/dashboard?keyerror=' + encodeURIComponent(e.message || 'Could not revoke that key.'));
+  }
 }));
 
 router.post('/dashboard/password', asyncRoute(async (req, res) => {

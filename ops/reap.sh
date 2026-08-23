@@ -74,10 +74,10 @@ case "${1:---list}" in
 
   --local)
     echo "Removing the local n8n test containers and their data directories."
-    for c in n8n-test n8n-fresh pdfmint-mem pdfmint-h; do
+    for c in n8n-test n8n-fresh n8n-video pdfmint-mem pdfmint-h; do
       docker_rm "$c" >/dev/null && echo "  removed container $c"
     done
-    for d in /tmp/n8n-data /tmp/n8n-fresh /tmp/n8ntest /tmp/installcheck /tmp/provcheck; do
+    for d in /tmp/n8n-data /tmp/n8n-fresh /tmp/n8n-video /tmp/n8ntest /tmp/installcheck /tmp/provcheck; do
       [ -e "$d" ] && rm -rf "$d" && echo "  removed $d"
     done
     echo "done."
