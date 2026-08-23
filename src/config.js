@@ -21,6 +21,11 @@ const config = {
 
   allowPrivateNetwork: process.env.ALLOW_PRIVATE_NETWORK === '1',
 
+  // Identifies this deployment in the usage log, so the public status page can
+  // report on production alone rather than on every process sharing the database.
+  origin: process.env.PDFMINT_ORIGIN
+    || ((process.env.PUBLIC_URL || '').includes('onrender.com') ? 'production' : 'dev'),
+
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY || '',
     publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',

@@ -273,8 +273,9 @@ function absoluteUrl(req, pathname) {
 
 function logUsage(accountId, kind, ok, extra = {}) {
   query(
-    `INSERT INTO usage_events (account_id, kind, pages, duration_ms, ok, error_code) VALUES ($1,$2,$3,$4,$5,$6)`,
-    [accountId, kind, extra.pages ?? null, extra.durationMs ?? null, ok, extra.errorCode ?? null],
+    `INSERT INTO usage_events (account_id, kind, pages, duration_ms, ok, error_code, origin)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [accountId, kind, extra.pages ?? null, extra.durationMs ?? null, ok, extra.errorCode ?? null, config.origin],
   ).catch(() => {});
 }
 

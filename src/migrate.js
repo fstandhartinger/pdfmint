@@ -60,6 +60,10 @@ const STATEMENTS = [
      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
    )`,
   `CREATE INDEX IF NOT EXISTS usage_events_account_time_idx ON usage_events(account_id, created_at DESC)`,
+  // Which deployment produced the event. A developer machine shares this database,
+  // and its failures were being published on the public status page as ours.
+  `ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS origin TEXT`,
+  `CREATE INDEX IF NOT EXISTS usage_events_origin_time_idx ON usage_events(origin, created_at DESC)`,
   `CREATE TABLE IF NOT EXISTS sessions (
      id          TEXT PRIMARY KEY,
      account_id  BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
