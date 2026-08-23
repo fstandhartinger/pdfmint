@@ -63,11 +63,13 @@ function normaliseMargin(raw, field = 'margin') {
     return { top: all, right: all, bottom: all, left: all };
   }
   if (typeof raw !== 'object') throw bad('invalid_option', `"${field}" must be a length or an object with top/right/bottom/left.`);
+  // Sides the caller did not mention keep the default, so {top: '30mm'} widens
+  // the top and leaves the rest as they would have been.
   return {
-    top: asLength(raw.top, `${field}.top`) || '0',
-    right: asLength(raw.right, `${field}.right`) || '0',
-    bottom: asLength(raw.bottom, `${field}.bottom`) || '0',
-    left: asLength(raw.left, `${field}.left`) || '0',
+    top: asLength(raw.top, `${field}.top`) || DEFAULT_MARGIN,
+    right: asLength(raw.right, `${field}.right`) || DEFAULT_MARGIN,
+    bottom: asLength(raw.bottom, `${field}.bottom`) || DEFAULT_MARGIN,
+    left: asLength(raw.left, `${field}.left`) || DEFAULT_MARGIN,
   };
 }
 

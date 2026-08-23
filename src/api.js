@@ -41,6 +41,20 @@ function pickSource(body) {
   return given[0];
 }
 
+const OUTPUT_MODES = ['binary', 'url', 'base64'];
+function outputModeFor(body, allowed = OUTPUT_MODES) {
+  const mode = String(body.output || 'binary').toLowerCase();
+  if (!allowed.includes(mode)) {
+    const list = allowed.map((m) => `"${m}"`);
+    const readable = list.length > 1 ? `${list.slice(0, -1).join(', ')} or ${list[list.length - 1]}` : list[0];
+    throw bad('invalid_option', `"output" must be ${readable} — got ${JSON.stringify(body.output)}.`, {
+      hint: '"binary" returns the file itself in this response, which is what you usually want in n8n.',
+      docs: '/docs#output',
+    });
+  }
+  return mode;
+}
+
 function timeoutFor(body) {
   const raw = body.timeout ?? body.timeoutMs;
   if (raw === undefined || raw === null || raw === '') return config.defaultTimeoutMs;
@@ -180,13 +194,7 @@ async function preparePdf(account, body) {
   const source = pickSource(body);
   const timeoutMs = timeoutFor(body);
   const options = normalisePdfOptions(body.options || body);
-  const outputMode = String(body.output || 'binary').toLowerCase();
-  if (!['binary', 'url', 'base64'].includes(outputMode)) {
-    throw bad('invalid_option', `"output" must be "binary", "url" or "base64" — got ${JSON.stringify(body.output)}.`, {
-      hint: '"binary" returns the PDF bytes in this response, which is what you usually want in n8n.',
-      docs: '/docs#output',
-    });
-  }
+  const outputMode = outputModeFor(body);
 
   let html = null;
   let url = null;
@@ -310,6 +318,15 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
     logUsage(req.account.id, 'pdf', false, { errorCode: e.code });
     throw e;
   }
+  // Storing or encrypting can still fail after the render succeeded. The caller
+  // got no document either way, so the credit goes back.
+  const refundOnFailure = async (fn) => {
+    try { return await fn(); } catch (e) {
+      await refundCredits(req.account.id, 1);
+      logUsage(req.account.id, 'pdf', false, { errorCode: e.code });
+      throw e;
+    }
+  };
   const { buffer, pages, filename, durationMs, debug } = out;
   logUsage(req.account.id, 'pdf', true, { pages, durationMs });
 
@@ -340,7 +357,7 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
       base64: buffer.toString('base64'),
     });
   }
-  const stored = await storeFile(req.account.id, buffer, filename, 'application/pdf', body.expiresInMinutes ?? body.expiration);
+  const stored = await refundOnFailure(() => storeFile(req.account.id, buffer, filename, 'application/pdf', body.expiresInMinutes ?? body.expiration));
   return res.json({
     filename, pages, size: buffer.length,
     url: stored.url,
@@ -363,6 +380,7 @@ router.post('/image', withAuth, asyncRoute(async (req, res) => {
   const source = pickSource(body);
   if (source === 'template') throw bad('unsupported_source', 'Images can be rendered from "html", "markdown" or "url", not from a saved template.', { docs: '/docs#image' });
   const timeoutMs = timeoutFor(body);
+  const imageOutputMode = outputModeFor(body);
   const type = String(body.type || 'png').toLowerCase();
   if (!['png', 'jpeg'].includes(type)) {
     throw bad('invalid_option', `"type" must be "png" or "jpeg" — got ${JSON.stringify(body.type)}.`, { docs: '/docs#image' });
@@ -396,7 +414,7 @@ router.post('/image', withAuth, asyncRoute(async (req, res) => {
   }
   logUsage(req.account.id, 'image', true, { durationMs: result.durationMs });
   const filename = sanitiseFilename(body.filename, `image.${type}`);
-  const outputMode = String(body.output || 'binary').toLowerCase();
+  const outputMode = imageOutputMode;
   res.set({ 'X-PDFMint-Duration-Ms': String(result.durationMs), 'X-PDFMint-Credits-Remaining': String(credits.remaining) });
   if (outputMode === 'url') {
     const stored = await storeFile(req.account.id, result.buffer, filename, `image/${type}`, body.expiresInMinutes);
@@ -441,6 +459,7 @@ router.post('/merge', withAuth, asyncRoute(async (req, res) => {
     }
   }
 
+  const mergeOutputMode = outputModeFor(body);
   const credits = await consumeCredits(req.account.id, 1);
   let merged;
   try {
@@ -454,9 +473,12 @@ router.post('/merge', withAuth, asyncRoute(async (req, res) => {
   const filename = sanitiseFilename(body.filename, 'merged.pdf').replace(/(\.pdf)?$/i, '.pdf');
   logUsage(req.account.id, 'merge', true, { pages });
   res.set({ 'X-PDFMint-Pages': String(pages), 'X-PDFMint-Credits-Remaining': String(credits.remaining) });
-  if (String(body.output || 'binary').toLowerCase() === 'url') {
+  if (mergeOutputMode === 'url') {
     const stored = await storeFile(req.account.id, merged, filename, 'application/pdf', body.expiresInMinutes);
     return res.json({ filename, pages, size: merged.length, url: stored.url, expires_in_minutes: stored.expiresInMinutes, credits_remaining: credits.remaining });
+  }
+  if (mergeOutputMode === 'base64') {
+    return res.json({ filename, pages, size: merged.length, base64: merged.toString('base64'), credits_remaining: credits.remaining });
   }
   res.set({ 'Content-Type': 'application/pdf', 'Content-Length': String(merged.length), 'Content-Disposition': `attachment; filename="${filename}"` });
   return res.end(merged);

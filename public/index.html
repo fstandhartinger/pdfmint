@@ -500,6 +500,23 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
 
 </main>
 
+<section class="l-who">
+  <div class="wrap">
+    <h2>Who runs this, and what it is not</h2>
+    <p>PDFMint is built and run by Florian Standhartinger. It launched in August 2026, so there are
+      no customer logos and no uptime history to show you &mdash; instead there is a
+      <a href="/status">status page</a> that reads the service's own request log: documents produced,
+      success rate, median and 95th-percentile render time, and a bar per hour for the last day.
+      It also lists, in plain words, what PDFMint does not have.</p>
+    <p>There is no SLA and no SOC&nbsp;2 report. It runs as one service in Frankfurt, and a deploy
+      restarts it. Failed renders refund the credit automatically. The
+      <a href="https://github.com/fstandhartinger/pdfmint" rel="noopener">API source</a> and the
+      <a href="https://github.com/fstandhartinger/n8n-nodes-pdfmint" rel="noopener">node source</a>
+      are both public, so you can read exactly what happens to the HTML you send.
+      Problems go to <a href="https://github.com/fstandhartinger/pdfmint/issues" rel="noopener">GitHub issues</a>.</p>
+  </div>
+</section>
+
 <footer class="l-foot">
   <div class="wrap">
     <span>PDFMint &mdash; HTML, Markdown and URLs to PDF.</span>
@@ -509,6 +526,7 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
       <a href="/login">Sign in</a>
       <a href="/signup">Create account</a>
       <a href="https://github.com/fstandhartinger/n8n-nodes-pdfmint" rel="noopener">n8n node</a>
+      <a href="/status">Status</a>
     </nav>
   </div>
 </footer>

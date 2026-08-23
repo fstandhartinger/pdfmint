@@ -44,7 +44,7 @@ function authForm(kind, error, values = {}) {
 <main class="auth">
   <a class="logo" href="/">PDF<span>Mint</span></a>
   <h1>${isSignup ? 'Create your account' : 'Sign in'}</h1>
-  <p class="sub">${isSignup ? '100 documents a month, free, no card.' : 'Welcome back.'}</p>
+  <p class="sub">${isSignup ? '300 documents a month, free, no card.' : 'Welcome back.'}</p>
   ${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}
   <form method="post" action="/${kind}">
     <label>Email<input type="email" name="email" required autocomplete="email" value="${escapeHtml(values.email || '')}"></label>

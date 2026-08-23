@@ -11,6 +11,7 @@ const { migrate } = require('./migrate');
 const api = require('./api');
 const billing = require('./billing');
 const web = require('./web');
+const status = require('./status');
 const render = require('./render');
 const jobs = require('./jobs');
 
@@ -61,6 +62,7 @@ app.get('/f/:token', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+app.use('/', status.router);
 app.use('/v1', api.router);
 app.use('/', web.router);
 app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h', extensions: ['html'] }));
@@ -70,7 +72,7 @@ app.use((req, res) => {
     return res.status(404).json({ error: {
       code: 'unknown_endpoint',
       message: `There is no ${req.method} ${req.path} endpoint.`,
-      hint: 'The endpoints are POST /v1/pdf, POST /v1/image, POST /v1/merge, GET /v1/me and /v1/templates.',
+      hint: 'The endpoints are POST /v1/pdf, POST /v1/image, POST /v1/merge, GET /v1/me, GET /v1/jobs/{id}, POST /v1/keys and GET/PUT/DELETE /v1/templates.',
       docs: `${config.publicUrl}/docs`,
       request_id: req.id,
     } });

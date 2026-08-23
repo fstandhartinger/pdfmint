@@ -261,3 +261,13 @@ table.cmp thead .us{color:var(--accent-ink);background:var(--l-tint-strong)}
 .l-foot a:hover{color:var(--ink)}
 
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* "Who runs this" — the honesty block before the footer. */
+.l-who {
+  border-top: 1px solid var(--rule);
+  background: var(--panel);
+  padding: 3rem 0;
+}
+.l-who h2 { margin-top: 0; font-size: 1.15rem; }
+.l-who p { color: var(--muted); max-width: 62ch; }
+.l-who p + p { margin-bottom: 0; }
