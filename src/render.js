@@ -10,6 +10,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const { config } = require('./config');
+const { toMm, pageSizeMm, HF_PAGE_INSET_MM, HF_BODY_GAP_MM, MAX_HF_PAGE_FRACTION } = require('./options');
 const { ApiError, bad } = require('./errors');
 const { assertPublicUrl, isPrivateAddress } = require('./net');
 
@@ -35,7 +36,7 @@ const LAUNCH_ARGS = [
 async function getBrowser() {
   if (!browserPromise) {
     browserPromise = chromium.launch({ args: LAUNCH_ARGS }).then((b) => {
-      b.on('disconnected', () => { browserPromise = null; });
+      b.on('disconnected', () => { browserPromise = null; measureContextPromise = null; });
       return b;
     }).catch((e) => { browserPromise = null; throw e; });
   }
@@ -56,6 +57,7 @@ async function closeBrowser() {
   if (!browserPromise) return;
   const b = await browserPromise.catch(() => null);
   browserPromise = null;
+  measureContextPromise = null;
   if (b) await b.close().catch(() => {});
 }
 
@@ -259,6 +261,9 @@ async function render(job) {
       // Costs nothing when the header has no image, and this is the last point
       // at which the header markup is still ours to change.
       const notes = await inlineHeaderFooterImages(o);
+      // Chrome will not tell us the header did not fit, so measure it here,
+      // while the margin is still ours to change.
+      notes.push(...await reserveMarginForHeaderFooter(o));
       if (notes.length && Array.isArray(o.warnings)) o.warnings.push(...notes);
     }
     if (o.mediaType === 'screen') await page.emulateMedia({ media: 'screen' });
@@ -355,6 +360,98 @@ async function inlineHeaderFooterImages(options) {
 
   options.headerTemplate = await rewrite(options.headerTemplate);
   options.footerTemplate = await rewrite(options.footerTemplate);
+  return notes;
+}
+
+/* ------------------------------------------- header and footer margin reserve */
+
+/**
+ * A long-lived context used only for measuring header/footer fragments. It is
+ * separate from the render context because a caller may have turned JavaScript
+ * off for their own page, and measuring needs it on.
+ */
+let measureContextPromise = null;
+
+async function getMeasureContext() {
+  if (!measureContextPromise) {
+    measureContextPromise = getBrowser()
+      .then((b) => b.newContext({ javaScriptEnabled: true, bypassCSP: true, viewport: { width: 800, height: 600 } }))
+      .catch((e) => { measureContextPromise = null; throw e; });
+  }
+  return measureContextPromise;
+}
+
+/**
+ * Lays the header/footer markup out in the same Chromium that will print it,
+ * at the paper width Chrome gives it, and returns its height in millimetres.
+ * Chrome renders header and footer templates unscaled at 96 dpi across the full
+ * paper width — measured on A4, A5, Letter, landscape and at scale 0.5.
+ */
+async function measureFragmentMm(widthMm, html) {
+  const ctx = await getMeasureContext();
+  const page = await ctx.newPage();
+  try {
+    await page.setViewportSize({ width: Math.max(64, Math.round((widthMm / 25.4) * 96)), height: 600 });
+    await page.setContent(
+      '<!doctype html><html><head><meta charset="utf-8">' +
+      '<style>html{margin:0;padding:0}body{margin:0;padding:0;display:flow-root}</style>' +
+      `</head><body>${html}</body></html>`,
+      { waitUntil: 'load', timeout: 5000 },
+    );
+    const px = await page.evaluate(() => {
+      // Chrome fills these in at print time. Give them representative content so
+      // a header that wraps around a page number measures its printed height.
+      const put = (sel, text) => document.querySelectorAll(sel).forEach((el) => { if (!el.textContent) el.textContent = text; });
+      put('.pageNumber', '88'); put('.totalPages', '88'); put('.date', '31/12/2026');
+      put('.title', 'Document title'); put('.url', 'https://example.com/page');
+      return Math.max(document.body.getBoundingClientRect().height, document.body.scrollHeight);
+    });
+    return (px / 96) * 25.4;
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+/**
+ * Chrome draws the header inside the top margin and, if it does not fit, simply
+ * prints it over the first lines of the body — no error, no clipping, nothing in
+ * the response to tell you. So we measure the header before printing and widen
+ * the margin to fit it. A header that wants more than a third of the page is not
+ * given it: it gets a third, and the caller gets a warning saying so.
+ *
+ * Mutates `options.margin` and returns any warnings.
+ */
+async function reserveMarginForHeaderFooter(options) {
+  const notes = [];
+  const { widthMm, heightMm } = pageSizeMm(options);
+  const capMm = heightMm * MAX_HF_PAGE_FRACTION;
+
+  for (const [side, what, tpl, present] of [
+    ['top', 'header', options.headerTemplate, options.hasHeader],
+    ['bottom', 'footer', options.footerTemplate, options.hasFooter],
+  ]) {
+    if (!present || !tpl) continue;
+    let fragmentMm;
+    try {
+      fragmentMm = await measureFragmentMm(widthMm, tpl);
+    } catch {
+      continue; // never fail a render because the measurement did not work
+    }
+    if (!Number.isFinite(fragmentMm) || fragmentMm <= 0) continue;
+    const needMm = HF_PAGE_INSET_MM + fragmentMm + HF_BODY_GAP_MM;
+    const haveMm = toMm(options.margin[side]);
+    if (needMm <= haveMm) continue;
+    const grownMm = Math.min(needMm, capMm);
+    if (grownMm > haveMm) options.margin[side] = `${grownMm.toFixed(2)}mm`;
+    const finalMm = Math.max(haveMm, grownMm);
+    if (needMm > finalMm) {
+      notes.push(
+        `The ${what} needs ${needMm.toFixed(0)} mm but a ${what} may not take more than a third of the page, ` +
+        `so ${finalMm.toFixed(0)} mm was reserved and the rest will print over the body. ` +
+        `Shorten the ${what}, or set "margin.${side}" yourself.`,
+      );
+    }
+  }
   return notes;
 }
 
@@ -501,5 +598,6 @@ async function mergePdfs(buffers) {
 module.exports = {
   render, warmup, closeBrowser, getBrowser,
   applyMetadata, countPages, encrypt, mergePdfs, addWatermark, hasQpdf, inlineHeaderFooterImages,
+  reserveMarginForHeaderFooter, measureFragmentMm,
   stats, assertPublicUrl,
 };

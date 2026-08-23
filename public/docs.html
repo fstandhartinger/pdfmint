@@ -472,15 +472,32 @@ that render — the page itself and its subresources. Use it for an API token or
 <section id="markdown">
 <h2>Markdown styling <a class="anchor" href="#markdown">#</a></h2>
 
-<p>When you send <code>markdown</code>, PDFMint parses it as GitHub-flavoured Markdown (tables,
-fenced code, task lists; a single newline is <em>not</em> a line break) and wraps it in a print
-stylesheet built for paper. You write no CSS and still get a finished document:</p>
+<p>When you send <code>markdown</code>, PDFMint parses it as GitHub-flavoured Markdown — tables
+with <code>|---:|</code> column alignment, fenced code, task lists, strikethrough and autolinks; a
+single newline is <em>not</em> a line break — and wraps it in a print stylesheet built for paper.
+GitHub's later extensions are <strong>not</strong> implemented: footnotes (<code>[^1]</code>), alert
+blockquotes (<code>&gt; [!NOTE]</code>) and <code>:emoji:</code> shortcodes all come through as
+literal text, and a footnote definition short enough to look like a link definition turns the marker
+into a broken link. If you need footnotes, write that part as <code>html</code>. Everything that
+<em>is</em> supported needs no CSS from you:</p>
 
 <ul>
   <li>11&nbsp;pt body text at 1.6 line height, Inter for prose and JetBrains Mono for code — both
       installed in the render container, so nothing waits on a font download.</li>
   <li><strong>Table headers repeat on every page</strong> (<code>thead { display: table-header-group }</code>)
-      and <strong>no row is split across a page break</strong> (<code>tr { break-inside: avoid }</code>).</li>
+      — up to a limit that is Chromium's, not ours. A <code>&lt;thead&gt;</code> taller than
+      <strong>a quarter of the page's text area</strong> is drawn on the first page only, and every
+      page after it gets no column names at all; no CSS turns that back on. On A4 with the default
+      12&nbsp;mm margins the ceiling is 258&nbsp;px, about 68&nbsp;mm — measured, not guessed. A
+      Markdown table has a single header row, so you only reach it if a header cell wraps to eleven
+      lines or more. In hand-written <code>html</code> a multi-row <code>&lt;thead&gt;</code> gets
+      there easily: keep it under a quarter of the page, or repeat the column names yourself.</li>
+  <li><strong>No row is split across a page break</strong> (<code>tr { break-inside: avoid }</code>)
+      — a row that will not fit moves to the next page whole. The one exception is a row taller than
+      the page itself, which has to break somewhere.</li>
+  <li><strong>Column alignment is honoured.</strong> <code>|---:|</code> right-aligns a column and
+      <code>|:---:|</code> centres it, so a money column lines up on the right instead of being
+      flattened to the left by the built-in table rules.</li>
   <li><strong>Headings never orphan</strong> at the foot of a page
       (<code>break-after: avoid</code> on every heading level).</li>
   <li><strong>Code blocks wrap instead of clipping</strong> (<code>white-space: pre-wrap</code>) and
@@ -1022,9 +1039,16 @@ your header should be. PDFMint fixes both for you:</p>
       Styles you set on your own elements still win — they are nested inside.</li>
   <li>The wrapper gets side padding of at least <strong>12&nbsp;mm</strong> so the header lines up
       with the body text instead of running to the paper edge.</li>
-  <li>Chrome silently clips a header or footer that does not fit in the page margin, so PDFMint
-      raises the relevant margin to at least <strong>15&nbsp;mm</strong> when you set one. Your
-      larger margin is kept as-is.</li>
+  <li>Chrome draws the header inside the top margin and, when it does not fit, prints it straight
+      over your first lines of body text — no error, nothing in the response to tell you. So PDFMint
+      lays your header out in the same Chromium <em>before</em> printing, measures how tall it
+      actually comes out, and reserves a margin that fits it: at least <strong>15&nbsp;mm</strong>,
+      and more when the header needs more. A larger margin you set yourself is never reduced. The
+      footer and the bottom margin are handled the same way.</li>
+  <li>A header or footer is never given more than <strong>a third of the page</strong>. One that
+      wants more gets a third, and the response carries an <code>X-PDFMint-Warning</code> naming the
+      height it needed, the height it got, and the fact that the rest will print over the body.
+      Shorten it, or set the margin yourself.</li>
 </ul>
 
 <p>Inside a header or footer, Chrome substitutes these classes:
@@ -1262,12 +1286,22 @@ are queued behind them right now.</p>
 <p>The pattern: a <code>{{#lines}}</code> section for the rows, <code>tr { break-inside: avoid }</code>
 so no row is cut in half by a page break, and <code>pageNumbers</code> with a custom format so a
 multi-page invoice is still identifiable page by page.</p>
+<div class="note">
+<p><strong>Note the <code>tfoot { display: table-row-group }</code>.</strong> Chromium
+repeats a <code>&lt;tfoot&gt;</code> on <em>every</em> page, exactly as it repeats a
+<code>&lt;thead&gt;</code>. Without that one rule an invoice long enough to run to three pages
+prints its grand total three times — once at the foot of each page, mid-way through the line items
+— and the customer reading it cannot tell which one is the amount due. The rule puts the total back
+in document order, so it prints once, after the last line item. Verified with this exact recipe and
+60 line items: three pages, and the word <code>Total</code> and the grand-total figure each appear
+exactly once in the whole document.</p>
+</div>
 
 <div class="code">
 <div class="cap">invoice.json</div>
 <button class="copy" type="button">Copy</button>
 <pre><code>{
-  "html": "&lt;style&gt;body{font:13px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a}h1{font-size:26px;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:18px}th{text-align:left;border-bottom:2px solid #12a37a;padding:8px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}td{padding:8px 6px;border-bottom:1px solid #e3e6ec}tr{break-inside:avoid}.r{text-align:right}tfoot td{font-weight:700;border-bottom:0;border-top:2px solid #12a37a}&lt;/style&gt;&lt;h1&gt;Invoice {{number}}&lt;/h1&gt;&lt;p&gt;{{customer.name}} &amp;middot; {{date}}&lt;/p&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Description&lt;/th&gt;&lt;th class=r&gt;Qty&lt;/th&gt;&lt;th class=r&gt;Unit&lt;/th&gt;&lt;th class=r&gt;Amount&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;{{#lines}}&lt;tr&gt;&lt;td&gt;{{desc}}&lt;/td&gt;&lt;td class=r&gt;{{qty}}&lt;/td&gt;&lt;td class=r&gt;{{unit}}&lt;/td&gt;&lt;td class=r&gt;{{amount}}&lt;/td&gt;&lt;/tr&gt;{{/lines}}&lt;/tbody&gt;&lt;tfoot&gt;&lt;tr&gt;&lt;td colspan=3 class=r&gt;Total&lt;/td&gt;&lt;td class=r&gt;{{total}}&lt;/td&gt;&lt;/tr&gt;&lt;/tfoot&gt;&lt;/table&gt;",
+  "html": "&lt;style&gt;body{font:13px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#1a1a1a}h1{font-size:26px;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:18px}th{text-align:left;border-bottom:2px solid #12a37a;padding:8px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}td{padding:8px 6px;border-bottom:1px solid #e3e6ec}tr{break-inside:avoid}.r{text-align:right}tfoot{display:table-row-group}tfoot td{font-weight:700;border-bottom:0;border-top:2px solid #12a37a}&lt;/style&gt;&lt;h1&gt;Invoice {{number}}&lt;/h1&gt;&lt;p&gt;{{customer.name}} &amp;middot; {{date}}&lt;/p&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Description&lt;/th&gt;&lt;th class=r&gt;Qty&lt;/th&gt;&lt;th class=r&gt;Unit&lt;/th&gt;&lt;th class=r&gt;Amount&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;{{#lines}}&lt;tr&gt;&lt;td&gt;{{desc}}&lt;/td&gt;&lt;td class=r&gt;{{qty}}&lt;/td&gt;&lt;td class=r&gt;{{unit}}&lt;/td&gt;&lt;td class=r&gt;{{amount}}&lt;/td&gt;&lt;/tr&gt;{{/lines}}&lt;/tbody&gt;&lt;tfoot&gt;&lt;tr&gt;&lt;td colspan=3 class=r&gt;Total&lt;/td&gt;&lt;td class=r&gt;{{total}}&lt;/td&gt;&lt;/tr&gt;&lt;/tfoot&gt;&lt;/table&gt;",
   "data": {
     "number": "2026-014",
     "date": "23 August 2026",
@@ -1328,9 +1362,10 @@ the built-in rules, so they win:</p>
 </div>
 
 <h3 id="recipe-header">A header with a logo, and a footer with page numbers <a class="anchor" href="#recipe-header">#</a></h3>
-<p>Reference the logo by public URL (inline base64 works but bloats the request). PDFMint reserves
-the margin for you, so the header cannot be clipped — the explicit <code>28mm</code> top margin
-below simply gives it more room than the 15&nbsp;mm minimum.</p>
+<p>Reference the logo by public URL (inline base64 works but bloats the request). PDFMint measures
+the header in the renderer and reserves a top margin tall enough for it, so it is neither clipped nor
+printed over your first paragraph — you can leave <code>margin.top</code> out entirely. The explicit
+<code>28mm</code> below simply gives the header more room than it needs.</p>
 
 <div class="code">
 <div class="cap">header.json</div>

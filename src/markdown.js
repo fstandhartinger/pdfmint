@@ -39,6 +39,12 @@ table { border-collapse:collapse; width:100%; font-size:.95em; break-inside:auto
 thead { display:table-header-group; }
 tr { break-inside:avoid; page-break-inside:avoid; }
 th, td { border:1px solid var(--rule); padding:.45em .6em; text-align:left; vertical-align:top; }
+/* GFM column alignment (|---:|) reaches us as the presentational align
+   attribute, which any author text-align — including the line above — beats.
+   Without these three rules every right-aligned money column prints left. */
+th[align="left"], td[align="left"] { text-align:left; }
+th[align="center"], td[align="center"] { text-align:center; }
+th[align="right"], td[align="right"] { text-align:right; }
 th { background:#f0f2f5; font-weight:600; }
 tbody tr:nth-child(even) td { background:#fafbfc; }
 /* GitHub task lists: marked emits <ul><li><input type=checkbox>. Without this a

@@ -38,6 +38,30 @@ function toMm(len) {
   }
 }
 
+/**
+ * Chrome's paper sizes, in inches, exactly as Playwright passes them on. Used
+ * to work out how much room a header can be given before it eats the document.
+ */
+const PAGE_SIZES_IN = {
+  A0: [33.1, 46.8], A1: [23.4, 33.1], A2: [16.54, 23.4], A3: [11.7, 16.54],
+  A4: [8.27, 11.7], A5: [5.83, 8.27], A6: [4.13, 5.83],
+  Letter: [8.5, 11], Legal: [8.5, 14], Tabloid: [11, 17], Ledger: [17, 11],
+};
+
+/** The paper size a set of normalised options will actually print at, in mm. */
+function pageSizeMm(o = {}) {
+  let w;
+  let h;
+  if (o.width && o.height) {
+    w = toMm(o.width); h = toMm(o.height);
+  } else {
+    const [win, hin] = PAGE_SIZES_IN[o.format] || PAGE_SIZES_IN.A4;
+    w = win * 25.4; h = hin * 25.4;
+  }
+  if (o.landscape) { const t = w; w = h; h = t; }
+  return { widthMm: w, heightMm: h };
+}
+
 function asBool(value, field, dflt) {
   if (value === undefined || value === null || value === '') return dflt;
   if (typeof value === 'boolean') return value;
@@ -102,8 +126,23 @@ function pageNumberTemplate(spec) {
   return `<div style="width:100%;text-align:center;">${body}</div>`;
 }
 
-/** Chrome silently clips header/footer that does not fit in the page margin. */
+/**
+ * Chrome silently clips a header/footer that does not fit in the page margin,
+ * and just as silently lets one that is taller than the margin print straight
+ * over the body text. 15 mm is the floor; render.js measures the header in the
+ * same Chromium and grows the margin further when it needs more than this.
+ */
 const MIN_HF_MARGIN_MM = 15;
+/**
+ * Measured, not guessed: Chrome insets the header and footer boxes this far
+ * from the paper edge, on every format, orientation and print scale we tested.
+ */
+const HF_PAGE_INSET_MM = 5.3;
+/** Breathing room kept between the header and the first line of body text. */
+const HF_BODY_GAP_MM = 2;
+/** A header may never be given more than this fraction of the page. */
+const MAX_HF_PAGE_FRACTION = 1 / 3;
+
 function ensureRoomFor(margin, side) {
   if (toMm(margin[side]) < MIN_HF_MARGIN_MM) margin[side] = `${MIN_HF_MARGIN_MM}mm`;
 }
@@ -147,6 +186,8 @@ function normalisePdfOptions(input = {}) {
   if (o.pageNumbers) footerHtml = footerHtml || pageNumberTemplate(o.pageNumbers === true ? null : o.pageNumbers);
 
   const displayHeaderFooter = Boolean(headerHtml || footerHtml);
+  const hasHeader = Boolean(headerHtml);
+  const hasFooter = Boolean(footerHtml);
   if (displayHeaderFooter) {
     if (headerHtml) ensureRoomFor(margin, 'top'); else headerHtml = '<span></span>';
     if (footerHtml) ensureRoomFor(margin, 'bottom'); else footerHtml = '<span></span>';
@@ -172,6 +213,8 @@ function normalisePdfOptions(input = {}) {
     scale,
     printBackground: asBool(o.printBackground, 'printBackground', true),
     displayHeaderFooter,
+    hasHeader,
+    hasFooter,
     headerTemplate: displayHeaderFooter ? headerHtml : undefined,
     footerTemplate: displayHeaderFooter ? footerHtml : undefined,
     preferCSSPageSize: asBool(o.preferCssPageSize ?? o.preferCSSPageSize, 'preferCssPageSize', false),
@@ -183,4 +226,7 @@ function normalisePdfOptions(input = {}) {
   };
 }
 
-module.exports = { normalisePdfOptions, normaliseMargin, asLength, asBool, toMm, FORMATS, DEFAULT_MARGIN };
+module.exports = {
+  normalisePdfOptions, normaliseMargin, asLength, asBool, toMm, pageSizeMm,
+  FORMATS, DEFAULT_MARGIN, MIN_HF_MARGIN_MM, HF_PAGE_INSET_MM, HF_BODY_GAP_MM, MAX_HF_PAGE_FRACTION,
+};
