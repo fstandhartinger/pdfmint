@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy policy — PDFMint</title>
+<meta name="description" content="What PDFMint stores, for how long, and who else touches it. Written from the code, not from a template.">
+<meta name="robots" content="index,follow">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/docs.css">
+<style>
+  .legal { max-width: 820px; margin: 0 auto; padding: 48px 24px 96px; }
+  .legal h1 { font-size: 40px; letter-spacing: -.02em; margin: 0 0 8px; }
+  .legal .sub { color: var(--mut, #6b7280); margin: 0 0 40px; }
+  .legal h2 { font-size: 24px; margin: 40px 0 12px; }
+  .legal h3 { font-size: 18px; margin: 28px 0 8px; }
+  .legal p, .legal li { line-height: 1.65; }
+  .legal table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 15px; }
+  .legal th, .legal td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #e3e6ec; vertical-align: top; }
+  .legal th { background: #f6f8fa; font-weight: 600; }
+  .legal code { font-family: 'JetBrains Mono', monospace; font-size: .9em; }
+  .legal .box { border: 1px solid #e3e6ec; border-left: 3px solid #12a37a; border-radius: 8px; padding: 14px 18px; margin: 22px 0; background: #fafcfb; }
+  .legal .todo { border-left-color: #d97706; background: #fffbf5; }
+  .legal a { color: #12a37a; }
+  .legal .foot { margin-top: 56px; padding-top: 20px; border-top: 1px solid #e3e6ec; font-size: 14px; color: #6b7280; }
+</style>
+</head>
+<body>
+<main class="legal">
+
+<h1>Privacy policy</h1>
+<p class="sub">What PDFMint stores, for how long, and who else touches it.
+  This was written from the database schema and the code that deletes things, not from a template.</p>
+
+<div class="box todo">
+  <p><strong>Operator details are not yet filled in.</strong> The controller block below is incomplete
+  until the responsible person's name and postal address are entered. Until then this document
+  describes the system accurately but is not a complete GDPR Art. 13 notice.</p>
+</div>
+
+<h2>1. Controller</h2>
+<p>The controller for the processing described here is:</p>
+<table>
+  <tr><th>Name</th><td>&lt;operator name&gt;</td></tr>
+  <tr><th>Address</th><td>&lt;street, postcode, city, country&gt;</td></tr>
+  <tr><th>Email</th><td>&lt;contact email&gt;</td></tr>
+</table>
+<p>See also the <a href="/legal">imprint</a>.</p>
+
+<h2>2. What is stored, and for how long</h2>
+<p>Everything below is in one PostgreSQL database. There is no analytics product, no advertising
+  network, no tracking pixel and no third-party script on this site other than the Google Fonts
+  stylesheet used for typography.</p>
+
+<table>
+  <tr><th>Data</th><th>Why</th><th>Kept for</th></tr>
+  <tr>
+    <td>Email address, password hash</td>
+    <td>To let you sign in and to identify your account. The password is stored only as a bcrypt hash; the password itself is never written down.</td>
+    <td>Until you ask for the account to be deleted.</td>
+  </tr>
+  <tr>
+    <td>API keys</td>
+    <td>Stored only as a SHA-256 hash plus the first 16 characters, so a key can be recognised and listed but never read back — not by support, not by the operator.</td>
+    <td>Until revoked; revoked keys keep a timestamp.</td>
+  </tr>
+  <tr>
+    <td><strong>The content you send to be rendered</strong> (HTML, Markdown, a URL, or a template)</td>
+    <td>For a normal synchronous request it is held in memory only for the render and is never written to the database. For an <strong>asynchronous</strong> request (<code>"async": true</code>) the whole request body <em>is</em> stored, because the job has to survive a restart.</td>
+    <td>Synchronous: not stored. Asynchronous: deleted 7 days after the job finishes.</td>
+  </tr>
+  <tr>
+    <td>Generated files (PDFs, images)</td>
+    <td>Only when you ask for a hosted link instead of the bytes. The file itself is stored so the link works.</td>
+    <td>60 minutes by default, at most 7 days, whichever you set. A reaper deletes expired files continuously.</td>
+  </tr>
+  <tr>
+    <td>Saved templates</td>
+    <td>The HTML you chose to store under a name.</td>
+    <td>Until you delete the template.</td>
+  </tr>
+  <tr>
+    <td>Usage records</td>
+    <td>One row per request: what kind, page count, duration, whether it succeeded, and the error code if not. <strong>No document content and no request body.</strong></td>
+    <td>Kept, so quota and the status page are accurate.</td>
+  </tr>
+  <tr>
+    <td>Login sessions</td>
+    <td>A random session id in a cookie so the dashboard knows who you are.</td>
+    <td>30 days, or until you sign out.</td>
+  </tr>
+  <tr>
+    <td>Stripe customer and subscription ids</td>
+    <td>To connect your account to your subscription.</td>
+    <td>Until the account is deleted.</td>
+  </tr>
+</table>
+
+<p>The application does not log your IP address or user agent. The hosting provider keeps its own
+  HTTP request logs, which do contain IP addresses; that is described under processors below.</p>
+
+<h2>3. Card details</h2>
+<p><strong>Card numbers never reach this service.</strong> Payment is handled entirely by Stripe on
+  Stripe's own pages. PDFMint stores only the Stripe identifiers, the plan, and whether the
+  subscription is active.</p>
+
+<h2>4. Email</h2>
+<p>PDFMint does not send email at all. There is no newsletter, no marketing mail, and no
+  transactional mail. One consequence is stated plainly on the signup page: there is no password
+  reset and no confirmation email.</p>
+
+<h2>5. Processors</h2>
+<p>Three companies process data on behalf of this service:</p>
+<table>
+  <tr><th>Processor</th><th>What they do</th><th>Where</th></tr>
+  <tr><td>Render Services, Inc.</td><td>Runs the application and keeps HTTP request logs (which include IP addresses).</td><td>Frankfurt, Germany</td></tr>
+  <tr><td>Neon, Inc.</td><td>Hosts the PostgreSQL database in which everything in section 2 is stored.</td><td>EU region</td></tr>
+  <tr><td>Stripe, Inc.</td><td>Takes payments and stores card details. Stripe is the controller for the card data itself.</td><td>Ireland / United States</td></tr>
+</table>
+<p>Google Fonts is loaded from Google's servers for typography on this website, which means your
+  browser contacts Google when you view these pages. No fonts are fetched during PDF rendering
+  unless your own document asks for them.</p>
+
+<h2>6. Rendering a URL you supply</h2>
+<p>If you ask PDFMint to render a URL, this service fetches that URL from its own server in
+  Frankfurt. The operator of that URL will see a request from this service, not from you. Private,
+  loopback and link-local addresses are refused.</p>
+
+<h2>7. Your rights</h2>
+<p>Under the GDPR you may request access to your data, correction, deletion, restriction of
+  processing, portability, and you may object to processing. You may also complain to a supervisory
+  authority.</p>
+<div class="box">
+  <p><strong>Being straight about deletion:</strong> there is currently no self-service account
+  deletion in the dashboard. A deletion request has to be handled by hand by the operator. That is a
+  gap, and it is named here rather than implied away.</p>
+</div>
+
+<h2>8. Legal basis</h2>
+<ul>
+  <li><strong>Art. 6(1)(b)</strong> — performing the contract: your account, your API keys, rendering your documents, quota accounting.</li>
+  <li><strong>Art. 6(1)(c)</strong> — legal obligation: records connected to payments.</li>
+  <li><strong>Art. 6(1)(f)</strong> — legitimate interest: rate limiting and the operational logs needed to keep the service standing and to stop abuse.</li>
+</ul>
+
+<h2>9. Changes</h2>
+<p>If this policy changes materially, the change will be visible in this page's git history — the
+  repository is public at
+  <a href="https://github.com/fstandhartinger/pdfmint" rel="noopener">github.com/fstandhartinger/pdfmint</a>.</p>
+
+<p class="foot">
+  <a href="/">PDFMint</a> ·
+  <a href="/docs">Docs</a> ·
+  <a href="/legal">Imprint</a> ·
+  <a href="/terms">Terms</a> ·
+  <a href="/status">Status</a>
+</p>
+
+</main>
+</body>
+</html>

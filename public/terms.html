@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Terms of service — PDFMint</title>
+<meta name="description" content="The terms PDFMint is offered under, including what it does not promise.">
+<meta name="robots" content="index,follow">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/docs.css">
+<style>
+  .legal { max-width: 820px; margin: 0 auto; padding: 48px 24px 96px; }
+  .legal h1 { font-size: 40px; letter-spacing: -.02em; margin: 0 0 8px; }
+  .legal .sub { color: #6b7280; margin: 0 0 40px; }
+  .legal h2 { font-size: 24px; margin: 40px 0 12px; }
+  .legal p, .legal li { line-height: 1.65; }
+  .legal code { font-family: 'JetBrains Mono', monospace; font-size: .9em; }
+  .legal .box { border: 1px solid #e3e6ec; border-left: 3px solid #12a37a; border-radius: 8px; padding: 14px 18px; margin: 22px 0; background: #fafcfb; }
+  .legal .todo { border-left-color: #d97706; background: #fffbf5; }
+  .legal a { color: #12a37a; }
+  .legal .foot { margin-top: 56px; padding-top: 20px; border-top: 1px solid #e3e6ec; font-size: 14px; color: #6b7280; }
+</style>
+</head>
+<body>
+<main class="legal">
+
+<h1>Terms of service</h1>
+<p class="sub">Short, and honest about what is not promised.</p>
+
+<div class="box todo">
+  <p><strong>Incomplete until the operator is named.</strong> These terms refer to "the operator";
+  the <a href="/legal">imprint</a> has to identify who that is before this document is meaningful.</p>
+</div>
+
+<h2>1. What the service is</h2>
+<p>PDFMint converts HTML, Markdown or a URL into a PDF or an image, over an HTTP API, and ships an
+  n8n community node that calls it. Nothing more is promised than that.</p>
+
+<h2>2. Your account</h2>
+<p>One account, one login. You are responsible for keeping your API keys secret. If a key leaks,
+  revoke it — <code>DELETE /v1/keys/{key_prefix}</code>, or the Revoke button in the dashboard.
+  Revocation takes effect on the next request. Usage on your key counts against your quota whoever
+  made it.</p>
+<p>There is no password reset and no confirmation email, because this service does not send email at
+  all. That is stated at signup as well. If you lose your password, the account cannot currently be
+  recovered without the operator's help.</p>
+
+<h2>3. Your content</h2>
+<p>What you send stays yours. It is not read, mined, sold or used to train anything. What is stored
+  and for how long is set out precisely in the <a href="/privacy">privacy policy</a> — including the
+  one case where request content <em>is</em> stored, namely asynchronous jobs.</p>
+<p>You must not use the service to produce or distribute unlawful material, to infringe copyright,
+  or to render URLs you have no right to fetch. Automated abuse, quota circumvention through
+  multiple accounts, and attempts to reach private network addresses through the URL renderer are
+  not permitted.</p>
+
+<h2>4. Quota and payment</h2>
+<p>Each plan includes a number of documents per calendar month. A credit is reserved before
+  rendering and refunded when the render fails, with one exception documented in the
+  <a href="/docs#quota">docs</a>. When the quota is spent the API answers
+  <code>402 quota_exceeded</code> until the next period; there is no overage billing and no surprise
+  invoice.</p>
+<p>Subscriptions are monthly, taken through Stripe, and can be cancelled at any time from the
+  dashboard. Cancelling stops the next charge; it does not refund the current month. Prices are as
+  shown on the pricing section of the home page.</p>
+
+<h2>5. What is not promised</h2>
+<div class="box">
+  <p>There is <strong>no SLA</strong>. The <a href="/status">status page</a> says what the service
+  actually is: one instance in one region, restarted on every deploy, with no third-party uptime
+  monitor and no SOC 2 report. A large enough document can exhaust the renderer and briefly affect
+  everyone. If your business would be damaged by an hour of downtime, this service is not yet the
+  right dependency, and you should know that before you build on it rather than after.</p>
+</div>
+<p>The service is provided as is. To the extent permitted by law, the operator is not liable for
+  indirect or consequential damage, lost profit, or lost data. Nothing here limits liability for
+  intent, gross negligence, or injury to life, body or health, and statutory consumer rights are
+  unaffected.</p>
+
+<h2>6. Ending it</h2>
+<p>You can stop using the service at any time and cancel the subscription from the dashboard. The
+  operator may suspend an account that is being used unlawfully or in a way that degrades the
+  service for others, and will say why.</p>
+
+<h2>7. Changes</h2>
+<p>These terms may change. The repository is public, so every change is visible in the git history
+  at <a href="https://github.com/fstandhartinger/pdfmint" rel="noopener">github.com/fstandhartinger/pdfmint</a>.
+  A material change affecting paying customers will be announced before it takes effect.</p>
+
+<h2>8. Governing law</h2>
+<p>German law applies, with the place of jurisdiction as stated in the <a href="/legal">imprint</a>,
+  to the extent that a place of jurisdiction may lawfully be agreed. Mandatory consumer protection
+  law in your country of residence is unaffected.</p>
+
+<p class="foot">
+  <a href="/">PDFMint</a> ·
+  <a href="/docs">Docs</a> ·
+  <a href="/legal">Imprint</a> ·
+  <a href="/privacy">Privacy</a> ·
+  <a href="/status">Status</a>
+</p>
+
+</main>
+</body>
+</html>
