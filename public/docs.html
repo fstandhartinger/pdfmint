@@ -1646,8 +1646,15 @@ dependencies</strong>, built and tested against n8n 2.35 on Node.js 20 and 22. I
 <code>usableAsTool</code>, so an n8n AI Agent can call it directly.</p>
 
 <h3 id="n8n-install">Install <a class="anchor" href="#n8n-install">#</a></h3>
-<p class="notice"><strong>Not on npm yet.</strong> The node is built, tested and running, but publication is waiting on an npm access token, and n8n requires verified community nodes to be published from GitHub Actions with a provenance statement. Until that lands, <em>n8n Cloud cannot install it</em> — Cloud only installs from npm — and a self-hosted n8n installs the release build directly:</p><pre><code>cd ~/.n8n/nodes
-npm install https://github.com/fstandhartinger/n8n-nodes-pdfmint/releases/download/snapshot/n8n-nodes-pdfmint-0.1.0.tgz</code></pre><p>Then restart n8n. Everything below is true of that build; we will drop this note the moment the package is on npm.</p>
+<p><strong>n8n Cloud and self-hosted</strong> &mdash; Settings &rarr; Community Nodes &rarr; Install,
+then enter <code>n8n-nodes-pdfmint</code>.</p>
+
+<p><strong>Self-hosted, from the CLI:</strong></p>
+<pre><code>cd ~/.n8n/nodes
+npm install n8n-nodes-pdfmint</code></pre>
+<p>Then restart n8n. The package is published with an npm provenance attestation, so
+<code>npm audit signatures</code> can verify it was built by the GitHub Actions workflow in the
+repository, from a specific commit.</p>
 </div>
 <p>Then restart n8n.</p>
 
@@ -1701,7 +1708,7 @@ has no such binary field, the error names the fields it does have.</p>
 box tells you what to change instead of <code>Request failed with status code 400</code>. Turn on
 <em>Settings → Continue On Fail</em> to route failed items down the error branch instead.</p>
 
-<p class="muted" style="font-size:.9rem">Package: <a href="https://github.com/fstandhartinger/n8n-nodes-pdfmint/releases/tag/snapshot">n8n-nodes-pdfmint (release build)</a> ·
+<p class="muted" style="font-size:.9rem">Package: <a href="https://www.npmjs.com/package/n8n-nodes-pdfmint">n8n-nodes-pdfmint</a> ·
 Issues: <a href="https://github.com/fstandhartinger/n8n-nodes-pdfmint/issues">GitHub</a></p>
 </section>
 
