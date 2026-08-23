@@ -153,12 +153,20 @@ async function handleEvent(event) {
       await applySubscription(event.data.object);
       break;
     case 'invoice.paid': {
-      // A new billing period starts: reset the monthly counter immediately.
+      // A renewal starts a new period — but only if the current one has actually
+      // ended. rollPeriod() already resets the counter on the calendar 1st, so
+      // resetting again on the billing anniversary handed a customer who
+      // subscribed mid-month a second full quota every cycle. The number of
+      // documents is the only thing being sold, so that was giving it away.
       const invoice = event.data.object;
       const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
       if (customerId) {
         await query(
-          `UPDATE accounts SET credits_used = 0, period_start = date_trunc('month', now() AT TIME ZONE 'UTC') WHERE stripe_customer_id = $1`,
+          `UPDATE accounts
+              SET credits_used = 0,
+                  period_start = date_trunc('month', now() AT TIME ZONE 'UTC')
+            WHERE stripe_customer_id = $1
+              AND period_start < date_trunc('month', now() AT TIME ZONE 'UTC')`,
           [customerId],
         );
       }
