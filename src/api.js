@@ -9,6 +9,7 @@ const { query } = require('./db');
 const { authenticate, consumeCredits, refundCredits, issueApiKey } = require('./auth');
 const jobs = require('./jobs');
 const { normalisePdfOptions, asBool } = require('./options');
+const { rateLimit } = require('./ratelimit');
 const { markdownToHtml } = require('./markdown');
 const render = require('./render');
 const { assertPublicUrl } = require('./net');
@@ -19,10 +20,13 @@ const router = express.Router();
 
 const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-const withAuth = asyncRoute(async (req, res, next) => {
+const authenticateOnly = asyncRoute(async (req, res, next) => {
   req.account = await authenticate(req);
   next();
 });
+
+/** Authenticate, then spend one token from the account's rate-limit bucket. */
+const withAuth = [authenticateOnly, rateLimit];
 
 function pickSource(body) {
   const given = ['html', 'url', 'markdown', 'template'].filter((k) => body[k] !== undefined && body[k] !== null && body[k] !== '');

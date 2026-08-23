@@ -369,6 +369,29 @@ describe('asynchronous rendering', () => {
   });
 });
 
+describe('rate limiting', () => {
+  test('a burst past the limit answers 429 with a Retry-After the caller can act on', async () => {
+    const { key: k } = await newAccount();
+    const responses = await Promise.all(Array.from({ length: 60 }, () =>
+      fetch(`${require('./helpers').BASE}/v1/me`, { headers: { Authorization: `Bearer ${k}` } })));
+    const limited = responses.filter((r) => r.status === 429);
+    const allowed = responses.filter((r) => r.status === 200);
+    assert.ok(allowed.length > 0, 'some requests must get through');
+    assert.ok(limited.length > 0, `expected some requests to be limited, all ${responses.length} succeeded`);
+
+    const one = limited[0];
+    assert.ok(Number(one.headers.get('retry-after')) >= 1, 'Retry-After must be a usable number of seconds');
+    assert.equal(one.headers.get('x-ratelimit-limit'), '120');
+    const body = await one.json();
+    assert.equal(body.error.code, 'rate_limited');
+
+    // And after waiting the advertised time, the caller gets back in.
+    await new Promise((r) => setTimeout(r, (Number(one.headers.get('retry-after')) + 1) * 1000));
+    const after = await fetch(`${require('./helpers').BASE}/v1/me`, { headers: { Authorization: `Bearer ${k}` } });
+    assert.equal(after.status, 200, 'the limit must lift after Retry-After');
+  });
+});
+
 describe('the public site', () => {
   test('the pages a stranger needs all answer', async () => {
     for (const [path, expect] of [['/', 200], ['/docs', 200], ['/signup', 200], ['/login', 200], ['/status', 200], ['/status.json', 200], ['/healthz', 200]]) {

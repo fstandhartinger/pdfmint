@@ -1527,6 +1527,7 @@ call in our logs.</p>
 
 <tr><td><code>wait_for_timeout</code></td><td>400</td><td class="wrap">The <code>waitFor</code> selector never appeared. The credit is refunded.</td><td class="wrap">Check the selector, or wait a fixed number of milliseconds. See <a href="#waitfor">waitFor</a>.</td></tr>
 <tr><td><code>render_timeout</code></td><td>504</td><td class="wrap">The render ran past <code>timeout</code>. Refunded.</td><td class="wrap">Raise <code>timeout</code> (up to 120000), or replace <code>networkidle</code> with a selector.</td></tr>
+<tr><td><code>rate_limited</code></td><td>429</td><td class="wrap">More than 120 requests a minute, or more than 30 at once, from this account.</td><td class="wrap">Wait the number of seconds in <code>Retry-After</code>, then retry. See <a href="#rate-limits">Rate limits</a>.</td></tr>
 <tr><td><code>renderer_busy</code></td><td>503</td><td class="wrap">Both render slots are full and 40 jobs are already queued.</td><td class="wrap">Retry after a few seconds. In n8n, enable <em>Retry On Fail</em> on the node.</td></tr>
 <tr><td><code>renderer_crashed</code></td><td>500</td><td class="wrap">Chrome died mid-document — almost always a huge or pathological page. Refunded.</td><td class="wrap">Split the document, shrink the images, or lower <code>scale</code>.</td></tr>
 <tr><td><code>render_failed</code></td><td>500</td><td class="wrap">A rendering failure that did not match any of the specific cases above; the browser's own message is included. Refunded.</td><td class="wrap">Read the message — it names the failing resource. If it looks like ours, send us the <code>request_id</code>.</td></tr>
@@ -1559,8 +1560,10 @@ Stripe checkout flow and are never returned by a <code>/v1/</code> endpoint.</p>
 
 <h3 id="errors-retry">What is worth retrying <a class="anchor" href="#errors-retry">#</a></h3>
 <ul>
-  <li><strong>Retry:</strong> <code>renderer_busy</code> (503), <code>internal_error</code> (500),
-      <code>render_timeout</code> (504) if you also raise <code>timeout</code>.</li>
+  <li><strong>Retry:</strong> <code>rate_limited</code> (429, after <code>Retry-After</code>),
+      <code>renderer_busy</code> (503), <code>url_unreachable</code> and <code>url_http_error</code>
+      (502, the page you pointed at failed, not your request), <code>internal_error</code> (500),
+      and <code>render_timeout</code> (504) if you also raise <code>timeout</code>.</li>
   <li><strong>Do not retry</strong> any 400 or 401 — the request itself needs changing; a retry
       fails identically.</li>
   <li><strong>402</strong> only clears on the 1st of the month, or on an upgrade.</li>
@@ -1585,6 +1588,8 @@ Stripe checkout flow and are never returned by a <code>/v1/</code> endpoint.</p>
 <tr><td class="wrap">Files per merge</td><td>2–50</td><td><code>invalid_input</code> / <code>too_many_files</code></td></tr>
 <tr><td class="wrap">Per-file download during a merge</td><td>30&nbsp;s</td><td><code>download_failed</code></td></tr>
 <tr><td class="wrap">Template name</td><td>1–64 chars</td><td><code>invalid_template_name</code></td></tr>
+<tr><td class="wrap">Requests per minute, per account</td><td>120</td><td><code>rate_limited</code></td></tr>
+<tr><td class="wrap">Burst above that rate</td><td>30</td><td><code>rate_limited</code></td></tr>
 <tr><td class="wrap">Concurrent renders per instance</td><td>2</td><td>—</td></tr>
 <tr><td class="wrap">Render queue depth</td><td>40</td><td><code>renderer_busy</code></td></tr>
 <tr><td class="wrap">Font loading wait, before printing</td><td>8&nbsp;s</td><td class="wrap">falls back to system fonts</td></tr>
@@ -1597,6 +1602,36 @@ Stripe checkout flow and are never returned by a <code>/v1/</code> endpoint.</p>
 
 <p>Two renders run at once per instance and up to 40 more can queue. <code>GET /healthz</code>
 reports both numbers live, so you can see whether a slow response is your page or the queue.</p>
+
+<h3 id="rate-limits">Rate limits <a class="anchor" href="#rate-limits">#</a></h3>
+
+<p>Every authenticated response carries the current state, so you never have to guess:</p>
+
+<pre><code>X-RateLimit-Limit: 120        # sustained requests per minute, per account
+X-RateLimit-Burst: 30         # how many you may fire at once
+X-RateLimit-Remaining: 27     # tokens left in your bucket right now</code></pre>
+
+<p>The bucket refills continuously at 2 tokens per second. Go past it and you get
+<code>429 rate_limited</code> with a <code>Retry-After</code> header in whole seconds — wait
+that long and the next request goes through. The limit is per account, not per key, so
+issuing extra keys does not raise it.</p>
+
+<p>These are not the same thing as the render queue. The rate limit governs how fast you may
+<em>ask</em>; the queue governs how fast documents actually come out. A long-running batch
+that respects <code>Retry-After</code> can still meet <code>renderer_busy</code> (503) if the
+renderer is saturated, and both are worth retrying.</p>
+
+<h3 id="egress">Where requests come from <a class="anchor" href="#egress">#</a></h3>
+
+<p>When you render a <code>url</code>, or PDFMint downloads a file for <code>/v1/merge</code>,
+or it calls your <code>webhookUrl</code>, the connection comes from Frankfurt with a source
+address in <code>74.220.51.0/24</code> or <code>74.220.59.0/24</code>.</p>
+
+<p class="notice"><strong>Read this before you use those ranges in a firewall.</strong> They are
+the shared egress ranges of the hosting provider, not addresses reserved for PDFMint.
+Allowlisting them lets in every other service hosted there too, so treat them as a
+convenience for reaching a low-risk internal report — never as an access control. If the page
+is genuinely sensitive, fetch it yourself and send the HTML.</p>
 
 <p>Pages behind a login, on a VPN, or on a private IP range are not reachable — see
 <a href="#url">Rendering a URL</a> for the full list and the workaround.</p>
