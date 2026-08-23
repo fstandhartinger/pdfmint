@@ -95,6 +95,22 @@ const FIELD_ALIASES = {
   encrypt: 'password',
 };
 
+/**
+ * `/v1/pdf` has always taken its settings either flat or inside an `options`
+ * object. `/v1/image` and `/v1/merge` only took them flat, so the same wrapper
+ * that works on one endpoint answered `400 unknown_field` on its neighbour —
+ * one vendor, adjacent endpoints, two contracts. This folds the wrapper into
+ * the body so all three behave the same. A flat key wins over the same key
+ * inside `options`, because the more specific spelling should not be silently
+ * overridden by the more general one.
+ */
+function foldOptionsWrapper(body) {
+  const wrapper = body && body.options;
+  if (!wrapper || typeof wrapper !== 'object' || Array.isArray(wrapper)) return body;
+  const { options, ...flat } = body;
+  return { ...wrapper, ...flat };
+}
+
 function rejectUnknownFields(body, known, where) {
   const unknown = Object.keys(body || {}).filter((k) => !known.has(k));
   if (!unknown.length) return;
@@ -499,7 +515,7 @@ router.get('/jobs/:id', withAuth, asyncRoute(async (req, res) => {
 /* --------------------------------------------------------------- /v1/image */
 
 router.post('/image', withAuth, asyncRoute(async (req, res) => {
-  const body = req.body || {};
+  const body = foldOptionsWrapper(req.body || {});
   const source = pickSource(body);
   if (source === 'template') throw bad('unsupported_source', 'Images can be rendered from "html", "markdown" or "url", not from a saved template.', { docs: '/docs#image' });
   const timeoutMs = timeoutFor(body);
@@ -554,7 +570,7 @@ router.post('/image', withAuth, asyncRoute(async (req, res) => {
 /* --------------------------------------------------------------- /v1/merge */
 
 router.post('/merge', withAuth, asyncRoute(async (req, res) => {
-  const body = req.body || {};
+  const body = foldOptionsWrapper(req.body || {});
   rejectUnknownFields(body, MERGE_FIELDS, 'POST /v1/merge');
   const inputs = body.files || body.urls || body.pdfs;
   if (!Array.isArray(inputs) || inputs.length < 2) {
