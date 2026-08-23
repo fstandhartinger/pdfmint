@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Behaviour tests against a real browser and a real database
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pdfmint_test
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pdfmint_test
+      PUBLIC_URL: http://127.0.0.1:3000
+      PORT: '3000'
+      SESSION_SECRET: ci-only-secret
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+      - name: Install Chromium and the tools the tests read PDFs with
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qpdf poppler-utils \
+            fonts-inter fonts-jetbrains-mono fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
+          fc-cache -f
+
+      - name: Start the service
+        run: |
+          node src/server.js > /tmp/server.log 2>&1 &
+          for i in $(seq 1 40); do
+            curl -sf http://127.0.0.1:3000/healthz && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:3000/healthz || { echo '::error::the service did not start'; cat /tmp/server.log; exit 1; }
+
+      - run: npm test
+
+      - name: Server log
+        if: always()
+        run: tail -80 /tmp/server.log
