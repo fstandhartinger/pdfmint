@@ -432,8 +432,9 @@ describe('webhooks', () => {
     const secret = ((await dash.text()).match(/id="whs">([0-9a-f]{32,})</) || [])[1];
     assert.ok(secret, 'the dashboard must show the webhook signing secret');
 
+    let server;
     const received = new Promise((resolve) => {
-      const server = http.createServer((rq, rs) => {
+      server = http.createServer((rq, rs) => {
         let raw = '';
         rq.on('data', (c) => { raw += c; });
         rq.on('end', () => {
@@ -444,30 +445,36 @@ describe('webhooks', () => {
       });
       server.listen(0, '127.0.0.1', () => { received.port = server.address().port; });
     });
-    // Give the listener a moment to bind and expose its port.
-    await new Promise((r) => setTimeout(r, 300));
-    const port = received.port;
+    try {
+      // Give the listener a moment to bind and expose its port.
+      await new Promise((r) => setTimeout(r, 300));
+      const port = received.port;
 
-    const queued = await req('/v1/pdf', {
-      method: 'POST', key: k,
-      body: { markdown: '# signed', webhookUrl: `http://127.0.0.1:${port}/hook` },
-    });
-    if (queued.res.status !== 202) {
-      // The SSRF guard refuses a loopback webhook unless the deployment allows it.
-      assert.equal(queued.json.error.code, 'private_address_blocked');
-      return;
+      const queued = await req('/v1/pdf', {
+        method: 'POST', key: k,
+        body: { markdown: '# signed', webhookUrl: `http://127.0.0.1:${port}/hook` },
+      });
+      if (queued.res.status !== 202) {
+        // The SSRF guard refuses a loopback webhook unless the deployment allows it.
+        assert.equal(queued.json.error.code, 'private_address_blocked');
+        return;
+      }
+
+      const hit = await Promise.race([received, new Promise((r) => setTimeout(() => r(null), 45000))]);
+      assert.ok(hit, 'the webhook must be delivered');
+      const signature = hit.headers['x-pdfmint-signature'];
+      const timestamp = hit.headers['x-pdfmint-timestamp'];
+      assert.ok(signature && timestamp, 'the callback must carry a signature and a timestamp');
+
+      const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${hit.raw}`).digest('hex');
+      assert.equal(signature, expected, 'the signature must verify against the account secret');
+      assert.ok(Math.abs(Date.now() / 1000 - Number(timestamp)) < 300, 'the timestamp must be recent');
+      assert.equal(JSON.parse(hit.raw).status, 'succeeded');
+    } finally {
+      // A listening socket keeps the process alive, so it has to be closed even
+      // when the test returns early — otherwise `npm test` never exits.
+      if (server.listening) server.close();
     }
-
-    const hit = await Promise.race([received, new Promise((r) => setTimeout(() => r(null), 45000))]);
-    assert.ok(hit, 'the webhook must be delivered');
-    const signature = hit.headers['x-pdfmint-signature'];
-    const timestamp = hit.headers['x-pdfmint-timestamp'];
-    assert.ok(signature && timestamp, 'the callback must carry a signature and a timestamp');
-
-    const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${hit.raw}`).digest('hex');
-    assert.equal(signature, expected, 'the signature must verify against the account secret');
-    assert.ok(Math.abs(Date.now() / 1000 - Number(timestamp)) < 300, 'the timestamp must be recent');
-    assert.equal(JSON.parse(hit.raw).status, 'succeeded');
   });
 });
 
