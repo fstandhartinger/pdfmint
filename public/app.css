@@ -1,0 +1,62 @@
+:root{
+  --bg:#ffffff; --panel:#f7f8fa; --ink:#12141a; --muted:#5c6472; --rule:#e3e6ec;
+  --accent:#12a37a; --accent-ink:#0b7a5b; --danger:#c0392b; --code:#f2f4f7;
+  --radius:10px; --maxw:1080px;
+  --sans:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Liberation Sans",Helvetica,Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,"Liberation Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0e1015;--panel:#171a21;--ink:#e9ecf1;--muted:#9aa3b2;--rule:#262b34;--code:#151920;}
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6}
+a{color:var(--accent-ink);text-decoration:none}
+a:hover{text-decoration:underline}
+code,pre{font-family:var(--mono)}
+code{background:var(--code);padding:.12em .35em;border-radius:4px;font-size:.9em}
+pre{background:var(--code);padding:1rem 1.1rem;border-radius:var(--radius);overflow-x:auto;border:1px solid var(--rule);font-size:.87rem;line-height:1.55}
+pre code{background:none;padding:0;font-size:1em}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;background:var(--accent);color:#fff;padding:.6rem 1.05rem;font-weight:600}
+button:hover{background:var(--accent-ink)}
+button.secondary{background:transparent;color:var(--muted);border:1px solid var(--rule)}
+button.link{background:none;color:var(--muted);padding:0;font-weight:400}
+.logo{font-weight:700;font-size:1.15rem;letter-spacing:-.02em;color:var(--ink)}
+.logo span{color:var(--accent)}
+.muted{color:var(--muted)}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--bg);z-index:5}
+.topbar nav{display:flex;gap:1.2rem;align-items:center}
+main{max-width:var(--maxw);margin:0 auto;padding:2rem 1.5rem 5rem}
+h1{font-size:2rem;letter-spacing:-.02em;line-height:1.2;margin:.2em 0 .4em}
+h2{font-size:1.3rem;letter-spacing:-.01em;margin:2.2rem 0 .6rem}
+h3{font-size:1.05rem;margin:1.4rem 0 .4rem}
+.auth{max-width:400px;padding-top:4rem;text-align:left}
+.auth h1{font-size:1.6rem}
+.auth .sub{color:var(--muted);margin-top:0}
+.auth form{display:flex;flex-direction:column;gap:.9rem;margin-top:1.4rem}
+.auth label{display:flex;flex-direction:column;gap:.35rem;font-size:.85rem;color:var(--muted);font-weight:500}
+.auth input{font:inherit;padding:.6rem .7rem;border:1px solid var(--rule);border-radius:8px;background:var(--bg);color:var(--ink)}
+.auth .alt{margin-top:1.4rem;font-size:.9rem;color:var(--muted)}
+.error{background:#fdecea;color:#8c2018;border:1px solid #f5c6c0;padding:.7rem .9rem;border-radius:8px;font-size:.9rem;margin-top:1rem}
+@media (prefers-color-scheme:dark){.error{background:#2a1614;color:#f3b1a8;border-color:#4a221d}}
+.notice{background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--accent);padding:.8rem 1rem;border-radius:8px;margin-bottom:1.5rem}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:var(--radius);padding:1.3rem 1.4rem;margin:1.4rem 0}
+.card h2{margin-top:0}
+.keybox{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+.keybox code{font-size:.95rem;word-break:break-all}
+.rows{width:100%;border-collapse:collapse;font-size:.88rem;margin:.8rem 0}
+.rows th{text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--rule);padding:.4rem .5rem}
+.rows td{padding:.4rem .5rem;border-bottom:1px solid var(--rule)}
+.big{font-size:1.8rem;font-weight:650;margin:.3rem 0}
+.big .muted{font-size:1rem;font-weight:400}
+.meter{height:8px;background:var(--rule);border-radius:99px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent)}
+.ok{color:var(--accent-ink);font-weight:600}
+.bad{color:var(--danger);font-weight:600}
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin:1rem 0}
+.plan{border:1px solid var(--rule);border-radius:var(--radius);padding:1rem;background:var(--bg)}
+.plan.current{border-color:var(--accent)}
+.plan h3{margin:0}
+.plan .price{font-size:1.6rem;font-weight:650;margin:.2rem 0}
+.plan .price span{font-size:.85rem;font-weight:400;color:var(--muted)}
+.tag{color:var(--accent-ink);font-weight:600;font-size:.85rem}

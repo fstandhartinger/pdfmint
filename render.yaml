@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: pdfmint
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PUBLIC_URL
+        value: https://pdfmint.onrender.com
+      - key: MAX_CONCURRENT_RENDERS
+        value: "2"
