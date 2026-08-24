@@ -66,6 +66,14 @@ async function createCheckoutSession(account, planId) {
     success_url: `${config.publicUrl}/dashboard?checkout=success`,
     cancel_url: `${config.publicUrl}/dashboard?checkout=cancelled`,
     allow_promotion_codes: true,
+    // An EU business needs its VAT ID on the invoice or its accountant will not
+    // accept the receipt. Optional on purpose: Stripe shows an "Add VAT ID" link
+    // that a private buyer can simply ignore, so nobody is forced to have one.
+    tax_id_collection: { enabled: true },
+    billing_address_collection: 'auto',
+    // Stripe requires this whenever a session both attaches an existing customer
+    // and collects an address or a tax id; without it the session is rejected.
+    customer_update: { name: 'auto', address: 'auto' },
     client_reference_id: String(account.id),
     subscription_data: { metadata: { account_id: String(account.id), plan: planId } },
     metadata: { account_id: String(account.id), plan: planId },

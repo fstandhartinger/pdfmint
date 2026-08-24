@@ -52,7 +52,7 @@ function authForm(kind, error, values = {}) {
 <main class="auth">
   <a class="logo" href="/">PDF<span>Mint</span></a>
   <h1>${isSignup ? 'Create your account' : 'Sign in'}</h1>
-  <p class="sub">${isSignup ? '300 documents a month, free, no card.' : 'Welcome back.'}</p>
+  <p class="sub">${isSignup ? '10 documents a month, free, no card.' : 'Welcome back.'}</p>
   ${isSignup ? '<p class="warnbox">There is no password reset yet, and no confirmation email, so nothing can be sent to you if you forget. Put the password in your password manager now.</p>' : ''}
   ${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}
   <form method="post" action="/${kind}">
@@ -177,7 +177,7 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
 <header class="topbar"><a class="logo" href="/">PDF<span>Mint</span></a>
   <nav><a href="/docs">Docs</a><form method="post" action="/logout"><button class="link">Sign out</button></form></nav></header>
 <main class="dash">
-  ${req.query.welcome ? '<div class="notice"><strong>Your account is ready.</strong> Copy the API key below into the PDFMint credential in n8n and you are done.</div>' : ''}
+  ${req.query.welcome ? '<div class="notice"><strong>Your account is ready.</strong> Copy the API key below into the PDFMint credential in n8n and you are done. The free plan is 10 documents a month; a plan below raises it.</div>' : ''}
   ${req.query.checkout === 'success' ? '<div class="notice ok"><strong>Payment received.</strong> Your new quota is live — it is shown below.</div>' : ''}
   ${req.query.checkout === 'cancelled' ? '<div class="notice">Checkout cancelled. Nothing was charged.</div>' : ''}
   <h1>Dashboard</h1>
@@ -251,6 +251,7 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
           : `<form method="post" action="/dashboard/checkout"><input type="hidden" name="plan" value="${p.id}"><button>Choose ${escapeHtml(p.name)}</button></form>`}
       </div>`).join('')}
     </div>
+    <p class="muted">The free plan is 10 documents a month. Checkout for a paid plan runs on Stripe, where you can add a VAT ID if you need one on the invoice; it is optional and can be left empty.</p>
     ${account.stripe_customer_id ? '<form method="post" action="/dashboard/portal"><button class="secondary">Manage billing / cancel</button></form>' : ''}
   </section>
 </main>

@@ -137,6 +137,16 @@ async function consumeCredits(accountId, n = 1) {
   if (!rows.length) {
     const { rows: cur } = await query(`SELECT credits_used, credits_limit, plan FROM accounts WHERE id = $1`, [accountId]);
     const a = cur[0] || { credits_used: 0, credits_limit: 0, plan: 'free' };
+    // An account with no plan never had a quota, so telling it the quota is
+    // "exceeded" would be a false statement about what happened.
+    if (Number(a.credits_limit) === 0) {
+      throw new ApiError(402, 'plan_required',
+        'This account has no plan, so it cannot render anything yet.', {
+          hint: 'This account has an allowance of 0 documents. Choose a plan at /dashboard.',
+          docs: '/docs#quota',
+          details: { plan: a.plan, credits_used: a.credits_used, credits_limit: a.credits_limit },
+        });
+    }
     throw new ApiError(402, 'quota_exceeded',
       `You have used all ${a.credits_limit} documents included in your ${a.plan} plan this month.`, {
         hint: 'The quota resets on the 1st of next month. To raise it now, upgrade at /dashboard.',

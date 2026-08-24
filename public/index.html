@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PDFMint — HTML, Markdown or a URL to PDF in one API call</title>
-<meta name="description" content="PDFMint is a PDF generation API and an n8n community node. POST HTML, Markdown, a URL or a named template and get the PDF bytes straight back. 300 documents a month free, no card.">
+<meta name="description" content="PDFMint is a PDF generation API and an n8n community node. POST HTML, Markdown, a URL or a named template and get the PDF bytes straight back. 10 documents a month free, no card.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta property="og:title" content="PDFMint — HTML, Markdown or a URL to PDF in one API call">
 <meta property="og:description" content="One POST, PDF bytes back. Page numbers that are not clipped, placeholders that do not fail silently, and an n8n node that returns the file on the same node.">
@@ -45,7 +45,7 @@
   <div class="wrap">
     <div class="hero-grid">
       <div>
-        <span class="pill">300 documents a month, free, no card</span>
+        <span class="pill">10 documents a month, free, no card</span>
         <h1 class="hero-title">HTML, Markdown or a URL in.<br><em>PDF bytes out.</em></h1>
         <p class="hero-sub">PDFMint is a PDF generation API and an <strong>n8n community node</strong>. One POST with the content you already have — no template editor to learn, no template ID to paste, no second request to fetch the file.</p>
         <div class="hero-cta">
@@ -363,7 +363,7 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
           </tr>
           <tr>
             <td>Free tier</td>
-            <td class="us">300 documents a month, permanent, no card</td>
+            <td class="us">10 documents a month, permanent, no card &mdash; a fifth of CraftMyPDF&rsquo;s</td>
             <td>50 documents a month, 3 templates</td>
             <td>No permanent free tier — 7-day trial</td>
           </tr>
@@ -395,7 +395,7 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
       </table>
     </div>
     <p class="scroll-hint">Scroll the table sideways to see every column.</p>
-    <p class="cmp-note">Sources: CraftMyPDF&rsquo;s published OpenAPI specification (<code>craftmypdf_api.yaml</code>) and pricing page; pdforge&rsquo;s pricing page and the source of its n8n node; PDFMint&rsquo;s own source and plan table. Dashes mean we did not find a published figure and would rather leave the cell empty than guess. These are good products with a different bet — a hosted drag-and-drop template designer. If that is what you want, buy that. PDFMint is for people who already have the HTML.</p>
+    <p class="cmp-note">Sources: CraftMyPDF&rsquo;s published OpenAPI specification (<code>craftmypdf_api.yaml</code>) and pricing page; pdforge&rsquo;s pricing page and the source of its n8n node; PDFMint&rsquo;s own source and plan table. On the free tier PDFMint is the least generous vendor that has one: CraftMyPDF gives 50 documents a month and PDFShift, which is not in this table, gives 50 credits a month, against PDFMint&rsquo;s 10. Dashes mean we did not find a published figure and would rather leave the cell empty than guess. These are good products with a different bet — a hosted drag-and-drop template designer. If that is what you want, buy that. PDFMint is for people who already have the HTML.</p>
   </div>
 </section>
 
@@ -411,9 +411,9 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
       <div class="pcard">
         <div class="pname">Free</div>
         <div class="amt">$0<small> /month</small></div>
-        <div class="docs">300 documents</div>
+        <div class="docs">10 documents</div>
         <div class="per">no card required</div>
-        <p class="plan-for">For trying it out, and for the workflow that fires a handful of times a day.</p>
+        <p class="plan-for">Enough to paste the first curl, wire up the n8n node and see a real PDF. Not enough to run a workflow on.</p>
         <a class="l-btn l-btn-ghost" href="/signup">Start free</a>
       </div>
       <div class="pcard feat">
@@ -446,7 +446,7 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
       <b>Every plan has every feature.</b> Password protection, headers and footers, page numbers, custom page sizes, templates, images, merging, hosted links and the n8n node are on the free tier too. The only thing that changes is how many documents you get.
     </div>
 
-    <p class="price-foot">Start on Free with no card. Upgrade or cancel from the <a href="/dashboard">dashboard</a> whenever you like.</p>
+    <p class="price-foot">Start on Free with no card; 10 documents a month is the whole of it, so a workflow that runs daily needs Starter. Checkout runs on Stripe, where you can add a VAT ID if you need one on the invoice &mdash; optional, and ignorable if you do not. Upgrade or cancel from the <a href="/dashboard">dashboard</a> whenever you like.</p>
   </div>
 </section>
 
@@ -461,6 +461,10 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
       <details open>
         <summary>Do I have to build a template first?</summary>
         <p>No. Templates are optional and exist only so you can stop pasting the same HTML. <code>POST /v1/pdf</code> with <code>html</code>, <code>markdown</code> or <code>url</code> works on the first call, before you have saved anything.</p>
+      </details>
+      <details>
+        <summary>How big is the free tier?</summary>
+        <p>10 documents a month, permanently, with no card. It is sized to prove the thing works &mdash; the first curl, the n8n node, a real PDF on disk &mdash; not to run a workflow on. Anything recurring needs Starter at $9 for 5,000 documents. It is a smaller free tier than several competitors give: CraftMyPDF and PDFShift both give 50 a month.</p>
       </details>
       <details>
         <summary>What exactly counts as one document?</summary>
@@ -498,7 +502,7 @@ published with an npm provenance attestation, and the source is on
 <section class="cta">
   <div class="wrap">
     <h2>Your first PDF is about 30 seconds away</h2>
-    <p>Create an account, copy the key off the dashboard, paste the curl above. 300 documents a month, free, no card.</p>
+    <p>Create an account, copy the key off the dashboard, paste the curl above. 10 documents a month, free, no card.</p>
     <div class="hero-cta">
       <a class="l-btn l-btn-primary l-btn-lg" href="/signup">Get an API key</a>
       <a class="l-btn l-btn-ghost l-btn-lg" href="/docs">Read the docs</a>

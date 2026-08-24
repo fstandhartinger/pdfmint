@@ -53,14 +53,16 @@
   not permitted.</p>
 
 <h2>4. Quota and payment</h2>
-<p>Each plan includes a number of documents per calendar month. A credit is reserved before
-  rendering and refunded when the render fails, with one exception documented in the
+<p>Each plan includes a number of documents per calendar month; the free plan includes 10 and needs
+  no card. A credit is reserved before rendering and refunded when the render fails, with one
+  exception documented in the
   <a href="/docs#quota">docs</a>. When the quota is spent the API answers
   <code>402 quota_exceeded</code> until the next period; there is no overage billing and no surprise
   invoice.</p>
 <p>Subscriptions are monthly, taken through Stripe, and can be cancelled at any time from the
-  dashboard. Cancelling stops the next charge; it does not refund the current month. Prices are as
-  shown on the pricing section of the home page.</p>
+  dashboard. Cancelling stops the next charge; it does not refund the current month. At checkout you
+  may optionally supply a VAT ID, which Stripe then shows on the invoice. Prices are as shown on the
+  pricing section of the home page.</p>
 
 <h2>5. What is not promised</h2>
 <div class="box">

@@ -8,6 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { req, newAccount, isPdf, countPagesIndependently } = require('./helpers');
+const { PLANS } = require('../src/config');
 
 let key;
 
@@ -364,9 +365,10 @@ describe('quota', () => {
   });
 
   test('/v1/me reports the plan and when the quota resets', async () => {
-    const { json } = await req('/v1/me', { key });
+    const { key: freeKey } = await newAccount('free');
+    const { json } = await req('/v1/me', { key: freeKey });
     assert.equal(json.plan, 'free');
-    assert.equal(json.credits_limit, 300);
+    assert.equal(json.credits_limit, PLANS.free.credits);
     assert.ok(Date.parse(json.period_resets_at) > Date.now());
   });
 });

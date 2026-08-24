@@ -1,6 +1,8 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const { query } = require('../src/db');
+const { PLANS } = require('../src/config');
 
 /**
  * These tests exercise real behaviour: a real HTTP server, a real Chromium, a
@@ -27,7 +29,7 @@ async function req(path, { method = 'GET', key, body, headers = {}, raw = false 
 }
 
 /** Signs up a throwaway account and returns its API key. */
-async function newAccount() {
+async function newAccount(plan = 'starter') {
   const email = `test-${crypto.randomBytes(6).toString('hex')}@pdfmint.test`;
   const res = await fetch(`${BASE}/signup`, {
     method: 'POST',
@@ -44,6 +46,17 @@ async function newAccount() {
   const html = await dash.text();
   const key = (html.match(/pm_live_[A-Za-z0-9_-]{20,}/) || [])[0];
   if (!key) throw new Error(`the dashboard did not show a new key (status ${dash.status})`);
+
+  // The free tier is 10 documents, which most suites would exhaust. Tests are
+  // about the API's behaviour, not about Stripe, so the account is put on a paid
+  // plan directly. Pass 'free' to exercise the free tier as a real user gets it.
+  if (plan !== 'none') {
+    const { credits } = PLANS[plan] || PLANS.starter;
+    await query(
+      `UPDATE accounts SET plan = $2, credits_limit = $3, credits_used = 0 WHERE email = $1`,
+      [email, plan, credits],
+    );
+  }
   return { email, key, cookie };
 }
 

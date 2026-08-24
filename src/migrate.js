@@ -72,7 +72,13 @@ const STATEMENTS = [
    )`,
   `ALTER TABLE accounts ADD COLUMN IF NOT EXISTS webhook_secret TEXT`,
   `UPDATE accounts SET webhook_secret = encode(gen_random_bytes(24), 'hex') WHERE webhook_secret IS NULL`,
-  // Existing free accounts get the newer, larger free allowance too.
+  // Historical one-off from when the free allowance was raised 100 -> 300. No
+  // account sits at 100 any more, so this is a no-op kept only so a replay from
+  // an old database lands somewhere sane. The free allowance is now 10 for NEW
+  // accounts (PLANS.free.credits); the ~500 accounts already holding 300 keep it
+  // rather than being cut off mid-month, 71 of them having already spent more
+  // than 10. Nothing published is untrue: the pages describe what a new signup
+  // gets.
   `UPDATE accounts SET credits_limit = 300 WHERE plan = 'free' AND credits_limit = 100`,
   `CREATE TABLE IF NOT EXISTS jobs (
      id           TEXT PRIMARY KEY,

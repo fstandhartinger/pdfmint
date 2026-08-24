@@ -92,7 +92,7 @@ bytes come back in the same response. No template editor, no second request to f
 <div class="cards">
   <div class="c"><strong>Base URL</strong><span><code>https://pdfmint-b9tt.onrender.com</code></span></div>
   <div class="c"><strong>Auth</strong><span><code>Authorization: Bearer pm_live_…</code></span></div>
-  <div class="c"><strong>Free plan</strong><span>300 documents per month, no card</span></div>
+  <div class="c"><strong>Free plan</strong><span>10 documents per month, no card</span></div>
 </div>
 
 <!-- ================================================================ QUICK -->
@@ -100,7 +100,8 @@ bytes come back in the same response. No template editor, no second request to f
 <h2>Your first PDF <a class="anchor" href="#quickstart">#</a></h2>
 
 <p>Create an account at <a href="/signup">/signup</a> — the API key is shown immediately, with no
-email confirmation. Then paste this into a terminal:</p>
+email confirmation, and the free plan&rsquo;s 10 documents are there straight away. Then paste this
+into a terminal:</p>
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
@@ -122,8 +123,8 @@ Content-Type: application/pdf
 Content-Disposition: attachment; filename="document.pdf"
 X-PDFMint-Pages: 1
 X-PDFMint-Duration-Ms: 274
-X-PDFMint-Credits-Remaining: 299
-X-PDFMint-Credits-Limit: 300</code></pre>
+X-PDFMint-Credits-Remaining: 9
+X-PDFMint-Credits-Limit: 10</code></pre>
 </div>
 
 <p class="muted" style="font-size:.9rem">Measured on 2026-08-23 against the live API: a one-page
@@ -273,9 +274,9 @@ works before you build anything.</p>
   "email": "you@example.com",
   "plan": "free",
   "plan_name": "Free",
-  "credits_limit": 300,
+  "credits_limit": 10,
   "credits_used": 1,
-  "credits_remaining": 299,
+  "credits_remaining": 9,
   "period_resets_at": "2026-09-01T00:00:00.000Z",
   "dashboard_url": "https://pdfmint-b9tt.onrender.com/dashboard"
 }</code></pre>
@@ -340,10 +341,14 @@ was revoked, gives <code>401 invalid_api_key</code>. Both name the problem in
 <p>One credit is one document. A PDF, an image and a merge each cost <strong>1</strong>, no matter
 how many pages come out. <code>GET /v1/me</code> and <code>GET /v1/templates</code> are free.</p>
 
+<p>The free plan is 10 documents a month, permanently and with no card. It is sized to get a first
+PDF out of the API, not to run a workflow on. Checkout for a paid plan runs on Stripe; a VAT ID can
+optionally be added there if you need one on the invoice.</p>
+
 <div class="tw"><table>
 <thead><tr><th>Plan</th><th>Price</th><th>Documents / month</th></tr></thead>
 <tbody>
-<tr><td>Free</td><td>$0</td><td>300</td></tr>
+<tr><td>Free</td><td>$0</td><td>10</td></tr>
 <tr><td>Starter</td><td>$9</td><td>5,000</td></tr>
 <tr><td>Pro</td><td>$29</td><td>50,000</td></tr>
 <tr><td>Scale</td><td>$99</td><td>250,000</td></tr>
@@ -373,14 +378,18 @@ how many pages come out. <code>GET /v1/me</code> and <code>GET /v1/templates</co
 <pre><code>{
   "error": {
     "code": "quota_exceeded",
-    "message": "You have used all 300 documents included in your free plan this month.",
-    "hint": "Your quota resets on the 1st of next month. To raise it now, upgrade at /dashboard.",
+    "message": "You have used all 10 documents included in your free plan this month.",
+    "hint": "The quota resets on the 1st of next month. To raise it now, upgrade at /dashboard.",
     "docs": "https://pdfmint-b9tt.onrender.com/docs#quota",
-    "details": { "plan": "free", "credits_used": 300, "credits_limit": 300 },
+    "details": { "plan": "free", "credits_used": 10, "credits_limit": 10 },
     "request_id": "…"
   }
 }</code></pre>
 </div>
+
+<p class="muted" style="font-size:.9rem">An account whose allowance is 0 &mdash; which is not what a
+new signup gets &mdash; is told <code>402 plan_required</code> instead, because never having had a
+quota is a different event from spending one.</p>
 </section>
 
 <!-- ================================================================ INPUT -->
@@ -1658,6 +1667,7 @@ call in our logs.</p>
 
 <tr><td><code>missing_api_key</code></td><td>401</td><td class="wrap">No <code>Authorization</code> or <code>X-API-Key</code> header.</td><td class="wrap">Send <code>Authorization: Bearer pm_live_…</code>. In n8n, pick the credential on the node.</td></tr>
 <tr><td><code>invalid_api_key</code></td><td>401</td><td class="wrap">The key does not start with <code>pm_live_</code>, is unknown, or was revoked.</td><td class="wrap">Copy the current key from <a href="/dashboard">/dashboard</a>.</td></tr>
+<tr><td><code>plan_required</code></td><td>402</td><td class="wrap">The account has no allowance at all: <code>details.credits_limit</code> is 0. A new signup gets the free plan, so this is not what you see after signing up.</td><td class="wrap">Choose a plan on the <a href="/dashboard">dashboard</a>. See <a href="#quota">Quota</a>.</td></tr>
 <tr><td><code>quota_exceeded</code></td><td>402</td><td class="wrap">All documents for this month are used. <code>details</code> carries plan, used and limit.</td><td class="wrap">Wait for the 1st, or upgrade on the dashboard. See <a href="#quota">Quota</a>.</td></tr>
 
 <tr><td><code>missing_content</code></td><td>400</td><td class="wrap">No source field — or, on <code>PUT /v1/templates/{name}</code>, no <code>html</code>.</td><td class="wrap">Send one of <code>html</code>, <code>markdown</code>, <code>url</code>, <code>template</code>. See <a href="#input">Choosing an input</a>.</td></tr>
@@ -1749,7 +1759,7 @@ Stripe checkout flow and are never returned by a <code>/v1/</code> endpoint.</p>
 <tr><td class="wrap">Webhook delivery attempts</td><td>3</td><td class="wrap">job stays <code>succeeded</code>/<code>failed</code>, poll it instead</td></tr>
 <tr><td class="wrap">Webhook request timeout</td><td>15&nbsp;s</td><td class="wrap">counts as a failed attempt</td></tr>
 <tr><td class="wrap">Job record retention after finishing</td><td>7&nbsp;days</td><td><code>job_not_found</code></td></tr>
-<tr><td class="wrap">Documents per month</td><td class="wrap">300 free · 5,000 Starter · 50,000 Pro · 250,000 Scale</td><td><code>quota_exceeded</code></td></tr>
+<tr><td class="wrap">Documents per month</td><td class="wrap">10 free · 5,000 Starter · 50,000 Pro · 250,000 Scale</td><td><code>quota_exceeded</code></td></tr>
 </tbody></table></div>
 
 <p>Two renders run at once per instance and up to 40 more can queue. <code>GET /healthz</code>

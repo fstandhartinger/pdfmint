@@ -91,7 +91,9 @@ describe('every number on the published pages matches the code', () => {
   });
 
   test('the free plan really is the number the pages advertise', async () => {
-    const { key } = await newAccount();
+    // The free tier as a real signup gets it — helpers put accounts on a paid
+    // plan by default so the other suites do not exhaust ten documents.
+    const { key } = await newAccount('free');
     const { json } = await req('/v1/me', { key });
     assert.equal(json.credits_limit, PLANS.free.credits);
     assert.ok(landing.includes(String(PLANS.free.credits)), 'the landing page must state the real free allowance');
