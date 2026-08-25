@@ -23,8 +23,13 @@ const config = {
 
   // Identifies this deployment in the usage log, so the public status page can
   // report on production alone rather than on every process sharing the database.
+  // This also gates whether reserved-TLD email addresses are refused at signup.
+  // It used to be derived from PUBLIC_URL containing 'onrender.com', which meant
+  // moving to a real domain would silently demote production to 'dev' and start
+  // accepting @example.test signups. Deployment identity is not a function of
+  // which hostname we happen to be on.
   origin: process.env.PDFMINT_ORIGIN
-    || ((process.env.PUBLIC_URL || '').includes('onrender.com') ? 'production' : 'dev'),
+    || (process.env.NODE_ENV === 'production' ? 'production' : 'dev'),
 
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY || '',

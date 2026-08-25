@@ -64,7 +64,7 @@
         </div>
 
         <div class="code-panel" role="tabpanel" id="panel-curl" aria-labelledby="tab-curl"><pre><code><span class="tok-c"># Markdown in, a real PDF file out.</span>
-curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+curl -X POST https://pdf.mintapis.com/v1/pdf \
   -H <span class="tok-s">"Authorization: Bearer pm_live_YOUR_KEY"</span> \
   -H <span class="tok-s">"Content-Type: application/json"</span> \
   -d <span class="tok-s">'{
@@ -73,7 +73,7 @@ curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
   }'</span> \
   --output invoice.pdf</code></pre></div>
 
-        <div class="code-panel" role="tabpanel" id="panel-node" aria-labelledby="tab-node" hidden><pre><code><span class="tok-k">const</span> res = <span class="tok-k">await</span> <span class="tok-f">fetch</span>(<span class="tok-s">'https://pdfmint-b9tt.onrender.com/v1/pdf'</span>, {
+        <div class="code-panel" role="tabpanel" id="panel-node" aria-labelledby="tab-node" hidden><pre><code><span class="tok-k">const</span> res = <span class="tok-k">await</span> <span class="tok-f">fetch</span>(<span class="tok-s">'https://pdf.mintapis.com/v1/pdf'</span>, {
   method: <span class="tok-s">'POST'</span>,
   headers: {
     <span class="tok-n">Authorization</span>: <span class="tok-s">`Bearer ${process.env.PDFMINT_KEY}`</span>,

@@ -92,7 +92,7 @@
 bytes come back in the same response. No template editor, no second request to fetch the file.</p>
 
 <div class="cards">
-  <div class="c"><strong>Base URL</strong><span><code>https://pdfmint-b9tt.onrender.com</code></span></div>
+  <div class="c"><strong>Base URL</strong><span><code>https://pdf.mintapis.com</code></span></div>
   <div class="c"><strong>Auth</strong><span><code>Authorization: Bearer pm_live_…</code></span></div>
   <div class="c"><strong>Free plan</strong><span>10 documents per month, no card</span></div>
 </div>
@@ -107,7 +107,7 @@ into a terminal:</p>
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"html":"&lt;h1&gt;Hello from PDFMint&lt;/h1&gt;","options":{"margin":"20mm"}}' \
@@ -145,7 +145,7 @@ laptop in Europe, network included). A one-page HTML document with a margin: 274
 <div class="panel" id="qs-curl">
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -162,7 +162,7 @@ laptop in Europe, network included). A one-page HTML document with a margin: 274
 <button class="copy" type="button">Copy</button>
 <pre><code>import { writeFile } from 'node:fs/promises';
 
-const res = await fetch('https://pdfmint-b9tt.onrender.com/v1/pdf', {
+const res = await fetch('https://pdf.mintapis.com/v1/pdf', {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${process.env.PDFMINT_API_KEY}`,
@@ -196,7 +196,7 @@ console.log('pages:', res.headers.get('x-pdfmint-pages'),
 import requests
 
 resp = requests.post(
-    "https://pdfmint-b9tt.onrender.com/v1/pdf",
+    "https://pdf.mintapis.com/v1/pdf",
     headers={"Authorization": f"Bearer {os.environ['PDFMINT_API_KEY']}"},
     json={
         "html": "&lt;h1&gt;Hello from Python&lt;/h1&gt;",
@@ -267,7 +267,7 @@ works before you build anything.</p>
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s https://pdfmint-b9tt.onrender.com/v1/me \
+<pre><code>curl -s https://pdf.mintapis.com/v1/me \
   -H "Authorization: Bearer $PDFMINT_API_KEY"</code></pre>
 </div>
 <div class="code">
@@ -280,7 +280,7 @@ works before you build anything.</p>
   "credits_used": 1,
   "credits_remaining": 9,
   "period_resets_at": "2026-09-01T00:00:00.000Z",
-  "dashboard_url": "https://pdfmint-b9tt.onrender.com/dashboard"
+  "dashboard_url": "https://pdf.mintapis.com/dashboard"
 }</code></pre>
 </div>
 
@@ -292,7 +292,7 @@ characters). Keys can also be created and listed on the <a href="/dashboard">das
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/keys \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/keys \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"label":"n8n"}'
@@ -313,12 +313,12 @@ replacement, move your workflows over, then revoke the old one. The
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s https://pdfmint-b9tt.onrender.com/v1/keys \
+<pre><code>curl -s https://pdf.mintapis.com/v1/keys \
   -H "Authorization: Bearer $PDFMINT_API_KEY"
 
 # {"keys":[{"key_prefix":"pm_live_ab12cd34","label":"n8n","created_at":"...","last_used_at":"..."}]}
 
-curl -s -X DELETE https://pdfmint-b9tt.onrender.com/v1/keys/pm_live_ab12cd34 \
+curl -s -X DELETE https://pdf.mintapis.com/v1/keys/pm_live_ab12cd34 \
   -H "Authorization: Bearer $PDFMINT_API_KEY"
 
 # {"revoked":"pm_live_ab12cd34"}</code></pre>
@@ -382,7 +382,7 @@ optionally be added there if you need one on the invoice.</p>
     "code": "quota_exceeded",
     "message": "You have used all 10 documents included in your free plan this month.",
     "hint": "The quota resets on the 1st of next month. To raise it now, upgrade at /dashboard.",
-    "docs": "https://pdfmint-b9tt.onrender.com/docs#quota",
+    "docs": "https://pdf.mintapis.com/docs#quota",
     "details": { "plan": "free", "credits_used": 10, "credits_limit": 10 },
     "request_id": "…"
   }
@@ -442,7 +442,7 @@ its own markup.</p>
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -458,7 +458,7 @@ its own markup.</p>
     "code": "unresolved_placeholders",
     "message": "The template uses 1 placeholder that \"data\" does not provide: missing.",
     "hint": "Check the spelling against your data, or set \"strict\": false to render them as empty instead.",
-    "docs": "https://pdfmint-b9tt.onrender.com/docs#strict",
+    "docs": "https://pdf.mintapis.com/docs#strict",
     "details": { "unresolved": ["missing"] },
     "request_id": "5490af9e4a650d19"
   }
@@ -554,7 +554,7 @@ says so in words:</p>
     "code": "unresolved_placeholders",
     "message": "The document still contains 1 unfilled placeholder and the request sent no \"data\": client_name.",
     "hint": "Send the values in \"data\", for example {\"data\": {\"client_name\": \"…\"}}. With no \"data\" at all the marker is printed on the page exactly as you wrote it.",
-    "docs": "https://pdfmint-b9tt.onrender.com/docs#strict",
+    "docs": "https://pdf.mintapis.com/docs#strict",
     "details": { "unresolved": ["client_name"], "data_supplied": false },
     "request_id": "ed755bf44f021edd"
   }
@@ -600,7 +600,7 @@ no image, and only on documents of up to 5000 elements. A larger one is reported
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{ "html": "&lt;div class=\"invoice\"&gt;&lt;/div&gt;", "strict": true }'</code></pre>
@@ -612,7 +612,7 @@ no image, and only on documents of up to 5000 elements. A larger one is reported
     "code": "blank_document",
     "message": "The rendered document body contains no visible text and no images, so the pages would come out blank.",
     "hint": "Check that \"data\" really filled the template, that anything built by JavaScript has finished (use \"waitFor\"), and that a print stylesheet is not hiding the content. A header or footer does not count as content. Send \"strict\": false to receive the blank document anyway.",
-    "docs": "https://pdfmint-b9tt.onrender.com/docs#strict",
+    "docs": "https://pdf.mintapis.com/docs#strict",
     "details": { "visible_text_chars": 0, "images": 0, "painted_elements": 0 },
     "request_id": "cde4e87a40dae5dd"
   }
@@ -644,7 +644,7 @@ left has to trip one of two rules, both deliberately severe:</p>
     "code": "unrendered_markup",
     "message": "The document shows 24 HTML tags as literal text — the markup was printed instead of being applied.",
     "hint": "The markup was almost certainly HTML-escaped somewhere on the way here, or a &lt;style&gt; tag lost its brackets, so the source arrived as text. In Zapier or Make, map the raw field rather than a formatted one. Send \"strict\": false to print it as it is.",
-    "docs": "https://pdfmint-b9tt.onrender.com/docs#strict",
+    "docs": "https://pdf.mintapis.com/docs#strict",
     "details": {
       "visible_text_chars": 233,
       "analysed_chars": 233,
@@ -682,7 +682,7 @@ worked; without strict it renders as it always did and you get a warning.</p>
     "code": "invalid_placeholder_value",
     "message": "\"customer\" is an object, so it would print as \"[object Object]\".",
     "hint": "A placeholder can only print text or a number. Use a path into the object, such as {{customer.name}}, or build the string before you send it. Triggers in Zapier and Make hand back nested objects, which is where this usually comes from.",
-    "docs": "https://pdfmint-b9tt.onrender.com/docs#strict",
+    "docs": "https://pdf.mintapis.com/docs#strict",
     "details": { "unprintable": [ { "name": "customer", "type": "object" } ] },
     "request_id": "84d848349db60770"
   }
@@ -706,7 +706,7 @@ contributes nothing, and the result looks like a success.</p>
     "code": "blank_document",
     "message": "files[1] is a valid PDF with no pages, so it contributed nothing to the merge.",
     "hint": "That input is empty — check what produced it. Send \"strict\": false to merge the remaining inputs anyway.",
-    "docs": "https://pdfmint-b9tt.onrender.com/docs#strict",
+    "docs": "https://pdf.mintapis.com/docs#strict",
     "details": { "input_index": 1, "pages": 0, "page_counts": [1, 0] },
     "request_id": "6c81bb12ec017d20"
   }
@@ -785,7 +785,7 @@ that render — the page itself and its subresources. Use it for an API token or
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -879,7 +879,7 @@ above the maximum are clamped, not rejected. Expired files are deleted, and the 
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"html":"&lt;h1&gt;Hosted&lt;/h1&gt;","output":"url","expiresInMinutes":15}'</code></pre>
@@ -890,7 +890,7 @@ above the maximum are clamped, not rejected. Expired files are deleted, and the 
   "filename": "document.pdf",
   "pages": 1,
   "size": 6668,
-  "url": "https://pdfmint-b9tt.onrender.com/f/8DWbNOQ4SKr4ClZ8_36k10pM",
+  "url": "https://pdf.mintapis.com/f/8DWbNOQ4SKr4ClZ8_36k10pM",
   "expires_in_minutes": 15,
   "duration_ms": 133,
   "credits_remaining": 296
@@ -925,7 +925,7 @@ milliseconds: loading, waiting, and printing.</p>
     "code": "render_timeout",
     "message": "Rendering timed out while loading the URL.",
     "hint": "Raise \"timeout\", or set waitFor to a fixed number of milliseconds instead of \"networkidle\" if the page keeps polling in the background.",
-    "docs": "https://pdfmint-b9tt.onrender.com/docs#timeout",
+    "docs": "https://pdf.mintapis.com/docs#timeout",
     "request_id": "935b22fbab54b64f"
   }
 }</code></pre>
@@ -963,7 +963,7 @@ find out it was a typo instead of getting a half-drawn page:</p>
     "code": "wait_for_timeout",
     "message": "Timed out waiting for \"#never\" to appear on the page.",
     "hint": "Check the selector, or use a number of milliseconds instead (for example waitFor: 1000).",
-    "docs": "https://pdfmint-b9tt.onrender.com/docs#waitfor",
+    "docs": "https://pdf.mintapis.com/docs#waitfor",
     "request_id": "8c78de2a7d723752"
   }
 }</code></pre>
@@ -1049,7 +1049,7 @@ can hold an HTTP connection open for a minute or more. Some clients time out fir
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1064,7 +1064,7 @@ can hold an HTTP connection open for a minute or more. Some clients time out fir
 <pre><code>{
   "job_id": "job_z25FB4zf4nb55i7Z",
   "status": "queued",
-  "status_url": "https://pdfmint-b9tt.onrender.com/v1/jobs/job_z25FB4zf4nb55i7Z",
+  "status_url": "https://pdf.mintapis.com/v1/jobs/job_z25FB4zf4nb55i7Z",
   "credits_remaining": 272
 }</code></pre>
 </div>
@@ -1100,7 +1100,7 @@ as usual (default 60, max 7 days), so give yourself enough time to fetch it.</p>
 #     -H "Content-Type: application/json" \
 #     -d '{"markdown":"# Report","async":true}' | jq -r .job_id)
 
-curl -s https://pdfmint-b9tt.onrender.com/v1/jobs/$JOB_ID \
+curl -s https://pdf.mintapis.com/v1/jobs/$JOB_ID \
   -H "Authorization: Bearer $PDFMINT_API_KEY"</code></pre>
 </div>
 <div class="code">
@@ -1113,7 +1113,7 @@ curl -s https://pdfmint-b9tt.onrender.com/v1/jobs/$JOB_ID \
   "started_at": "2026-08-23T15:08:39.364Z",
   "finished_at": "2026-08-23T15:08:40.454Z",
   "attempts": 0,
-  "url": "https://pdfmint-b9tt.onrender.com/f/9xKR-JWGbkear8iiGJAVnBn9",
+  "url": "https://pdf.mintapis.com/f/9xKR-JWGbkear8iiGJAVnBn9",
   "size": 8042,
   "pages": 1,
   "filename": "async.pdf",
@@ -1132,7 +1132,7 @@ one case this exists for: a document big enough to exhaust the renderer used to 
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X DELETE https://pdfmint-b9tt.onrender.com/v1/jobs/$JOB_ID \
+<pre><code>curl -s -X DELETE https://pdf.mintapis.com/v1/jobs/$JOB_ID \
   -H "Authorization: Bearer $PDFMINT_API_KEY"
 
 # {"job_id":"job_z25FB4zf4nb55i7Z","status":"cancelled"}</code></pre>
@@ -1155,7 +1155,7 @@ it is in, rather than pretending to cancel something that is over. Another accou
   "filename": "async.pdf",
   "pages": 1,
   "size": 8042,
-  "url": "https://pdfmint-b9tt.onrender.com/f/9xKR-JWGbkear8iiGJAVnBn9",
+  "url": "https://pdf.mintapis.com/f/9xKR-JWGbkear8iiGJAVnBn9",
   "expires_in_minutes": 120,
   "duration_ms": 56
 }</code></pre>
@@ -1246,7 +1246,7 @@ question is always the same: <em>what did the browser actually see?</em> Send
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1461,7 +1461,7 @@ works as it does on <a href="#pdf"><code>/v1/pdf</code></a>, including
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/image \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/image \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1523,7 +1523,7 @@ curl -s -X POST $API/v1/merge \
   "filename": "contract.pdf",
   "pages": 2,
   "size": 10140,
-  "url": "https://pdfmint-b9tt.onrender.com/f/e4AJQ048aQPLrLc5chiZsvIO",
+  "url": "https://pdf.mintapis.com/f/e4AJQ048aQPLrLc5chiZsvIO",
   "expires_in_minutes": 60,
   "credits_remaining": 290
 }</code></pre>
@@ -1571,7 +1571,7 @@ override the stored ones.</p>
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X PUT https://pdfmint-b9tt.onrender.com/v1/templates/invoice \
+<pre><code>curl -s -X PUT https://pdf.mintapis.com/v1/templates/invoice \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1586,7 +1586,7 @@ override the stored ones.</p>
 <h3 id="templates-render">Rendering one <a class="anchor" href="#templates-render">#</a></h3>
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1711,7 +1711,7 @@ exactly once in the whole document.</p>
 </div>
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   --data-binary @invoice.json \
@@ -1729,7 +1729,7 @@ breaks.</p>
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1762,14 +1762,14 @@ printed over your first paragraph — you can leave <code>margin.top</code> out 
   "html": "&lt;h1&gt;Annual report&lt;/h1&gt;&lt;p&gt;Body text.&lt;/p&gt;",
   "options": {
     "margin": { "top": "28mm", "bottom": "20mm", "left": "18mm", "right": "18mm" },
-    "headerHtml": "&lt;div style='display:flex;justify-content:space-between;align-items:center;width:100%'&gt;&lt;img src='https://pdfmint-b9tt.onrender.com/favicon.svg' style='height:14px'&gt;&lt;span&gt;Annual report 2026&lt;/span&gt;&lt;/div&gt;",
+    "headerHtml": "&lt;div style='display:flex;justify-content:space-between;align-items:center;width:100%'&gt;&lt;img src='https://pdf.mintapis.com/favicon.svg' style='height:14px'&gt;&lt;span&gt;Annual report 2026&lt;/span&gt;&lt;/div&gt;",
     "footerHtml": "&lt;div style='text-align:center;width:100%'&gt;Page &lt;span class='pageNumber'&gt;&lt;/span&gt; of &lt;span class='totalPages'&gt;&lt;/span&gt;&lt;/div&gt;"
   }
 }</code></pre>
 </div>
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   --data-binary @header.json -o report.pdf -w "%{http_code}\n"
@@ -1796,7 +1796,7 @@ properly. The three rules that matter:</p>
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1820,7 +1820,7 @@ instead of handing you a blank rectangle.</p>
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1844,7 +1844,7 @@ happened. In your own page:</p>
 <h3 id="recipe-password">A password-protected document <a class="anchor" href="#recipe-password">#</a></h3>
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1865,7 +1865,7 @@ copying text is not.</p>
 <h3 id="recipe-watermark">A DRAFT watermark on every page <a class="anchor" href="#recipe-watermark">#</a></h3>
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+<pre><code>curl -s -X POST https://pdf.mintapis.com/v1/pdf \
   -H "Authorization: Bearer $PDFMINT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1908,14 +1908,14 @@ curl -s -X POST $API/v1/pdf \
       }"
 
 # 202 {"job_id":"job_…","status":"queued",
-#      "status_url":"https://pdfmint-b9tt.onrender.com/v1/jobs/job_…",
+#      "status_url":"https://pdf.mintapis.com/v1/jobs/job_…",
 #      "webhook_url":"https://your-n8n.example.com/webhook/pdf-done",
 #      "credits_remaining":271}</code></pre>
 </div>
 <p>Without a webhook, poll instead — this is the loop, measured against a live queue:</p>
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>API=https://pdfmint-b9tt.onrender.com
+<pre><code>API=https://pdf.mintapis.com
 ID=$(curl -s -X POST $API/v1/pdf \
       -H "Authorization: Bearer $PDFMINT_API_KEY" -H "Content-Type: application/json" \
       -d '{"html":"&lt;h1&gt;Async report&lt;/h1&gt;","filename":"async.pdf","async":true}' | jq -r .job_id)
@@ -1938,7 +1938,7 @@ curl -s $API/v1/jobs/$ID -H "Authorization: Bearer $PDFMINT_API_KEY" | jq .</cod
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
-<pre><code>API=https://pdfmint-b9tt.onrender.com
+<pre><code>API=https://pdf.mintapis.com
 AUTH="Authorization: Bearer $PDFMINT_API_KEY"
 JSON="Content-Type: application/json"
 
@@ -1951,7 +1951,7 @@ curl -s -X POST $API/v1/merge -H "$AUTH" -H "$JSON" \
   -d "{\"files\":[\"$U1\",\"$U2\"],\"filename\":\"contract.pdf\",\"output\":\"url\"}"
 
 # {"filename":"contract.pdf","pages":2,"size":10140,
-#  "url":"https://pdfmint-b9tt.onrender.com/f/e4AJQ048aQPLrLc5chiZsvIO",
+#  "url":"https://pdf.mintapis.com/f/e4AJQ048aQPLrLc5chiZsvIO",
 #  "expires_in_minutes":60,"credits_remaining":290}</code></pre>
 </div>
 <p>If the parts are already in memory, skip the hosting step and send
@@ -1973,7 +1973,7 @@ call in our logs.</p>
     "code": "invalid_option",
     "message": "\"format\" must be one of A0, A1, A2, A3, A4, A5, A6, Letter, Legal, Tabloid, Ledger — got \"A9\".",
     "hint": "Use \"A4\" for metric paper or \"Letter\" for US paper. To use a custom size, set \"width\" and \"height\" instead of \"format\".",
-    "docs": "https://pdfmint-b9tt.onrender.com/docs#options",
+    "docs": "https://pdf.mintapis.com/docs#options",
     "details": { },
     "request_id": "2a9310a5d2dd1281"
   }
@@ -2160,7 +2160,7 @@ File and you get the same binary the PDFMint node would have handed you.</p>
   <li>Create an account at <a href="/signup">/signup</a> — the key is shown immediately.</li>
   <li>In n8n, add a <strong>PDFMint API</strong> credential and paste the key (it starts with
       <code>pm_live_</code>).</li>
-  <li><strong>Base URL</strong> defaults to <code>https://pdfmint-b9tt.onrender.com</code>. Change it
+  <li><strong>Base URL</strong> defaults to <code>https://pdf.mintapis.com</code>. Change it
       only if you run your own instance.</li>
   <li>The credential tests itself with <code>GET /v1/me</code>, so you know immediately whether the
       key works.</li>
