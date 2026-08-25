@@ -4,7 +4,13 @@ const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
 const { query } = require('./db');
 const { ApiError } = require('./errors');
-const { PLANS } = require('./config');
+const { config, PLANS } = require('./config');
+
+/**
+ * Hints are read by a human, in a terminal or an n8n error panel, where a bare
+ * "/dashboard" is not a link and not a place they can go. Always absolute.
+ */
+const dashboardUrl = () => `${config.publicUrl || ''}/dashboard`;
 
 const KEY_PREFIX = 'pm_live_';
 
@@ -102,7 +108,7 @@ async function authenticate(req) {
   }
   if (!key.startsWith(KEY_PREFIX)) {
     throw new ApiError(401, 'invalid_api_key', 'That does not look like a PDFMint API key.', {
-      hint: 'PDFMint keys start with "pm_live_". If you no longer have yours, create a new one on your dashboard at /dashboard — keys are only shown once, so an existing key cannot be read back.',
+      hint: `PDFMint keys start with "pm_live_". If you no longer have yours, create a new one at ${dashboardUrl()} — keys are only shown once, so an existing key cannot be read back.`,
       docs: '/docs#authentication',
     });
   }
@@ -113,7 +119,7 @@ async function authenticate(req) {
   );
   if (!rows.length) {
     throw new ApiError(401, 'invalid_api_key', 'This API key is not valid, or it has been revoked.', {
-      hint: 'Keys are only shown once and cannot be read back, so if you have lost it, create a new one on your dashboard at /dashboard. Revoked keys stop working immediately.',
+      hint: `Keys are only shown once and cannot be read back, so if you have lost it, create a new one at ${dashboardUrl()}. Revoked keys stop working immediately.`,
       docs: '/docs#authentication',
     });
   }
@@ -142,14 +148,14 @@ async function consumeCredits(accountId, n = 1) {
     if (Number(a.credits_limit) === 0) {
       throw new ApiError(402, 'plan_required',
         'This account has no plan, so it cannot render anything yet.', {
-          hint: 'This account has an allowance of 0 documents. Choose a plan at /dashboard.',
+          hint: `This account has an allowance of 0 documents. Choose a plan at ${dashboardUrl()}.`,
           docs: '/docs#quota',
           details: { plan: a.plan, credits_used: a.credits_used, credits_limit: a.credits_limit },
         });
     }
     throw new ApiError(402, 'quota_exceeded',
       `You have used all ${a.credits_limit} documents included in your ${a.plan} plan this month.`, {
-        hint: 'The quota resets on the 1st of next month. To raise it now, upgrade at /dashboard.',
+        hint: `The quota resets on the 1st of next month. To raise it now, upgrade at ${dashboardUrl()}.`,
         docs: '/docs#quota',
         details: { plan: a.plan, credits_used: a.credits_used, credits_limit: a.credits_limit },
       });

@@ -146,10 +146,10 @@ const PDF_FIELDS = new Set([
 const IMAGE_FIELDS = new Set([
   'html', 'markdown', 'url', 'type', 'output', 'filename', 'quality', 'width', 'height',
   'deviceScaleFactor', 'fullPage', 'omitBackground', 'waitFor', 'timeout', 'timeoutMs',
-  'javascript', 'css', 'googleFonts', 'expiresInMinutes',
+  'javascript', 'css', 'googleFonts', 'expiresInMinutes', 'strict', 'data',
 ]);
 
-const MERGE_FIELDS = new Set(['files', 'urls', 'pdfs', 'output', 'filename', 'metadata', 'expiresInMinutes']);
+const MERGE_FIELDS = new Set(['files', 'urls', 'pdfs', 'output', 'filename', 'metadata', 'expiresInMinutes', 'strict']);
 
 const OUTPUT_MODES = ['binary', 'url', 'base64'];
 function outputModeFor(body, allowed = OUTPUT_MODES) {
@@ -185,17 +185,70 @@ function timeoutWarning(body) {
   return null;
 }
 
+/**
+ * The extension has to match the bytes. A caller who asks for "chart" gets
+ * "chart.png", exactly as the PDF path appends ".pdf" — without it the file
+ * uploads to Drive with no extension and will not preview. A caller who asks for
+ * "chart.png" as a JPEG gets "chart.jpeg" and a warning: a file whose name lies
+ * about its format is worse than a renamed one.
+ */
+function imageFilename(requested, type, warnings) {
+  const base = sanitiseFilename(requested, `image.${type}`);
+  const wrong = /\.(png|jpe?g)$/i.exec(base);
+  if (wrong && wrong[1].toLowerCase().replace('jpg', 'jpeg') === type) return base;
+  const named = `${base.replace(/\.(png|jpe?g)$/i, '')}.${type}`;
+  if (wrong && warnings) warnings.push(`"filename" ended in "${wrong[0]}" but the image is a ${type.toUpperCase()}, so it was named "${named}"`);
+  return named;
+}
+
+/**
+ * A warning is advice, and advice must never be the thing that fails the call.
+ * Node refuses a header byte above U+00FF, so one em dash in a warning answered
+ * 500 to a request whose document was perfectly fine.
+ */
+const TYPOGRAPHY = { '\u2014': '-', '\u2013': '-', '\u2018': "'", '\u2019': "'", '\u201c': '"', '\u201d': '"', '\u2026': '...' };
+function warningHeader(warnings) {
+  return warnings.join(' | ')
+    .replace(/[\u2013\u2014\u2018\u2019\u201c\u201d\u2026]/g, (c) => TYPOGRAPHY[c])
+    .replace(/[^\t\x20-\x7e\xa0-\xff]/g, ' ')
+    .slice(0, 900);
+}
+
 function sanitiseFilename(name, fallback) {
   const s = String(name || fallback).trim().replace(/[\\/:*?"<>|\r\n\t]/g, '_').slice(0, 120);
   return s || fallback;
 }
 
 /**
+ * A value that cannot be printed as text. `{{customer}}` where customer is an
+ * object puts "[object Object]" on an invoice, and Zapier and Make hand back
+ * nested objects from most triggers, so this happens constantly. An array of
+ * scalars is fine — `{{tags}}` giving "red,blue" is what the caller meant.
+ */
+function unprintableType(v) {
+  if (v === null || typeof v !== 'object') return null;
+  if (Array.isArray(v)) return v.some((x) => x !== null && typeof x === 'object') ? 'array of objects' : null;
+  return 'object';
+}
+
+/**
  * Renders a mustache-lite template: {{name}}, {{a.b}}, {{#list}}...{{/list}},
  * {{^empty}}...{{/empty}} and {{{raw}}}. Deliberately tiny and dependency-free.
+ *
+ * Returns, besides the markup: every name it could not resolve, every name whose
+ * value cannot be printed, and every marker it met at all. That last one is what
+ * `GET /v1/templates/{name}` reports, so the list a client builds its fields from
+ * comes from this exact traversal and cannot drift from what a render does.
+ *
+ * `opts.escape: false` inserts values raw — for a watermark, which is drawn as
+ * text by pdf-lib and would otherwise show a literal "&amp;".
  */
-function fillTemplate(tpl, data) {
+function fillTemplate(tpl, data, opts = {}) {
+  const escapeValues = opts.escape !== false;
   const unresolved = new Set();
+  const unprintable = new Map();
+  const seen = new Map();
+  const record = (name, kind) => { if (!seen.has(name)) seen.set(name, kind); };
   const lookup = (ctxStack, path) => {
     if (path === '.') return ctxStack[ctxStack.length - 1];
     const parts = path.split('.');
@@ -221,29 +274,62 @@ function fillTemplate(tpl, data) {
       guard += 1;
       const [full, kind, name, inner] = m;
       const val = lookup(ctxStack, name);
+      record(name, kind === '#' ? 'section' : 'inverted');
       let replacement = '';
       if (kind === '#') {
+        // A key that is present and holds an empty list is a real invoice with
+        // no extras. A key that is absent altogether is a misspelling, and the
+        // section — usually the whole line-item table — silently disappears.
+        if (val === undefined) unresolved.add(name);
         if (Array.isArray(val)) replacement = val.map((item) => renderStr(inner, ctxStack.concat([item]))).join('');
         else if (val) replacement = renderStr(inner, ctxStack.concat([typeof val === 'object' ? val : {}]));
       } else if (!val || (Array.isArray(val) && val.length === 0)) {
+        // An inverted section exists to handle the missing case, so a missing
+        // key here is the author doing what the syntax is for, not a mistake.
         replacement = renderStr(inner, ctxStack);
       }
       out = out.slice(0, m.index) + replacement + out.slice(m.index + full.length);
     }
     out = out.replace(/\{\{\{\s*([\w.$]+)\s*\}\}\}/g, (_, p) => {
+      record(p, 'raw');
       const v = lookup(ctxStack, p);
       if (v === undefined || v === null) { unresolved.add(p); return ''; }
+      const bad = unprintableType(v);
+      if (bad) unprintable.set(p, bad);
       return String(v);
     });
     out = out.replace(/\{\{\s*([\w.$]+)\s*\}\}/g, (_, p) => {
+      record(p, 'scalar');
       const v = lookup(ctxStack, p);
       if (v === undefined || v === null) { unresolved.add(p); return ''; }
-      return esc(v);
+      const bad = unprintableType(v);
+      if (bad) unprintable.set(p, bad);
+      return escapeValues ? esc(v) : String(v);
     });
     return out;
   };
   const html = renderStr(String(tpl), [data && typeof data === 'object' ? data : {}]);
-  return { html, unresolved: Array.from(unresolved) };
+  return {
+    html,
+    unresolved: Array.from(unresolved),
+    unprintable: Array.from(unprintable, ([name, type]) => ({ name, type })),
+    placeholders: Array.from(seen, ([name, kind]) => ({ name, kind })),
+  };
+}
+
+/**
+ * Finds the placeholders a source uses, without substituting anything.
+ *
+ * A request that sent no "data" at all used to skip the scan entirely, so
+ * `{"html": "<h1>Hi {{client_name}}</h1>", "strict": true}` came back 200 with
+ * the raw token printed on the paper — the exact complaint strict mode exists to
+ * answer. Returns null when the source cannot contain a placeholder, so the
+ * common case never pays for the scan.
+ */
+function scanPlaceholders(source) {
+  const s = String(source || '');
+  if (!s.includes('{{')) return null;
+  return fillTemplate(s, {}).unresolved;
 }
 
 function parseData(raw) {
@@ -295,6 +381,235 @@ function logUsage(accountId, kind, ok, extra = {}) {
   ).catch(() => {});
 }
 
+/* -------------------------------------------------------------- strict mode */
+
+/**
+ * The failure Zapier and Make users actually complain about is not an error at
+ * all — it is a 200 with a blank or garbled file behind it. Strict mode is the
+ * promise that we refuse instead of handing that over.
+ *
+ * Both markup thresholds are measured on the text *outside* code samples, since
+ * a <pre> is the one place a real document shows CSS and tags on purpose. They
+ * are still deliberately severe: a false accusation here would be worse than the
+ * bug being caught, so a page has to be almost nothing but source to be refused.
+ */
+const STRICT = {
+  markupMinChars: 200,
+  markupMinRatio: 0.85,
+  markupMinDeclarations: 3,
+  tagMinCount: 8,
+  tagMinClosing: 3,
+  tagMinRatio: 0.3,
+  docs: '/docs#strict',
+};
+
+/**
+ * One greppable line per strict decision, whether strict is on or off. A daily
+ * observer reads these to know the check is running and what it decided.
+ */
+function logStrict(ctx, fields) {
+  const parts = [`id=${(ctx && ctx.id) || '-'}`, `endpoint=${(ctx && ctx.endpoint) || '-'}`];
+  for (const [k, v] of Object.entries(fields)) parts.push(`${k}=${v}`);
+  console.log(`[strict] ${parts.join(' ')}`);
+}
+
+/**
+ * The placeholder verdict, shared by /v1/pdf and /v1/image so both say the same
+ * thing about the same document. `filled` records whether "data" was applied at
+ * all: without it the marker is printed exactly as written rather than as an
+ * empty string, and an error that got that backwards would send the reader
+ * looking in the wrong place.
+ */
+function gatePlaceholders({ ctx, strict, unresolved = [], unprintable = [], filled, scan, warnings, durationMs }) {
+  const n = unresolved.length;
+  const names = unresolved.slice(0, 12).join(', ');
+  let problem = null;
+  if (n && filled) {
+    problem = bad('unresolved_placeholders',
+      `The template uses ${n} placeholder${n === 1 ? '' : 's'} that "data" does not provide: ${names}.`, {
+        hint: 'Check the spelling against your data, or set "strict": false to render them as empty instead.',
+        details: { unresolved, data_supplied: true },
+        docs: STRICT.docs,
+      });
+  } else if (n) {
+    problem = bad('unresolved_placeholders',
+      `The document still contains ${n} unfilled placeholder${n === 1 ? '' : 's'} and the request sent no "data": ${names}.`, {
+        hint: `Send the values in "data", for example {"data": {"${unresolved[0]}": "…"}}. With no "data" at all the marker is printed on the page exactly as you wrote it.`,
+        details: { unresolved, data_supplied: false },
+        docs: STRICT.docs,
+      });
+  } else if (unprintable.length) {
+    const first = unprintable[0];
+    problem = bad('invalid_placeholder_value',
+      `"${first.name}" is an ${first.type}, so it would print as "[object Object]".`, {
+        hint: `A placeholder can only print text or a number. Use a path into the object, such as {{${first.name}.name}}, or build the string before you send it. Triggers in Zapier and Make hand back nested objects, which is where this usually comes from.`,
+        details: { unprintable },
+        docs: STRICT.docs,
+      });
+  }
+  logStrict(ctx, {
+    strict: strict ? 'on' : 'off',
+    unresolved: n,
+    unprintable: unprintable.length,
+    placeholder_scan: scan,
+    visible_text_chars: '-',
+    images: '-',
+    painted: '-',
+    markup_ratio: '-',
+    tag_ratio: '-',
+    verdict: problem ? (strict ? 'rejected' : 'warned') : 'ok',
+    reason: problem ? problem.code : 'none',
+    ms: durationMs === undefined ? '-' : durationMs,
+  });
+  if (!problem) return null;
+  if (strict) return problem;
+  if (warnings) {
+    if (n) {
+      warnings.push(filled
+        ? `${n} placeholder(s) had no value and rendered empty: ${names}`
+        : `${n} placeholder(s) are printed on the page exactly as written because no "data" was sent: ${names}`);
+    }
+    for (const u of unprintable) {
+      warnings.push(`"${u.name}" is an ${u.type} and printed as "[object Object]" — use a path into it, such as {{${u.name}.name}}`);
+    }
+  }
+  return null;
+}
+
+const BLANK_TEXT = {
+  pdf: {
+    message: 'The rendered document body contains no visible text and no images, so the pages would come out blank.',
+    hint: 'Check that "data" really filled the template, that anything built by JavaScript has finished (use "waitFor"), and that a print stylesheet is not hiding the content. A header or footer does not count as content. Send "strict": false to receive the blank document anyway.',
+  },
+  image: {
+    message: 'The rendered page contains no visible text and no images, so the screenshot would come out blank.',
+    hint: 'Check that the markup has content, and that anything built by JavaScript has finished (use "waitFor"). Send "strict": false to receive the blank image anyway.',
+  },
+};
+
+/**
+ * Turns the measurements taken inside Chromium into a verdict. Returns the error
+ * that describes what is wrong with the document, or null when it is fine.
+ * A measurement we could not take is never a reason to refuse anything.
+ */
+function contentProblem(content, kind, extra = {}) {
+  if (!content || content.error) return null;
+  if (content.textChars === 0 && content.images === 0 && content.painted === 0 && !content.truncated) {
+    const t = BLANK_TEXT[kind] || BLANK_TEXT.pdf;
+    return bad('blank_document', t.message, {
+      hint: t.hint,
+      details: { visible_text_chars: 0, images: 0, painted_elements: 0, ...extra },
+      docs: STRICT.docs,
+    });
+  }
+  const markupHint = 'The markup was almost certainly HTML-escaped somewhere on the way here, or a <style> tag lost its brackets, so the source arrived as text. In Zapier or Make, map the raw field rather than a formatted one. Send "strict": false to print it as it is.';
+  const markupDetails = {
+    visible_text_chars: content.textChars,
+    analysed_chars: content.proseChars,
+    markup_ratio: Number((content.markupRatio || 0).toFixed(3)),
+    tag_ratio: Number((content.tagRatio || 0).toFixed(3)),
+    css_declarations: content.declarations,
+    literal_tags: content.tags,
+  };
+  // Two different accidents, so two different measurements. A leaked stylesheet
+  // is CSS all the way down; escaped markup is prose with tags printed through it.
+  if (content.proseChars >= STRICT.markupMinChars
+      && content.markupRatio >= STRICT.markupMinRatio
+      && content.declarations >= STRICT.markupMinDeclarations) {
+    return bad('unrendered_markup',
+      `${Math.round(content.markupRatio * 100)}% of the visible text is raw CSS — the stylesheet was printed instead of being applied.`, {
+        hint: markupHint, details: markupDetails, docs: STRICT.docs,
+      });
+  }
+  if (content.tags >= STRICT.tagMinCount
+      && content.closingTags >= STRICT.tagMinClosing
+      && content.tagRatio >= STRICT.tagMinRatio) {
+    return bad('unrendered_markup',
+      `The document shows ${content.tags} HTML tags as literal text — the markup was printed instead of being applied.`, {
+        hint: markupHint, details: markupDetails, docs: STRICT.docs,
+      });
+  }
+  return null;
+}
+
+const orDash = (v) => (v === undefined || v === null ? '-' : v);
+
+/**
+ * Decides, logs, and in strict mode hands back the error to throw. A caller who
+ * did not ask to be protected still gets told, as a warning — being quiet about
+ * a document we know looks blank is the behaviour we are selling against.
+ */
+function gateContent({ ctx, strict, content, kind, unresolved = 0, scan = '-', warnings, durationMs, extra }) {
+  const problem = contentProblem(content, kind, extra);
+  const c = content || {};
+  logStrict(ctx, {
+    strict: strict ? 'on' : 'off',
+    unresolved,
+    unprintable: '-',
+    placeholder_scan: scan,
+    visible_text_chars: c.error ? '-' : orDash(c.textChars),
+    images: c.error ? '-' : orDash(c.images),
+    painted: c.error ? '-' : orDash(c.painted),
+    markup_ratio: c.error ? '-' : (typeof c.markupRatio === 'number' ? c.markupRatio.toFixed(2) : '-'),
+    tag_ratio: c.error ? '-' : (typeof c.tagRatio === 'number' ? c.tagRatio.toFixed(2) : '-'),
+    verdict: problem ? (strict ? 'rejected' : 'warned') : 'ok',
+    // A "0 painted, but fine" line would otherwise read as a contradiction: say
+    // outright when the paint scan was skipped for being too big to trust.
+    reason: problem ? problem.code : (c.error ? 'not_measured' : (c.truncated ? 'paint_scan_skipped' : 'none')),
+    ms: durationMs === undefined ? '-' : durationMs,
+    check_ms: orDash(c.ms),
+  });
+  if (!problem) return null;
+  if (strict) return problem;
+  if (warnings) warnings.push(`${problem.message} Set "strict": true to make this an error instead.`);
+  return null;
+}
+
+/**
+ * A merge has no page to look at, so the equivalent question is whether any
+ * pages came out — in total, and from each input. An input that contributed
+ * nothing is the merge version of the same silent failure.
+ */
+function gateMerge({ ctx, strict, pageCounts, warnings, durationMs }) {
+  const total = pageCounts.reduce((a, b) => a + b, 0);
+  const emptyIndex = pageCounts.findIndex((n) => n === 0);
+  let problem = null;
+  if (total === 0) {
+    problem = bad('blank_document', 'The merged document has no pages: every input was an empty PDF.', {
+      hint: 'Check that the inputs are the documents you meant to merge. Send "strict": false to receive the empty document anyway.',
+      details: { pages: 0, page_counts: pageCounts },
+      docs: STRICT.docs,
+    });
+  } else if (emptyIndex >= 0) {
+    problem = bad('blank_document', `files[${emptyIndex}] is a valid PDF with no pages, so it contributed nothing to the merge.`, {
+      hint: 'That input is empty — check what produced it. Send "strict": false to merge the remaining inputs anyway.',
+      details: { input_index: emptyIndex, pages: 0, page_counts: pageCounts },
+      docs: STRICT.docs,
+    });
+  }
+  logStrict(ctx, {
+    strict: strict ? 'on' : 'off',
+    unresolved: '-',
+    unprintable: '-',
+    placeholder_scan: '-',
+    visible_text_chars: '-',
+    images: '-',
+    painted: '-',
+    markup_ratio: '-',
+    tag_ratio: '-',
+    inputs: pageCounts.length,
+    pages: total,
+    empty_inputs: pageCounts.filter((n) => n === 0).length,
+    verdict: problem ? (strict ? 'rejected' : 'warned') : 'ok',
+    reason: problem ? problem.code : 'none',
+    ms: durationMs === undefined ? '-' : durationMs,
+  });
+  if (!problem) return null;
+  if (strict) return problem;
+  if (warnings) warnings.push(`${problem.message} Set "strict": true to make this an error instead.`);
+  return null;
+}
+
 /* ------------------------------------------------------------------ /v1/me */
 
 router.get('/me', withAuth, asyncRoute(async (req, res) => {
@@ -320,27 +635,70 @@ router.get('/me', withAuth, asyncRoute(async (req, res) => {
  * Builds the render job from a request body. Shared by the synchronous route
  * and the async worker so both behave identically.
  */
-async function preparePdf(account, body) {
+async function preparePdf(account, rawBody, ctx = {}) {
+  const startedAt = Date.now();
+  // Fold "options" into the body the way /v1/image and /v1/merge already do.
+  // Without it a caller who sent page options flat had them computed and then
+  // thrown away by a saved template's stored options, and a "waitFor" inside
+  // the wrapper was read by one endpoint and ignored by its neighbour.
+  const body = foldOptionsWrapper(rawBody || {});
   rejectUnknownFields(body, PDF_FIELDS, 'POST /v1/pdf');
+  // Read once, up front: a "strict": "maybe" must be refused whether or not the
+  // document happens to have anything wrong with it.
+  const strict = asBool(body.strict, 'strict', false);
   const source = pickSource(body);
   const timeoutMs = timeoutFor(body);
-  const options = normalisePdfOptions(body.options || body);
+  const options = normalisePdfOptions(body);
   const outputMode = outputModeFor(body);
 
   let html = null;
   let url = null;
-  let unresolved = [];
+  // Whether "data" was applied at all, and what the placeholder scan did. Both
+  // reach the caller: a marker rendered empty and a marker printed as written
+  // are different failures with different fixes.
+  let dataApplied = false;
+  let scan = 'none';
+  const data = body.data ? parseData(body.data) : null;
+  const unresolved = [];
+  const unprintable = [];
+  const collect = (r) => {
+    for (const n of r.unresolved) if (!unresolved.includes(n)) unresolved.push(n);
+    for (const u of r.unprintable) if (!unprintable.some((x) => x.name === u.name)) unprintable.push(u);
+    return r;
+  };
+
+  /**
+   * Fills one fragment that is not the body — a header, a footer, a watermark.
+   * These went to the renderer raw, so "Invoice {{invoice_number}}" printed on
+   * every page with strict on and data supplied. With no data at all the bytes
+   * are left exactly as they were, and the markers are only reported.
+   */
+  const fillPart = (text, escape = true) => {
+    if (typeof text !== 'string' || !text.includes('{{')) return text;
+    const r = collect(fillTemplate(text, data || {}, { escape }));
+    if (scan === 'none') scan = dataApplied ? 'filled' : 'scanned';
+    return data ? r.html : text;
+  };
+
   if (source === 'html') {
     html = String(body.html);
-    const data = body.data ? parseData(body.data) : null;
-    if (data) ({ html, unresolved } = fillTemplate(html, data));
+    if (data) {
+      html = collect(fillTemplate(html, data)).html;
+      dataApplied = true;
+      scan = 'filled';
+    } else if (html.includes('{{')) {
+      collect(fillTemplate(html, {}));
+      scan = 'scanned';
+    }
   } else if (source === 'markdown') {
     let md = String(body.markdown);
-    const data = body.data ? parseData(body.data) : null;
     if (data) {
-      const filled = fillTemplate(md, data);
-      md = filled.html;
-      unresolved = filled.unresolved;
+      md = collect(fillTemplate(md, data)).html;
+      dataApplied = true;
+      scan = 'filled';
+    } else if (md.includes('{{')) {
+      collect(fillTemplate(md, {}));
+      scan = 'scanned';
     }
     html = markdownToHtml(md, {
       title: body.metadata?.title || body.title,
@@ -361,22 +719,40 @@ async function preparePdf(account, body) {
       });
     }
     const tpl = rows[0];
-    ({ html, unresolved } = fillTemplate(tpl.html, parseData(body.data)));
-    Object.assign(options, normalisePdfOptions({ ...(tpl.options || {}), ...(body.options || {}) }));
+    // A saved template is always filled, even from an empty object: asking for a
+    // template is asking for substitution, whether or not values came with it.
+    html = collect(fillTemplate(tpl.html, parseData(body.data))).html;
+    dataApplied = true;
+    scan = 'filled';
+    // The template's stored options are defaults. The request wins over them —
+    // it is the more specific statement of intent, and it arrived later.
+    Object.assign(options, normalisePdfOptions({ ...(tpl.options || {}), ...body }));
+  }
+
+  // A header, a footer and a watermark are content too, and are filled from the
+  // same data as the body. Done after the template branch, because a template
+  // can carry its own headerHtml and it must be filled as well.
+  if (options.displayHeaderFooter) {
+    options.headerTemplate = fillPart(options.headerTemplate);
+    options.footerTemplate = fillPart(options.footerTemplate);
+  }
+  let watermark = null;
+  if (body.watermark) {
+    const spec = typeof body.watermark === 'string' ? { text: body.watermark } : { ...body.watermark };
+    // Drawn as text by pdf-lib, not as markup, so escaping it would print a
+    // literal "&amp;" across the page.
+    if (typeof spec.text === 'string') spec.text = fillPart(spec.text, false);
+    watermark = spec;
   }
 
   // Every other vendor renders a silently blank document when the data keys do
   // not match the placeholder names. We refuse to do that quietly.
-  if (unresolved.length) {
-    if (asBool(body.strict, 'strict', false)) {
-      throw bad('unresolved_placeholders',
-        `The template uses ${unresolved.length} placeholder${unresolved.length === 1 ? '' : 's'} that "data" does not provide: ${unresolved.slice(0, 12).join(', ')}.`, {
-          hint: 'Check the spelling against your data, or set "strict": false to render them as empty instead.',
-          details: { unresolved },
-          docs: '/docs#templates',
-        });
-    }
-    options.warnings.push(`${unresolved.length} placeholder(s) had no value and rendered empty: ${unresolved.slice(0, 12).join(', ')}`);
+  if (unresolved.length || unprintable.length) {
+    const problem = gatePlaceholders({
+      ctx, strict, unresolved, unprintable, filled: dataApplied, scan,
+      warnings: options.warnings, durationMs: Date.now() - startedAt,
+    });
+    if (problem) throw problem;
   }
 
   if (html && Buffer.byteLength(html, 'utf8') > config.maxHtmlBytes) {
@@ -389,12 +765,12 @@ async function preparePdf(account, body) {
   const clamped = timeoutWarning(body);
   if (clamped) options.warnings.push(clamped);
 
-  return { html, url, options, timeoutMs, outputMode };
+  return { html, url, options, timeoutMs, outputMode, strict, scan, watermark, unresolved: unresolved.length };
 }
 
 /** Runs a prepared job and returns the finished buffer plus its facts. */
-async function producePdf(account, body, prepared) {
-  const { html, url, options, timeoutMs } = prepared;
+async function producePdf(account, body, prepared, ctx = {}) {
+  const { html, url, options, timeoutMs, strict, unresolved, scan } = prepared;
   const result = await render.render({
     html, url, options, timeoutMs, kind: 'pdf',
     waitFor: body.waitFor,
@@ -404,11 +780,19 @@ async function producePdf(account, body, prepared) {
     headers: body.headers && typeof body.headers === 'object' ? body.headers : undefined,
   });
 
+  // Before anything is stamped onto it: if there is nothing on the page, saying
+  // so is worth more than a metadata-perfect blank PDF.
+  const problem = gateContent({
+    ctx, strict, content: result.content, kind: 'pdf', unresolved, scan,
+    warnings: options.warnings, durationMs: result.durationMs,
+    extra: options.displayHeaderFooter ? { header_or_footer: true } : undefined,
+  });
+  if (problem) throw problem;
+
   let buffer = await render.applyMetadata(result.buffer, body.metadata);
-  if (body.watermark) {
-    const spec = typeof body.watermark === 'string' ? { text: body.watermark } : body.watermark;
-    buffer = await render.addWatermark(buffer, spec);
-  }
+  // prepared.watermark, not body.watermark: the text has had its placeholders
+  // filled from the same data as the rest of the document.
+  if (prepared.watermark) buffer = await render.addWatermark(buffer, prepared.watermark);
   if (body.password) {
     buffer = await render.encrypt(buffer, {
       password: String(body.password),
@@ -423,11 +807,12 @@ async function producePdf(account, body, prepared) {
 }
 
 router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
-  const body = req.body || {};
+  const body = foldOptionsWrapper(req.body || {});
   const webhookUrl = body.webhookUrl || body.webhook_url;
   const wantsAsync = Boolean(webhookUrl) || asBool(body.async, 'async', false);
 
-  const prepared = await preparePdf(req.account, body);
+  const ctx = { id: req.id, endpoint: '/v1/pdf' };
+  const prepared = await preparePdf(req.account, body, ctx);
 
   if (wantsAsync) {
     if (webhookUrl) await assertPublicUrl(String(webhookUrl), 'webhookUrl');
@@ -446,7 +831,7 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
   const credits = await consumeCredits(req.account.id, 1);
   let out;
   try {
-    out = await producePdf(req.account, body, prepared);
+    out = await producePdf(req.account, body, prepared, ctx);
   } catch (e) {
     await refundCredits(req.account.id, 1);
     logUsage(req.account.id, 'pdf', false, { errorCode: e.code });
@@ -470,7 +855,7 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
     'X-PDFMint-Credits-Limit': String(credits.limit),
   });
   if (pages) res.set('X-PDFMint-Pages', String(pages));
-  if (options.warnings.length) res.set('X-PDFMint-Warning', options.warnings.join(' | '));
+  if (options.warnings.length) res.set('X-PDFMint-Warning', warningHeader(options.warnings));
   if (debug && debug.pageErrors.length) res.set('X-PDFMint-Page-Errors', debug.pageErrors.join(' | ').slice(0, 900));
 
   if (outputMode === 'binary') {
@@ -524,16 +909,48 @@ router.post('/image', withAuth, asyncRoute(async (req, res) => {
   if (source === 'template') throw bad('unsupported_source', 'Images can be rendered from "html", "markdown" or "url", not from a saved template.', { docs: '/docs#image' });
   const timeoutMs = timeoutFor(body);
   rejectUnknownFields(body, IMAGE_FIELDS, 'POST /v1/image');
+  const strict = asBool(body.strict, 'strict', false);
+  const warnings = [];
+  const ctx = { id: req.id, endpoint: '/v1/image' };
   const imageOutputMode = outputModeFor(body);
   const type = String(body.type || 'png').toLowerCase();
   if (!['png', 'jpeg'].includes(type)) {
     throw bad('invalid_option', `"type" must be "png" or "jpeg" — got ${JSON.stringify(body.type)}.`, { docs: '/docs#image' });
   }
 
-  let html = null; let url = null;
-  if (source === 'html') html = String(body.html);
-  else if (source === 'markdown') html = markdownToHtml(String(body.markdown), { css: body.css, googleFonts: body.googleFonts });
+  // Placeholders work here exactly as they do on /v1/pdf. They did not before,
+  // so "Hello {{first_name}}" was screenshotted as written — one vendor, two
+  // contracts on adjacent endpoints.
+  const data = body.data ? parseData(body.data) : null;
+  let html = null; let url = null; let sourceText = null;
+  if (source === 'html') sourceText = String(body.html);
+  else if (source === 'markdown') sourceText = String(body.markdown);
   else url = (await assertPublicUrl(String(body.url), 'url')).toString();
+
+  let dataApplied = false;
+  let scan = 'none';
+  let filledUnresolved = [];
+  let filledUnprintable = [];
+  if (sourceText !== null && (data || sourceText.includes('{{'))) {
+    const r = fillTemplate(sourceText, data || {});
+    filledUnresolved = r.unresolved;
+    filledUnprintable = r.unprintable;
+    if (data) { sourceText = r.html; dataApplied = true; scan = 'filled'; } else scan = 'scanned';
+  }
+  if (sourceText !== null) {
+    html = source === 'markdown'
+      ? markdownToHtml(sourceText, { css: body.css, googleFonts: body.googleFonts })
+      : sourceText;
+  }
+
+  // Checked before the credit is spent, so there is nothing to refund.
+  if (filledUnresolved.length || filledUnprintable.length) {
+    const problem = gatePlaceholders({
+      ctx, strict, unresolved: filledUnresolved, unprintable: filledUnprintable,
+      filled: dataApplied, scan, warnings, durationMs: 0,
+    });
+    if (problem) throw problem;
+  }
 
   const credits = await consumeCredits(req.account.id, 1);
   let result;
@@ -551,21 +968,28 @@ router.post('/image', withAuth, asyncRoute(async (req, res) => {
         omitBackground: body.omitBackground === true,
       },
     });
+    // Inside the try so a refusal refunds by the same path a crash does.
+    const problem = gateContent({
+      ctx, strict, content: result.content, kind: 'image', warnings, durationMs: result.durationMs,
+      scan,
+    });
+    if (problem) throw problem;
   } catch (e) {
     await refundCredits(req.account.id, 1);
     logUsage(req.account.id, 'image', false, { errorCode: e.code });
     throw e;
   }
   logUsage(req.account.id, 'image', true, { durationMs: result.durationMs });
-  const filename = sanitiseFilename(body.filename, `image.${type}`);
+  const filename = imageFilename(body.filename, type, warnings);
   const outputMode = imageOutputMode;
   res.set({ 'X-PDFMint-Duration-Ms': String(result.durationMs), 'X-PDFMint-Credits-Remaining': String(credits.remaining) });
+  if (warnings.length) res.set('X-PDFMint-Warning', warningHeader(warnings));
   if (outputMode === 'url') {
     const stored = await storeFile(req.account.id, result.buffer, filename, `image/${type}`, body.expiresInMinutes);
-    return res.json({ filename, size: result.buffer.length, url: absoluteUrl(req, stored.path), expires_in_minutes: stored.expiresInMinutes, credits_remaining: credits.remaining });
+    return res.json({ filename, size: result.buffer.length, url: absoluteUrl(req, stored.path), expires_in_minutes: stored.expiresInMinutes, credits_remaining: credits.remaining, warnings: warnings.length ? warnings : undefined });
   }
   if (outputMode === 'base64') {
-    return res.json({ filename, size: result.buffer.length, base64: result.buffer.toString('base64'), credits_remaining: credits.remaining });
+    return res.json({ filename, size: result.buffer.length, base64: result.buffer.toString('base64'), credits_remaining: credits.remaining, warnings: warnings.length ? warnings : undefined });
   }
   res.set({ 'Content-Type': `image/${type}`, 'Content-Length': String(result.buffer.length), 'Content-Disposition': `attachment; filename="${filename}"` });
   return res.end(result.buffer);
@@ -605,12 +1029,22 @@ router.post('/merge', withAuth, asyncRoute(async (req, res) => {
   }
 
   const mergeOutputMode = outputModeFor(body);
+  const strict = asBool(body.strict, 'strict', false);
+  const warnings = [];
+  const ctx = { id: req.id, endpoint: '/v1/merge' };
   const credits = await consumeCredits(req.account.id, 1);
+  const startedAt = Date.now();
   let merged;
   try {
-    merged = await render.mergePdfs(buffers);
+    const out = await render.mergePdfs(buffers);
+    const problem = gateMerge({
+      ctx, strict, pageCounts: out.pageCounts, warnings, durationMs: Date.now() - startedAt,
+    });
+    if (problem) throw problem;
+    merged = out.buffer;
   } catch (e) {
     await refundCredits(req.account.id, 1);
+    logUsage(req.account.id, 'merge', false, { errorCode: e.code });
     throw e;
   }
   if (body.metadata) merged = await render.applyMetadata(merged, body.metadata);
@@ -618,16 +1052,43 @@ router.post('/merge', withAuth, asyncRoute(async (req, res) => {
   const filename = sanitiseFilename(body.filename, 'merged.pdf').replace(/(\.pdf)?$/i, '.pdf');
   logUsage(req.account.id, 'merge', true, { pages });
   res.set({ 'X-PDFMint-Pages': String(pages), 'X-PDFMint-Credits-Remaining': String(credits.remaining) });
+  if (warnings.length) res.set('X-PDFMint-Warning', warningHeader(warnings));
   if (mergeOutputMode === 'url') {
     const stored = await storeFile(req.account.id, merged, filename, 'application/pdf', body.expiresInMinutes);
-    return res.json({ filename, pages, size: merged.length, url: absoluteUrl(req, stored.path), expires_in_minutes: stored.expiresInMinutes, credits_remaining: credits.remaining });
+    return res.json({ filename, pages, size: merged.length, url: absoluteUrl(req, stored.path), expires_in_minutes: stored.expiresInMinutes, credits_remaining: credits.remaining, warnings: warnings.length ? warnings : undefined });
   }
   if (mergeOutputMode === 'base64') {
-    return res.json({ filename, pages, size: merged.length, base64: merged.toString('base64'), credits_remaining: credits.remaining });
+    return res.json({ filename, pages, size: merged.length, base64: merged.toString('base64'), credits_remaining: credits.remaining, warnings: warnings.length ? warnings : undefined });
   }
   res.set({ 'Content-Type': 'application/pdf', 'Content-Length': String(merged.length), 'Content-Disposition': `attachment; filename="${filename}"` });
   return res.end(merged);
 }));
+
+/**
+ * Every placeholder a stored template uses, so a client — the n8n node, the
+ * Zapier app, the Make module — can put one input field on screen per marker
+ * instead of asking the user to retype names from memory. Retyping is what
+ * causes the misspelling that strict mode then catches at run time, and making
+ * the mistake impossible beats reporting it.
+ *
+ * Derived by running the template through fillTemplate with no data, so this
+ * list and what a render reports as unresolved come from the same traversal and
+ * cannot drift apart. A header or footer stored with the template is scanned too,
+ * because those are filled at render time as well.
+ */
+function templatePlaceholders(html, options) {
+  const seen = new Map();
+  const scan = (text) => {
+    if (typeof text !== 'string' || !text.includes('{{')) return;
+    for (const ph of fillTemplate(text, {}).placeholders) if (!seen.has(ph.name)) seen.set(ph.name, ph);
+  };
+  scan(html);
+  const o = options && typeof options === 'object' ? options : {};
+  scan(o.headerHtml || o.headerTemplate);
+  scan(o.footerHtml || o.footerTemplate);
+  scan(typeof o.watermark === 'string' ? o.watermark : (o.watermark && o.watermark.text));
+  return Array.from(seen.values());
+}
 
 /* ------------------------------------------------------------ /v1/templates */
 
@@ -666,13 +1127,18 @@ router.put('/templates/:name', withAuth, asyncRoute(async (req, res) => {
      RETURNING name, updated_at`,
     [req.account.id, name, html, JSON.stringify(options)],
   );
-  res.json({ template: rows[0], usage: { template: name, data: { example: 'value' } } });
+  const placeholders = templatePlaceholders(html, options);
+  res.json({
+    template: rows[0],
+    placeholders,
+    usage: { template: name, data: Object.fromEntries(placeholders.map((ph) => [ph.name, 'value'])) },
+  });
 }));
 
 router.get('/templates/:name', withAuth, asyncRoute(async (req, res) => {
   const { rows } = await query(`SELECT name, html, options, updated_at FROM templates WHERE account_id = $1 AND name = $2`, [req.account.id, String(req.params.name)]);
   if (!rows.length) throw bad('template_not_found', `You have no template called "${req.params.name}".`, { docs: '/docs#templates' });
-  res.json(rows[0]);
+  res.json({ ...rows[0], placeholders: templatePlaceholders(rows[0].html, rows[0].options) });
 }));
 
 router.delete('/templates/:name', withAuth, asyncRoute(async (req, res) => {
@@ -718,11 +1184,12 @@ async function runJob(job) {
   const { rows } = await query(`SELECT * FROM accounts WHERE id = $1`, [job.account_id]);
   const account = rows[0];
   if (!account) throw new ApiError(404, 'account_gone', 'The account that queued this job no longer exists.');
-  const body = job.request;
-  const prepared = await preparePdf(account, body);
+  const body = foldOptionsWrapper(job.request);
+  const ctx = { id: job.id, endpoint: '/v1/pdf(job)' };
+  const prepared = await preparePdf(account, body, ctx);
   let out;
   try {
-    out = await producePdf(account, body, prepared);
+    out = await producePdf(account, body, prepared, ctx);
   } catch (e) {
     await refundCredits(account.id, 1);
     logUsage(account.id, 'pdf', false, { errorCode: e.code });
@@ -739,4 +1206,4 @@ async function runJob(job) {
   };
 }
 
-module.exports = { router, fillTemplate, storeFile, runJob, absoluteUrl };
+module.exports = { router, fillTemplate, storeFile, runJob, absoluteUrl, STRICT };

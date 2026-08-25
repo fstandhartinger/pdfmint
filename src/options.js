@@ -147,6 +147,42 @@ function ensureRoomFor(margin, side) {
   if (toMm(margin[side]) < MIN_HF_MARGIN_MM) margin[side] = `${MIN_HF_MARGIN_MM}mm`;
 }
 
+/**
+ * Chrome answers a malformed page range with a protocol error, which surfaced as
+ * a 500 telling the caller to shrink their images. Its grammar, established by
+ * trying every shape against Chromium: comma-separated items, each "N", "N-M",
+ * "N-" (to the end) or "-M" (from the start); an empty item is tolerated; page
+ * numbers start at 1 and a range may not run backwards.
+ */
+const PAGE_RANGE_ADVICE = 'Use page numbers separated by commas, with optional ranges: "1-5, 8, 11-13". Pages are numbered from 1.';
+
+function validatePageRanges(raw) {
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const spec = String(raw).trim();
+  if (!spec) return undefined;
+  const refuse = (why) => {
+    throw bad('invalid_option', `"pageRanges" is not a valid page range: ${JSON.stringify(String(raw))} — ${why}.`, {
+      hint: PAGE_RANGE_ADVICE,
+      docs: '/docs#options',
+    });
+  };
+  let items = 0;
+  for (const part of spec.split(',')) {
+    const item = part.trim();
+    if (item === '') continue; // Chrome tolerates "1,,2"
+    items += 1;
+    const m = /^(\d*)\s*(-?)\s*(\d*)$/.exec(item);
+    if (!m || (!m[1] && !m[3])) refuse(`"${item}" is not a page number or a range`);
+    const [, from, dash, to] = m;
+    if (!dash && !from) refuse(`"${item}" is not a page number`);
+    if (from && Number(from) < 1) refuse('pages are numbered from 1, so 0 is not a page');
+    if (to && Number(to) < 1) refuse('pages are numbered from 1, so 0 is not a page');
+    if (from && to && Number(from) > Number(to)) refuse(`"${item}" runs backwards`);
+  }
+  if (!items) refuse('it names no pages');
+  return spec;
+}
+
 function normalisePdfOptions(input = {}) {
   const o = input || {};
   const warnings = [];
@@ -203,7 +239,7 @@ function normalisePdfOptions(input = {}) {
     });
   }
 
-  const pageRanges = o.pageRanges ? String(o.pageRanges).trim() : undefined;
+  const pageRanges = validatePageRanges(o.pageRanges);
 
   return {
     format: width ? undefined : (format || 'A4'),
@@ -229,4 +265,5 @@ function normalisePdfOptions(input = {}) {
 module.exports = {
   normalisePdfOptions, normaliseMargin, asLength, asBool, toMm, pageSizeMm,
   FORMATS, DEFAULT_MARGIN, MIN_HF_MARGIN_MM, HF_PAGE_INSET_MM, HF_BODY_GAP_MM, MAX_HF_PAGE_FRACTION,
+  validatePageRanges, PAGE_RANGE_ADVICE,
 };

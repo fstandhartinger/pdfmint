@@ -38,6 +38,7 @@
       <ul>
         <li><a href="#input">Choosing an input</a></li>
         <li><a href="#placeholders" class="sub">Placeholders</a></li>
+        <li><a href="#strict">Strict mode</a></li>
         <li><a href="#url" class="sub">Rendering a URL</a></li>
         <li><a href="#markdown" class="sub">Markdown styling</a></li>
         <li><a href="#output">Output modes</a></li>
@@ -58,6 +59,7 @@
         <li><a href="#merge">POST /v1/merge</a></li>
         <li><a href="#me">GET /v1/me</a></li>
         <li><a href="#templates">/v1/templates</a></li>
+        <li><a href="#templates-placeholders" class="sub">Template placeholders</a></li>
         <li><a href="#misc">Files &amp; health</a></li>
       </ul>
 
@@ -431,7 +433,11 @@ still succeeds but the response carries
 <code>X-PDFMint-Warning: 1 placeholder(s) had no value and rendered empty: missing</code> (and a
 <code>warnings</code> array in the JSON output modes). Set <code>"strict": true</code> to turn that
 into a <code>400 unresolved_placeholders</code> instead — the error lists every missing name in
-<code>details.unresolved</code>.</p>
+<code>details.unresolved</code>. The same applies when <code>data</code> is left out entirely, in
+which case the marker is printed on the page as you wrote it and
+<code>details.data_supplied</code> is <code>false</code>. That is one of four checks
+<a href="#strict">strict mode</a> runs; the others catch a document that renders blank or prints
+its own markup.</p>
 </div>
 
 <div class="code">
@@ -452,12 +458,294 @@ into a <code>400 unresolved_placeholders</code> instead — the error lists ever
     "code": "unresolved_placeholders",
     "message": "The template uses 1 placeholder that \"data\" does not provide: missing.",
     "hint": "Check the spelling against your data, or set \"strict\": false to render them as empty instead.",
-    "docs": "https://pdfmint-b9tt.onrender.com/docs#templates",
+    "docs": "https://pdfmint-b9tt.onrender.com/docs#strict",
     "details": { "unresolved": ["missing"] },
     "request_id": "5490af9e4a650d19"
   }
 }</code></pre>
 </div>
+</section>
+
+<!-- =============================================================== STRICT -->
+<section id="strict">
+<h2>Strict mode <a class="anchor" href="#strict">#</a></h2>
+
+<p>The complaint every PDF automation eventually produces is not an error. It is a green tick
+with a blank file behind it, or forty-seven pages of stylesheet, or
+<code>{{client_name}}</code> printed where the customer's name should be. Nothing failed, so
+nothing was retried, and the first person to notice is the customer.</p>
+
+<p><code>"strict": true</code> turns those into a <code>4xx</code> with a request id, so the
+workflow stops where the mistake is. It is a per-request boolean, off by default, accepted on
+<a href="#pdf"><code>/v1/pdf</code></a>, <a href="#image"><code>/v1/image</code></a> and
+<a href="#merge"><code>/v1/merge</code></a>. The strings <code>"true"</code> and
+<code>"false"</code>, and <code>1</code>/<code>0</code>, are accepted too — automation tools send
+booleans as strings all the time. Anything else is <code>invalid_option</code>.</p>
+
+<div class="note">
+<p><strong>A rejected render costs nothing.</strong> The credit is spent when the call starts and
+refunded when strict refuses, on every endpoint. <code>GET /v1/me</code> will show the same
+<code>credits_used</code> before and after.</p>
+</div>
+
+<h3 id="strict-checks">What it checks <a class="anchor" href="#strict-checks">#</a></h3>
+
+<div class="tw"><table>
+<thead><tr><th>Check</th><th>Endpoints</th><th>Error</th><th>Fires when</th></tr></thead>
+<tbody>
+<tr><td>Unresolved placeholders</td><td class="t"><code>/v1/pdf</code>, <code>/v1/image</code></td><td class="t"><code>unresolved_placeholders</code></td><td class="wrap">A <code>{{marker}}</code> in <code>html</code>, <code>markdown</code> or a <code>template</code> had no matching value in <code>data</code> — <strong>or no <code>data</code> was sent at all</strong>. Checked before anything is rendered, so it costs no render time.</td></tr>
+<tr><td>Unprintable value</td><td class="t"><code>/v1/pdf</code>, <code>/v1/image</code></td><td class="t"><code>invalid_placeholder_value</code></td><td class="wrap">A <code>{{marker}}</code> resolved to an object or an array of objects, so it would print as <code>[object Object]</code>.</td></tr>
+<tr><td>Blank document</td><td class="t"><code>/v1/pdf</code>, <code>/v1/image</code></td><td class="t"><code>blank_document</code></td><td class="wrap">The page laid out with <strong>no</strong> visible text, <strong>no</strong> image, canvas, SVG, video or iframe with a real box, and <strong>no</strong> painted area at all.</td></tr>
+<tr><td>Markup printed as text</td><td class="t"><code>/v1/pdf</code>, <code>/v1/image</code></td><td class="t"><code>unrendered_markup</code></td><td class="wrap">The visible text is overwhelmingly raw CSS, or literal <code>&lt;tags&gt;</code>, outside any code sample. Your markup was escaped on the way in.</td></tr>
+<tr><td>Empty merge</td><td class="t"><code>/v1/merge</code></td><td class="t"><code>blank_document</code></td><td class="wrap">The merged file has no pages, or one input was a valid PDF that contributed no pages. The message names the index.</td></tr>
+</tbody></table></div>
+
+<p>With <code>strict</code> off, every one of these is still detected — it just arrives as a
+warning instead: the <code>X-PDFMint-Warning</code> response header, and a <code>warnings</code>
+array in the JSON output modes. Nothing is ever silently swallowed; strict only decides whether
+the finding is fatal.</p>
+
+<h3 id="strict-where">Everything on the page is checked <a class="anchor" href="#strict-where">#</a></h3>
+
+<p>Placeholders are filled, and counted, in every piece of content a request carries — not only
+the body:</p>
+
+<ul>
+  <li><code>html</code>, <code>markdown</code>, or the stored HTML of a <code>template</code></li>
+  <li><code>headerHtml</code> and <code>footerHtml</code>, including the ones a template stored
+      with itself</li>
+  <li><code>watermark.text</code>, which is stamped raw rather than HTML-escaped, so
+      <code>Smith &amp; Sons</code> prints as written</li>
+</ul>
+
+<p>A header is content: an invoice number in a letterhead is exactly as wrong as one in the body,
+and it repeats on every page.</p>
+
+<p>A <strong>section</strong> counts too. <code>{{#lines}}…{{/lines}}</code> where
+<code>lines</code> is <em>absent from the data</em> is reported — that is the line-item table
+disappearing because the field was renamed upstream. <code>lines: []</code>, present and empty, is
+not reported: an invoice with no extras is a real invoice. An inverted section
+<code>{{^lines}}</code> is never reported, because handling the missing case is the whole purpose
+of the syntax.</p>
+
+<h3 id="strict-nodata">When no <code>data</code> was sent at all <a class="anchor" href="#strict-nodata">#</a></h3>
+
+<p>Worth stating on its own, because it is the complaint this feature was built for: a document
+that reaches the paper still saying <code>{{client_name}}</code>. That happens when the field
+carrying your values never arrived — the mapping was renamed, the step before returned nothing, or
+<code>data</code> was simply forgotten. The markers are then <em>printed exactly as written</em>,
+which is different from a marker whose value was missing (that one renders empty).</p>
+
+<p>Both are caught. <code>details.data_supplied</code> tells you which happened, and the message
+says so in words:</p>
+
+<div class="tw"><table>
+<thead><tr><th>Request</th><th>With <code>strict</code></th><th>Without</th></tr></thead>
+<tbody>
+<tr><td class="wrap"><code>{"html": "Hi {{name}}", "data": {}}</code></td><td class="wrap"><code>400</code>, <code>data_supplied: true</code></td><td class="wrap">renders <code>Hi </code>, warning header</td></tr>
+<tr><td class="wrap"><code>{"html": "Hi {{name}}"}</code></td><td class="wrap"><code>400</code>, <code>data_supplied: false</code></td><td class="wrap">renders <code>Hi {{name}}</code>, warning header</td></tr>
+<tr><td class="wrap"><code>{"html": "Hi {{name}}", "data": null}</code></td><td class="wrap"><code>400</code>, <code>data_supplied: false</code></td><td class="wrap">renders <code>Hi {{name}}</code>, warning header</td></tr>
+</tbody></table></div>
+
+<div class="code">
+<div class="cap">400 Bad Request</div>
+<pre><code>{
+  "error": {
+    "code": "unresolved_placeholders",
+    "message": "The document still contains 1 unfilled placeholder and the request sent no \"data\": client_name.",
+    "hint": "Send the values in \"data\", for example {\"data\": {\"client_name\": \"…\"}}. With no \"data\" at all the marker is printed on the page exactly as you wrote it.",
+    "docs": "https://pdfmint-b9tt.onrender.com/docs#strict",
+    "details": { "unresolved": ["client_name"], "data_supplied": false },
+    "request_id": "ed755bf44f021edd"
+  }
+}</code></pre>
+</div>
+
+<p>Without <code>strict</code> the bytes are exactly what they always were — nothing is
+substituted, nothing is removed — and the finding arrives only as
+<code>X-PDFMint-Warning</code>. <code>/v1/image</code> never fills placeholders at all, so there
+the check is the only thing standing between you and a screenshot of your own template syntax.</p>
+
+<div class="note">
+<p><strong>If you print <code>{{…}}</code> on purpose</strong> — documentation about templating,
+or Vue/Angular/Handlebars markup you want to survive onto the page — leave <code>strict</code> off.
+You will get one warning header per call, which costs nothing to ignore. The alternative, staying
+quiet, means the person who mistyped a field name never finds out.</p>
+</div>
+
+<h3 id="strict-blank">How "blank" is measured <a class="anchor" href="#strict-blank">#</a></h3>
+
+<p>Inside the same Chromium that prints the file, after the print stylesheet has been applied —
+so a page that hides itself on screen and shows itself on paper is measured as it will print.
+Three numbers come back, and <em>all three</em> must be zero before anything is refused:</p>
+
+<ul>
+  <li><strong>Visible text.</strong> <code>document.body.innerText</code>, trimmed. It already
+      excludes <code>display:none</code>, <code>visibility:hidden</code> and anything a
+      <code>@media print</code> rule removed.</li>
+  <li><strong>Images.</strong> Every <code>img</code>, <code>canvas</code>, <code>svg</code>,
+      <code>video</code>, <code>object</code>, <code>embed</code>, <code>iframe</code> and
+      <code>picture</code> with a layout box of at least 1&nbsp;&times;&nbsp;1&nbsp;px. An
+      image-only document — a chart, a scan, a QR code — is a real document and is never
+      refused.</li>
+  <li><strong>Painted area.</strong> Any element with a box that has a background colour, a
+      background image, a border, an outline, a box shadow, or CSS-generated
+      <code>::before</code>/<code>::after</code> content, plus the backgrounds of
+      <code>&lt;html&gt;</code> and <code>&lt;body&gt;</code> themselves.</li>
+</ul>
+
+<p class="muted" style="font-size:.9rem">The painted-area scan only runs when there is no text and
+no image, and only on documents of up to 5000 elements. A larger one is reported as
+"could not tell" and is never refused on this check.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -s -X POST https://pdfmint-b9tt.onrender.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "html": "&lt;div class=\"invoice\"&gt;&lt;/div&gt;", "strict": true }'</code></pre>
+</div>
+<div class="code">
+<div class="cap">400 Bad Request</div>
+<pre><code>{
+  "error": {
+    "code": "blank_document",
+    "message": "The rendered document body contains no visible text and no images, so the pages would come out blank.",
+    "hint": "Check that \"data\" really filled the template, that anything built by JavaScript has finished (use \"waitFor\"), and that a print stylesheet is not hiding the content. A header or footer does not count as content. Send \"strict\": false to receive the blank document anyway.",
+    "docs": "https://pdfmint-b9tt.onrender.com/docs#strict",
+    "details": { "visible_text_chars": 0, "images": 0, "painted_elements": 0 },
+    "request_id": "cde4e87a40dae5dd"
+  }
+}</code></pre>
+</div>
+
+<p>A <strong>header or footer is not counted as content</strong>: the check is about the body of
+the document. A page-numbers footer on an otherwise empty body is still refused, and
+<code>details.header_or_footer</code> is <code>true</code> so you can tell that case apart.</p>
+
+<h3 id="strict-markup">How "markup printed as text" is measured <a class="anchor" href="#strict-markup">#</a></h3>
+
+<p>Text inside <code>&lt;pre&gt;</code>, <code>&lt;code&gt;</code>, <code>&lt;samp&gt;</code>,
+<code>&lt;kbd&gt;</code>, <code>&lt;xmp&gt;</code> and <code>&lt;textarea&gt;</code> is removed
+first — a code sample is the one place a real document shows CSS and tags on purpose. What is
+left has to trip one of two rules, both deliberately severe:</p>
+
+<div class="tw"><table>
+<thead><tr><th>Rule</th><th>Fires when all of these hold</th></tr></thead>
+<tbody>
+<tr><td>Leaked stylesheet</td><td class="wrap">at least 200 characters of text remain, at least 3 CSS declarations are present, and 85% or more of the non-whitespace characters sit inside a CSS rule</td></tr>
+<tr><td>Escaped markup</td><td class="wrap">at least 8 literal HTML tags are visible, at least 3 of them are closing tags, and the tags themselves make up 30% or more of the non-whitespace characters</td></tr>
+</tbody></table></div>
+
+<div class="code">
+<div class="cap">400 Bad Request</div>
+<pre><code>{
+  "error": {
+    "code": "unrendered_markup",
+    "message": "The document shows 24 HTML tags as literal text — the markup was printed instead of being applied.",
+    "hint": "The markup was almost certainly HTML-escaped somewhere on the way here, or a &lt;style&gt; tag lost its brackets, so the source arrived as text. In Zapier or Make, map the raw field rather than a formatted one. Send \"strict\": false to print it as it is.",
+    "docs": "https://pdfmint-b9tt.onrender.com/docs#strict",
+    "details": {
+      "visible_text_chars": 233,
+      "analysed_chars": 233,
+      "markup_ratio": 0.735,
+      "tag_ratio": 0.574,
+      "css_declarations": 2,
+      "literal_tags": 24
+    },
+    "request_id": "d02f60b88857d289"
+  }
+}</code></pre>
+</div>
+
+<div class="note warn">
+<p><strong>The one document this gets wrong.</strong> A page whose visible content really is
+markup — an XML sample, a stylesheet listing — and which does <em>not</em> put it in a
+<code>&lt;pre&gt;</code> or <code>&lt;code&gt;</code> element looks identical to the bug, because
+at that point there is nothing left to tell them apart. Wrap intentional markup in
+<code>&lt;pre&gt;</code> (you want the monospace anyway) and it is exempt, or leave
+<code>strict</code> off for that call. Prose that merely mentions a few tag names is well under
+the thresholds and is not affected.</p>
+</div>
+
+<h3 id="strict-value">A value that cannot be printed <a class="anchor" href="#strict-value">#</a></h3>
+
+<p>Triggers in Zapier and Make hand back nested objects. <code>{{customer}}</code> where
+<code>customer</code> is <code>{"name": "Ada"}</code> puts the literal text
+<code>[object Object]</code> on the invoice. Strict refuses it and names the path that would have
+worked; without strict it renders as it always did and you get a warning.</p>
+
+<div class="code">
+<div class="cap">400 Bad Request</div>
+<pre><code>{
+  "error": {
+    "code": "invalid_placeholder_value",
+    "message": "\"customer\" is an object, so it would print as \"[object Object]\".",
+    "hint": "A placeholder can only print text or a number. Use a path into the object, such as {{customer.name}}, or build the string before you send it. Triggers in Zapier and Make hand back nested objects, which is where this usually comes from.",
+    "docs": "https://pdfmint-b9tt.onrender.com/docs#strict",
+    "details": { "unprintable": [ { "name": "customer", "type": "object" } ] },
+    "request_id": "84d848349db60770"
+  }
+}</code></pre>
+</div>
+
+<p>An array of plain values is <em>not</em> refused: <code>{{tags}}</code> over
+<code>["red", "blue"]</code> prints <code>red,blue</code>, which is what the caller meant. Only an
+object, or an array containing objects, is a mistake every time.</p>
+
+<h3 id="strict-merge">Strict on a merge <a class="anchor" href="#strict-merge">#</a></h3>
+
+<p>An input that is not a readable PDF is always <code>invalid_pdf</code>, strict or not. What
+strict adds is the input that <em>is</em> a valid PDF and contains no pages — it merges cleanly,
+contributes nothing, and the result looks like a success.</p>
+
+<div class="code">
+<div class="cap">400 Bad Request</div>
+<pre><code>{
+  "error": {
+    "code": "blank_document",
+    "message": "files[1] is a valid PDF with no pages, so it contributed nothing to the merge.",
+    "hint": "That input is empty — check what produced it. Send \"strict\": false to merge the remaining inputs anyway.",
+    "docs": "https://pdfmint-b9tt.onrender.com/docs#strict",
+    "details": { "input_index": 1, "pages": 0, "page_counts": [1, 0] },
+    "request_id": "6c81bb12ec017d20"
+  }
+}</code></pre>
+</div>
+
+<h3 id="strict-limits">What strict does <em>not</em> detect <a class="anchor" href="#strict-limits">#</a></h3>
+
+<p>Worth reading before you rely on it. Strict is a floor, not a proofreader:</p>
+
+<ul>
+  <li><strong>A page with any content on it at all.</strong> One heading is enough to pass. If
+      your template rendered its title and lost the table under it, strict says nothing.</li>
+  <li><strong>Wrong values.</strong> A placeholder that resolved to the wrong customer, an empty
+      string in <code>data</code>, or a total that does not add up all render fine. Only a
+      <em>missing</em> value is caught.</li>
+  <li><strong>White text on white paper</strong>, content pushed off the page, or a
+      <code>z-index</code> covering everything. Those are painted, so they are not blank.</li>
+  <li><strong>Layout damage.</strong> A missing font, a table running off the right edge, a
+      chart that drew nothing but kept its canvas box.</li>
+  <li><strong>Pages after the first.</strong> The measurement is of the document, not per page,
+      so a document that turns blank on page 4 is not caught.</li>
+  <li><strong>Content only in a header or footer</strong> counts as blank, as described
+      above.</li>
+  <li><strong>An inverted section that fired by mistake.</strong>
+      <code>{{^lines}}Nothing to show{{/lines}}</code> printing when there really were lines is
+      indistinguishable from the same block printing on purpose.</li>
+  <li><strong>The fields inside a section.</strong> A template reports <code>lines</code>, not
+      <code>lines[].description</code> — the inner names repeat per item and are only resolved
+      once there are items.</li>
+  <li><strong>A URL you asked us to render.</strong> Placeholders are never applied to a page
+      fetched by <code>url</code>; whatever that page serves is what prints.</li>
+  <li><strong>Encrypted or merged input contents.</strong> On <code>/v1/merge</code> only page
+      counts are checked; nothing looks inside the pages.</li>
+</ul>
+
+<p>For anything past that floor, render with <code>"output": "url"</code> and check
+<code>pages</code> and <code>size</code> in the response, or fetch the file and assert on it in
+your own workflow.</p>
 </section>
 
 <!-- ================================================================== URL -->
@@ -1018,7 +1306,7 @@ are diagnosing something, not in production.</p>
 <tr><td><code>url</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Public page to load and print. See <a href="#url">Rendering a URL</a>.</td></tr>
 <tr><td><code>template</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Name of a <a href="#templates">saved template</a>. Its stored options are merged under the ones you send here.</td></tr>
 <tr><td><code>data</code></td><td class="t">object &#124; string</td><td class="t">—</td><td class="wrap">Values for <a href="#placeholders"><code>{{placeholders}}</code></a>. A string must contain valid JSON, or you get <code>invalid_data</code>.</td></tr>
-<tr><td><code>strict</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Fail with <code>unresolved_placeholders</code> instead of rendering an unmatched placeholder empty.</td></tr>
+<tr><td><code>strict</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Refuse the call instead of returning a document that is wrong: an unmatched placeholder, a page that renders blank, or markup printed as text. See <a href="#strict">Strict mode</a>.</td></tr>
 <tr><td><code>options</code></td><td class="t">object</td><td class="t"><code>{}</code></td><td class="wrap">Page setup — see the <a href="#options">PDF options reference</a>. If you omit this object entirely, the option names are also read from the top level of the body.</td></tr>
 <tr><td><code>output</code></td><td class="t">string</td><td class="t"><code>binary</code></td><td class="wrap"><code>binary</code>, <code>url</code> or <code>base64</code>. See <a href="#output">Output modes</a>.</td></tr>
 <tr><td><code>filename</code></td><td class="t">string</td><td class="t"><code>document.pdf</code></td><td class="wrap">Name in <code>Content-Disposition</code> and in the JSON response. <code>\ / : * ? " &lt; &gt; |</code> and newlines are replaced with <code>_</code>, the name is cut to 120 characters, and <code>.pdf</code> is appended if missing.</td></tr>
@@ -1079,7 +1367,7 @@ all, these names are read from the top level of the body instead — handy for a
 <tr><td><code>headerHtml</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Markup repeated at the top of every page. Alias: <code>headerTemplate</code>. See <a href="#options-hf">Headers and footers</a>.</td></tr>
 <tr><td><code>footerHtml</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Markup repeated at the bottom of every page. Alias: <code>footerTemplate</code>.</td></tr>
 <tr><td><code>pageNumbers</code></td><td class="t">boolean &#124; string</td><td class="t"><code>false</code></td><td class="wrap"><code>true</code> gives a centred <code>Page {page} of {total}</code> footer. A string is used as the format. Ignored if you already set <code>footerHtml</code>.</td></tr>
-<tr><td><code>pageRanges</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Keep only these pages, e.g. <code>1-3, 8</code>.</td></tr>
+<tr><td><code>pageRanges</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Keep only these pages: comma-separated numbers and ranges, e.g. <code>1-5, 8, 11-13</code>. <code>3-</code> means "from 3 to the end" and <code>-3</code> "up to 3". Pages are numbered from 1. A range that is malformed, runs backwards, or starts past the last page is <code>invalid_option</code>, not a rendering failure.</td></tr>
 <tr><td><code>mediaType</code></td><td class="t">string</td><td class="t"><code>print</code></td><td class="wrap"><code>print</code> or <code>screen</code>. Use <code>screen</code> when your CSS was written for the browser and <code>@media print</code> rules would hide things.</td></tr>
 <tr><td><code>preferCssPageSize</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Let an <code>@page { size: … }</code> rule in your CSS win over <code>format</code>. Alias: <code>preferCSSPageSize</code>.</td></tr>
 <tr><td><code>tagged</code></td><td class="t">boolean</td><td class="t"><strong><code>true</code></strong></td><td class="wrap">Emit a tagged (accessible) PDF with document structure. Set <code>false</code> for a slightly smaller file.</td></tr>
@@ -1146,8 +1434,10 @@ from a format string:</p>
 
 <p>The same renderer, screenshotted instead of printed. Costs 1 credit. Sources are
 <code>html</code>, <code>markdown</code> or <code>url</code> — a saved <code>template</code> is
-<strong>not</strong> supported here and gives <code>unsupported_source</code>. Placeholder
-<code>data</code> is not applied on this endpoint either.</p>
+<strong>not</strong> supported here and gives <code>unsupported_source</code>. Everything else
+works as it does on <a href="#pdf"><code>/v1/pdf</code></a>, including
+<a href="#placeholders"><code>data</code> placeholders</a> and
+<a href="#strict"><code>strict</code></a>.</p>
 
 <div class="tw"><table>
 <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
@@ -1159,8 +1449,10 @@ from a format string:</p>
 <tr><td><code>deviceScaleFactor</code></td><td class="t">number</td><td class="t">2</td><td class="wrap">Pixel density multiplier. <code>2</code> gives a retina-sharp image at twice the pixel dimensions.</td></tr>
 <tr><td><code>fullPage</code></td><td class="t">boolean</td><td class="t"><code>true</code></td><td class="wrap">Capture the whole scrollable page rather than just the viewport.</td></tr>
 <tr><td><code>omitBackground</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Leave the page background transparent instead of white. PNG only, in practice.</td></tr>
-<tr><td><code>filename</code></td><td class="t">string</td><td class="t"><code>image.&lt;type&gt;</code></td><td class="wrap">Same sanitising as for PDFs, but no extension is forced.</td></tr>
+<tr><td><code>filename</code></td><td class="t">string</td><td class="t"><code>image.&lt;type&gt;</code></td><td class="wrap">Same sanitising as for PDFs. The extension matching <code>type</code> is appended if it is missing, and corrected — with a warning — if it contradicts the bytes, so <code>chart</code> as a PNG comes back <code>chart.png</code>.</td></tr>
 <tr><td><code>output</code></td><td class="t">string</td><td class="t"><code>binary</code></td><td class="wrap"><code>binary</code>, <code>url</code> or <code>base64</code>.</td></tr>
+<tr><td><code>data</code></td><td class="t">object</td><td class="t">—</td><td class="wrap">Values for the <a href="#placeholders"><code>{{placeholders}}</code></a> in <code>html</code> or <code>markdown</code>, exactly as on <code>/v1/pdf</code>.</td></tr>
+<tr><td><code>strict</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Refuse with <code>unresolved_placeholders</code>, <code>invalid_placeholder_value</code>, <code>blank_document</code> or <code>unrendered_markup</code> rather than screenshot a page that is wrong. See <a href="#strict">Strict mode</a>.</td></tr>
 <tr><td><code>waitFor</code>, <code>timeout</code>, <code>javascript</code>,<br><code>css</code>, <code>googleFonts</code>, <code>expiresInMinutes</code></td><td class="t">—</td><td class="t">—</td><td class="wrap">Behave exactly as on <a href="#pdf"><code>/v1/pdf</code></a>.</td></tr>
 </tbody></table></div>
 
@@ -1194,7 +1486,8 @@ files go in.</p>
 <tbody>
 <tr><td><code>files</code></td><td class="t">array</td><td class="t">required</td><td class="wrap">2–50 entries. Each is a public <code>http(s)</code> URL string, an object <code>{"base64": "…"}</code>, or a bare base64 string. Aliases for this field: <code>urls</code>, <code>pdfs</code>.</td></tr>
 <tr><td><code>filename</code></td><td class="t">string</td><td class="t"><code>merged.pdf</code></td><td class="wrap"><code>.pdf</code> appended if missing.</td></tr>
-<tr><td><code>output</code></td><td class="t">string</td><td class="t"><code>binary</code></td><td class="wrap"><code>binary</code> or <code>url</code>. <code>base64</code> is <strong>not</strong> supported here.</td></tr>
+<tr><td><code>output</code></td><td class="t">string</td><td class="t"><code>binary</code></td><td class="wrap"><code>binary</code>, <code>url</code> or <code>base64</code>.</td></tr>
+<tr><td><code>strict</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Refuse with <code>blank_document</code> when the merge produces no pages, or when one input is a valid PDF that contributed none. See <a href="#strict">Strict mode</a>.</td></tr>
 <tr><td><code>metadata</code></td><td class="t">object</td><td class="t">—</td><td class="wrap">Title, author, subject, keywords, creator for the merged document.</td></tr>
 <tr><td><code>expiresInMinutes</code></td><td class="t">number</td><td class="t">60</td><td class="wrap">Only with <code>output: "url"</code>.</td></tr>
 </tbody></table></div>
@@ -1305,6 +1598,36 @@ override the stored ones.</p>
 # {"filename":"document.pdf","pages":1,"size":13997,
 #  "duration_ms":64,"credits_remaining":295,"base64":"JVBERi0…"}</code></pre>
 </div>
+
+<h3 id="templates-placeholders">The fields a template wants <a class="anchor" href="#templates-placeholders">#</a></h3>
+
+<p><code>PUT</code> and <code>GET</code> on a single template both answer with a
+<code>placeholders</code> array: every distinct marker the template uses, in the stored HTML and in
+a stored <code>headerHtml</code>, <code>footerHtml</code> or <code>watermark</code>. It is what an
+integration builds its input fields from, so the person filling the form picks a name from a list
+instead of retyping one from memory — which is what causes the misspelling in the first place.</p>
+
+<div class="code">
+<div class="cap">GET /v1/templates/invoice</div>
+<pre><code>{
+  "name": "invoice",
+  "html": "…",
+  "options": { },
+  "updated_at": "2026-08-25T09:14:02.113Z",
+  "placeholders": [
+    { "name": "invoice_number", "kind": "scalar" },
+    { "name": "customer.name",  "kind": "scalar" },
+    { "name": "lines",          "kind": "section" }
+  ]
+}</code></pre>
+</div>
+
+<p><code>kind</code> is <code>scalar</code> for <code>{{name}}</code>, <code>raw</code> for
+<code>{{{name}}}</code>, <code>section</code> for <code>{{#name}}</code> and
+<code>inverted</code> for <code>{{^name}}</code>. The list is produced by running the template
+through the same code that fills it, so it can never name a field the renderer does not look for.
+Names <em>inside</em> a section are not listed: they repeat per item and belong to the array you
+map into <code>lines</code>.</p>
 
 <h3 id="templates-list"><span class="pill get">GET</span><span class="path">/v1/templates</span> <a class="anchor" href="#templates-list">#</a></h3>
 <p>Lists every template on the account, alphabetically. This is what fills the template dropdown in
@@ -1673,9 +1996,12 @@ call in our logs.</p>
 <tr><td><code>missing_content</code></td><td>400</td><td class="wrap">No source field — or, on <code>PUT /v1/templates/{name}</code>, no <code>html</code>.</td><td class="wrap">Send one of <code>html</code>, <code>markdown</code>, <code>url</code>, <code>template</code>. See <a href="#input">Choosing an input</a>.</td></tr>
 <tr><td><code>ambiguous_content</code></td><td>400</td><td class="wrap">Two or more source fields were sent; the message names which.</td><td class="wrap">Keep one. For a template plus values, use <code>template</code> + <code>data</code>.</td></tr>
 <tr><td><code>unsupported_source</code></td><td>400</td><td class="wrap"><code>/v1/image</code> was asked to render a saved template.</td><td class="wrap">Use <code>html</code>, <code>markdown</code> or <code>url</code> on <a href="#image"><code>/v1/image</code></a>.</td></tr>
-<tr><td><code>invalid_option</code></td><td>400</td><td class="wrap">One option failed validation — an unknown <code>format</code>, <code>scale</code> outside 0.1–2, a bad length, <code>mediaType</code> other than print/screen, a non-boolean boolean, <code>output</code> outside binary/url/base64, image <code>type</code> other than png/jpeg, a <code>watermark</code> with no <code>text</code>, or <code>timeout</code> below 1000&nbsp;ms.</td><td class="wrap">The message names the field and the accepted values. See <a href="#options">PDF options</a>.</td></tr>
+<tr><td><code>invalid_option</code></td><td>400</td><td class="wrap">One option failed validation — an unknown <code>format</code>, <code>scale</code> outside 0.1–2, a bad length, <code>mediaType</code> other than print/screen, a non-boolean boolean, <code>output</code> outside binary/url/base64, image <code>type</code> other than png/jpeg, a <code>watermark</code> with no <code>text</code>, a malformed <code>pageRanges</code>, or <code>timeout</code> below 1000&nbsp;ms.</td><td class="wrap">The message names the field and the accepted values. See <a href="#options">PDF options</a>.</td></tr>
 <tr><td><code>invalid_data</code></td><td>400</td><td class="wrap"><code>data</code> was a string that is not valid JSON. <code>details.parse_error</code> says where.</td><td class="wrap">Send an object, or fix the JSON. In n8n use an expression such as <code>{{ $json }}</code>.</td></tr>
-<tr><td><code>unresolved_placeholders</code></td><td>400</td><td class="wrap">Only with <code>"strict": true</code>: placeholders had no value. <code>details.unresolved</code> lists them.</td><td class="wrap">Fix the spelling in <code>data</code>, or drop <code>strict</code> to render them empty with a warning. See <a href="#placeholders">Placeholders</a>.</td></tr>
+<tr><td><code>unresolved_placeholders</code></td><td>400</td><td class="wrap">Only with <code>"strict": true</code>: placeholders had no value. <code>details.unresolved</code> lists them.</td><td class="wrap">Fix the spelling in <code>data</code>, or drop <code>strict</code> to render them empty with a warning. See <a href="#strict">Strict mode</a>.</td></tr>
+<tr><td><code>blank_document</code></td><td>400</td><td class="wrap">Only with <code>"strict": true</code>: the rendered body had no visible text, no image and no painted area — or, on <code>/v1/merge</code>, the result had no pages. Refunded.</td><td class="wrap">Check what the page actually renders; drop <code>strict</code> to receive it anyway. See <a href="#strict">Strict mode</a>.</td></tr>
+<tr><td><code>invalid_placeholder_value</code></td><td>400</td><td class="wrap">Only with <code>"strict": true</code>: a placeholder resolved to an object or an array of objects, which would print as <code>[object Object]</code>. <code>details.unprintable</code> names each one.</td><td class="wrap">Use a path into the object, <code>{{customer.name}}</code>, or build the string before you send it. See <a href="#strict">Strict mode</a>.</td></tr>
+<tr><td><code>unrendered_markup</code></td><td>400</td><td class="wrap">Only with <code>"strict": true</code>: the visible text is overwhelmingly raw CSS or literal tags, so the markup was printed rather than applied. Refunded.</td><td class="wrap">Stop the markup being HTML-escaped upstream, or wrap an intentional sample in <code>&lt;pre&gt;</code>. See <a href="#strict">Strict mode</a>.</td></tr>
 <tr><td><code>invalid_json</code></td><td>400</td><td class="wrap">The request body is not parseable JSON.</td><td class="wrap">Look for a trailing comma or an unescaped quote.</td></tr>
 
 <tr><td><code>invalid_url</code></td><td>400</td><td class="wrap">The <code>url</code> could not be parsed.</td><td class="wrap">Include the scheme: <code>https://example.com/report</code>.</td></tr>

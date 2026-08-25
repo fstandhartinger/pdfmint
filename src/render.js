@@ -115,6 +115,129 @@ const READY_SCRIPT = `(async () => {
   if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
 })()`;
 
+/* --------------------------------------------------------- content inspection */
+
+/**
+ * A document with more elements than this is not scanned for painted area. The
+ * scan only runs on a document that already has no text and no images, and one
+ * of those with 5000 elements is pathological — we would rather report "could
+ * not tell" than spend a second per render deciding.
+ */
+const PAINT_SCAN_BUDGET = 5000;
+
+/**
+ * Runs inside Chromium. This is the only vantage point that knows what will
+ * actually be on the paper: pdf-lib cannot read text out of the finished bytes,
+ * and parsing the PDF operators to find out would be guesswork.
+ *
+ * Returns counts only. Never the page's text — on a long document that would be
+ * megabytes crossing the CDP connection for every render.
+ *
+ * Everything below runs in the browser, not in node: Playwright ships this
+ * function's source to the page, so it must close over nothing.
+ */
+function inspectInPage(budget) {
+  const out = {
+    textChars: 0, proseChars: 0, images: 0, painted: 0,
+    declarations: 0, tags: 0, closingTags: 0, markupRatio: 0, tagRatio: 0,
+    elements: 0, truncated: false,
+  };
+  const body = document.body;
+  if (!body) return out;
+
+  // innerText, not textContent: it is the one property that already accounts for
+  // display:none, visibility:hidden and the print stylesheet we just applied.
+  const text = String(body.innerText || '').trim();
+  out.textChars = text.length;
+
+  // A code sample is the one place a real document legitimately shows CSS or
+  // HTML tags as text. Take those out before asking whether markup leaked;
+  // without this, a printed stylesheet looks exactly like the bug.
+  let prose = text;
+  const code = body.querySelectorAll('pre,code,samp,kbd,xmp,textarea');
+  for (let i = 0; i < code.length && i < 200; i += 1) {
+    const chunk = String(code[i].innerText || '').trim();
+    if (chunk.length > 20) prose = prose.replace(chunk, ' ');
+  }
+  prose = prose.trim();
+  out.proseChars = prose.length;
+
+  const TAG_RE = /<\/?[a-zA-Z][a-zA-Z0-9:-]*(?:\s[^<>\n]{0,300})?\/?>/g;
+  const DECL_RE = /[-a-zA-Z][-a-zA-Z0-9]*\s*:\s*[^;{}\n]{1,200}[;}]/g;
+  if (prose.length) {
+    const tagged = prose.match(TAG_RE) || [];
+    out.tags = tagged.length;
+    out.closingTags = tagged.filter((t) => t.charAt(1) === '/').length;
+    out.declarations = (prose.match(DECL_RE) || []).length;
+    const dense = prose.replace(/\s+/g, '').length;
+    // How much of the text is literal tags, and how much is left once every CSS
+    // rule and every tag is removed. Whitespace is excluded from both so that
+    // indentation cannot move the number.
+    out.tagRatio = dense ? Math.min(1, tagged.join('').replace(/\s+/g, '').length / dense) : 0;
+    const rest = prose
+      .replace(TAG_RE, ' ')
+      .replace(/@[-a-z]+[^{;\n]{0,200}[{;]/g, ' ')
+      .replace(DECL_RE, ' ')
+      .replace(/[^{}\n]{0,160}\{/g, ' ')
+      .replace(/[{}]/g, ' ')
+      .replace(/\s+/g, '')
+      .length;
+    out.markupRatio = dense ? Math.max(0, Math.min(1, 1 - rest / dense)) : 0;
+  }
+
+  // An image-only page — a chart, a scan, a QR code — is a legitimate document
+  // and must never be called blank.
+  const visual = body.querySelectorAll('img,canvas,svg,video,object,embed,iframe,picture');
+  for (let i = 0; i < visual.length && i < 400; i += 1) {
+    const r = visual[i].getBoundingClientRect();
+    if (r.width >= 1 && r.height >= 1) out.images += 1;
+  }
+
+  // Only worth asking what else was painted when there is nothing else at all.
+  if (out.textChars === 0 && out.images === 0) {
+    const all = body.querySelectorAll('*');
+    out.elements = all.length;
+    if (all.length > budget) { out.truncated = true; return out; }
+
+    const opaque = (c) => !!c && c !== 'transparent' && !/^rgba\([^)]*,\s*0\s*\)$/.test(c);
+    const generated = (c) => !!c && c !== 'none' && c !== 'normal' && c !== '""' && c !== "''";
+    const bordered = (cs) => ['Top', 'Right', 'Bottom', 'Left'].some((s) =>
+      cs['border' + s + 'Style'] !== 'none' && parseFloat(cs['border' + s + 'Width']) > 0);
+
+    for (const root of [document.documentElement, body]) {
+      const cs = getComputedStyle(root);
+      if (cs.backgroundImage !== 'none' || opaque(cs.backgroundColor)) out.painted += 1;
+    }
+    for (let i = 0; i < all.length; i += 1) {
+      const el = all[i];
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) continue;
+      const cs = getComputedStyle(el);
+      if (cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
+      if (cs.backgroundImage !== 'none' || opaque(cs.backgroundColor)) { out.painted += 1; continue; }
+      if (bordered(cs) || cs.outlineStyle !== 'none' || cs.boxShadow !== 'none') { out.painted += 1; continue; }
+      // CSS-generated content is real ink on the page but is not in innerText.
+      if (generated(getComputedStyle(el, '::before').content) || generated(getComputedStyle(el, '::after').content)) out.painted += 1;
+    }
+  }
+  return out;
+}
+
+/**
+ * Measures what the page will actually print. A measurement that fails comes
+ * back as { error }, never as a throw: a document must not be refused because
+ * we could not look at it.
+ */
+async function inspectContent(page, budget = PAINT_SCAN_BUDGET) {
+  const started = Date.now();
+  try {
+    const r = await page.evaluate(inspectInPage, budget);
+    return { ...r, ms: Date.now() - started };
+  } catch (e) {
+    return { error: String((e && e.message) || e).slice(0, 160), ms: Date.now() - started };
+  }
+}
+
 async function guardRoutes(page) {
   if (config.allowPrivateNetwork) return;
   await page.route('**/*', async (route) => {
@@ -182,6 +305,15 @@ function normaliseChromeError(e, source) {
       docs: '/docs#timeout',
     });
   }
+  // Chrome refuses a page range at print time, after the document is laid out.
+  // Without this it landed in renderer_crashed, which told a caller who typo'd a
+  // page range to shrink their images.
+  if (/Page range/i.test(msg)) {
+    return new ApiError(400, 'invalid_option', `"pageRanges" was refused by the renderer: ${msg.replace(/^.*Page range/i, 'page range').replace(/\n[\s\S]*$/, '')}.`, {
+      hint: 'A range cannot start past the last page of the document. Render without "pageRanges" first to see how many pages there are.',
+      docs: '/docs#options',
+    });
+  }
   if (/Target (page|closed)|Protocol error|browser has been closed|crashed/i.test(msg)) {
     return new ApiError(500, 'renderer_crashed', 'The renderer crashed while producing this document.', {
       hint: 'This is usually a very large or very complex page. Try splitting it, or reducing image sizes.',
@@ -239,13 +371,14 @@ async function render(job) {
     await applyWait(page, job.waitFor, remaining());
 
     if (job.kind === 'image') {
+      const content = await inspectContent(page);
       const buf = await page.screenshot({
         type: job.image.type,
         quality: job.image.type === 'jpeg' ? job.image.quality : undefined,
         fullPage: job.image.fullPage !== false,
         omitBackground: job.image.omitBackground === true,
       });
-      return { buffer: buf, durationMs: Date.now() - started, consoleErrors };
+      return { buffer: buf, durationMs: Date.now() - started, consoleErrors, content };
     }
 
     const debug = job.debug
@@ -269,6 +402,10 @@ async function render(job) {
     if (o.mediaType === 'screen') await page.emulateMedia({ media: 'screen' });
     else await page.emulateMedia({ media: 'print' });
 
+    // Measured after the print stylesheet is in force, never before: a page can
+    // hide on screen what it shows on paper, and the paper is what we ship.
+    const content = await inspectContent(page);
+
     const buf = await page.pdf({
       format: o.format,
       width: o.width,
@@ -286,7 +423,7 @@ async function render(job) {
       outline: o.outline,
       timeout: remaining(),
     });
-    return { buffer: buf, durationMs: Date.now() - started, consoleErrors, debug };
+    return { buffer: buf, durationMs: Date.now() - started, consoleErrors, debug, content };
   } catch (e) {
     if (e instanceof ApiError) throw e;
     const mapped = normaliseChromeError(e, job.url ? 'URL' : 'HTML');
@@ -576,8 +713,14 @@ async function addWatermark(buffer, spec) {
   return Buffer.from(await doc.save());
 }
 
+/**
+ * Returns the merged bytes plus how many pages each input contributed. The
+ * per-input counts are what makes a silently empty input visible: a merge of
+ * five files where one contributed nothing still looks like a success.
+ */
 async function mergePdfs(buffers) {
   const out = await PDFDocument.create();
+  const pageCounts = [];
   for (let i = 0; i < buffers.length; i += 1) {
     let src;
     try {
@@ -589,15 +732,17 @@ async function mergePdfs(buffers) {
       });
     }
     const pages = await out.copyPages(src, src.getPageIndices());
+    pageCounts.push(pages.length);
     pages.forEach((p) => out.addPage(p));
   }
   out.setProducer('PDFMint');
-  return Buffer.from(await out.save());
+  return { buffer: Buffer.from(await out.save()), pageCounts };
 }
 
 module.exports = {
   render, warmup, closeBrowser, getBrowser,
   applyMetadata, countPages, encrypt, mergePdfs, addWatermark, hasQpdf, inlineHeaderFooterImages,
   reserveMarginForHeaderFooter, measureFragmentMm,
+  inspectContent, PAINT_SCAN_BUDGET,
   stats, assertPublicUrl,
 };
