@@ -116,6 +116,16 @@ async function applySubscription(subscription) {
   const plan = planForPriceId(priceId);
   const active = ['active', 'trialing', 'past_due'].includes(subscription.status);
 
+  // One Stripe account serves more than one product, and every endpoint on it
+  // receives every event. A subscription whose price is not one of ours belongs
+  // to a sibling product; acting on it once downgraded a live, paying PDFMint
+  // customer because a DocMint subscription tagged with the same account_id was
+  // cancelled. Anything we cannot price is not ours to act on.
+  if (!plan) {
+    console.warn(`[stripe] ignoring subscription ${subscription.id}: price ${priceId} is not a PDFMint plan`);
+    return { ignored: 'foreign_price' };
+  }
+
   let target = null;
   if (accountId) {
     const { rows } = await query(`SELECT * FROM accounts WHERE id = $1`, [accountId]);
@@ -130,7 +140,16 @@ async function applySubscription(subscription) {
     return;
   }
 
-  const newPlan = active && plan ? plan : PLANS.free;
+  // A cancellation only speaks for the subscription it names. When an account has
+  // since moved to a different subscription, an older one ending must not revoke
+  // the current one.
+  if (!active && target.stripe_subscription_id && target.stripe_subscription_id !== subscription.id) {
+    console.warn(`[stripe] ignoring ${subscription.status} of stale subscription ${subscription.id};`
+      + ` account ${target.id} is on ${target.stripe_subscription_id}`);
+    return { ignored: 'stale_subscription' };
+  }
+
+  const newPlan = active ? plan : PLANS.free;
   await query(
     `UPDATE accounts SET plan = $2, credits_limit = $3, stripe_subscription_id = $4, stripe_customer_id = COALESCE(stripe_customer_id, $5)
      WHERE id = $1`,
