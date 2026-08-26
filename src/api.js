@@ -806,6 +806,96 @@ async function producePdf(account, body, prepared, ctx = {}) {
   return { buffer, pages, filename, durationMs: result.durationMs, debug: result.debug };
 }
 
+/**
+ * The demo render: no key, no account, no credits.
+ *
+ * A blind critic comparing this landing page against a competitor's named the
+ * same gap that kills the page: every number on it is asserted by a vendor with
+ * no track record, and the hero `curl` needs `pm_live_YOUR_KEY`, so a reader
+ * cannot check a single claim inside the ninety seconds they are giving us.
+ * Someone who gets a real PDF on disk before creating an account has already
+ * decided.
+ *
+ * It is deliberately the narrowest possible endpoint, because an unauthenticated
+ * renderer is an abuse surface:
+ *   - `html` and nothing else. No `url`, so there is no SSRF reachable here at
+ *     all; no `template`, so it never touches anyone's data; no options, so no
+ *     option can be turned into a resource attack.
+ *   - a hard size cap well under anything that could exhaust the one render slot
+ *   - a per-IP hourly budget, in memory, which is the honest implementation for
+ *     a single instance
+ *   - synchronous only: no jobs, no webhooks, nothing that outlives the request
+ */
+const DEMO_MAX_HTML_BYTES = 16 * 1024;
+const DEMO_PER_IP_PER_HOUR = 5;
+const demoBuckets = new Map();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, b] of demoBuckets) if (b.resetAt <= now) demoBuckets.delete(ip);
+}, 600_000).unref();
+
+function demoTake(ip) {
+  const now = Date.now();
+  let b = demoBuckets.get(ip);
+  if (!b || b.resetAt <= now) {
+    b = { used: 0, resetAt: now + 3600_000 };
+    demoBuckets.set(ip, b);
+  }
+  if (b.used >= DEMO_PER_IP_PER_HOUR) {
+    return { ok: false, retryAfterSeconds: Math.max(1, Math.ceil((b.resetAt - now) / 1000)), remaining: 0 };
+  }
+  b.used += 1;
+  return { ok: true, remaining: DEMO_PER_IP_PER_HOUR - b.used };
+}
+
+router.post('/demo/pdf', asyncRoute(async (req, res) => {
+  const ip = String(req.ip || req.connection?.remoteAddress || 'unknown');
+  const budget = demoTake(ip);
+  res.set('X-PDFMint-Demo-Remaining', String(budget.remaining));
+  if (!budget.ok) {
+    res.set('Retry-After', String(budget.retryAfterSeconds));
+    // bad() is hardcoded to 400, so the status is set explicitly here.
+    throw new ApiError(429, 'demo_limit_reached',
+      `The keyless demo allows ${DEMO_PER_IP_PER_HOUR} renders an hour from one address.`, {
+        hint: 'Create a free account for 10 documents a month, no card: https://pdf.mintapis.com/signup',
+        docs: '/docs',
+      });
+  }
+
+  const html = (req.body || {}).html;
+  if (typeof html !== 'string' || !html.trim()) {
+    throw bad('missing_content', 'Send the markup you want rendered in "html".', {
+      hint: `curl -X POST ${'https://pdf.mintapis.com'}/v1/demo/pdf -H "Content-Type: application/json" -d '{"html":"<h1>Hello</h1>"}' -o hello.pdf`,
+      docs: '/docs',
+    });
+  }
+  const bytes = Buffer.byteLength(html, 'utf8');
+  if (bytes > DEMO_MAX_HTML_BYTES) {
+    throw new ApiError(413, 'demo_payload_too_large',
+      `The demo accepts ${DEMO_MAX_HTML_BYTES} bytes of HTML; this was ${bytes}.`, {
+        hint: 'The full API has no such limit. A free account takes about twenty seconds: https://pdf.mintapis.com/signup',
+        docs: '/docs',
+      });
+  }
+
+  // Only `html` is honoured. Anything else the caller sent is ignored on purpose.
+  const body = { html };
+  const ctx = { id: req.id, endpoint: '/v1/demo/pdf' };
+  const demoAccount = { id: null, plan: 'demo' };
+  const prepared = await preparePdf(demoAccount, body, ctx);
+  const out = await producePdf(demoAccount, body, prepared, ctx);
+
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Length': String(out.buffer.length),
+    'Content-Disposition': 'attachment; filename="hello.pdf"',
+    'X-PDFMint-Duration-Ms': String(out.durationMs),
+  });
+  if (out.pages) res.set('X-PDFMint-Pages', String(out.pages));
+  return res.end(out.buffer);
+}));
+
 router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
   const body = foldOptionsWrapper(req.body || {});
   const webhookUrl = body.webhookUrl || body.webhook_url;

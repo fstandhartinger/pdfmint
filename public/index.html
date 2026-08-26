@@ -70,14 +70,11 @@
           <button class="code-copy" type="button" id="copyBtn">Copy</button>
         </div>
 
-        <div class="code-panel" role="tabpanel" id="panel-curl" aria-labelledby="tab-curl"><pre><code><span class="tok-c"># Markdown in, a real PDF file out.</span>
-curl -X POST https://pdf.mintapis.com/v1/pdf \
-  -H <span class="tok-s">"Authorization: Bearer pm_live_YOUR_KEY"</span> \
+        <div class="code-panel" role="tabpanel" id="panel-curl" aria-labelledby="tab-curl"><pre><code><span class="tok-c"># Paste this exactly as it is. No key, no signup.</span>
+<span class="tok-c"># 5 renders an hour per address; the full API has no such limit.</span>
+curl -X POST https://pdf.mintapis.com/v1/demo/pdf \
   -H <span class="tok-s">"Content-Type: application/json"</span> \
-  -d <span class="tok-s">'{
-    "markdown": "# Invoice 1042\n\nThanks for your business.",
-    "options": { "margin": "18mm", "pageNumbers": true }
-  }'</span> \
+  -d <span class="tok-s">'{"html": "&lt;h1&gt;Invoice 1042&lt;/h1&gt;&lt;p&gt;Thanks for your business.&lt;/p&gt;"}'</span> \
   --output invoice.pdf</code></pre></div>
 
         <div class="code-panel" role="tabpanel" id="panel-node" aria-labelledby="tab-node" hidden><pre><code><span class="tok-k">const</span> res = <span class="tok-k">await</span> <span class="tok-f">fetch</span>(<span class="tok-s">'https://pdf.mintapis.com/v1/pdf'</span>, {
