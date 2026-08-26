@@ -61,6 +61,7 @@
 
       <h2>Endpoints</h2>
       <ul>
+        <li><a href="#demo">POST /v1/demo/pdf</a></li>
         <li><a href="#pdf">POST /v1/pdf</a></li>
         <li><a href="#options" class="sub">PDF options</a></li>
         <li><a href="#jobs" class="sub">GET /v1/jobs/{id}</a></li>
@@ -110,9 +111,20 @@ bytes come back in the same response. No template editor, no second request to f
 <section id="quickstart">
 <h2>Your first PDF <a class="anchor" href="#quickstart">#</a></h2>
 
-<p>Create an account at <a href="/signup">/signup</a> — the API key is shown immediately, with no
-email confirmation, and the free plan&rsquo;s 10 documents are there straight away. Then paste this
-into a terminal:</p>
+<p>You do not need an account to see it work. Paste this and a real PDF lands on disk:</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -X POST https://pdf.mintapis.com/v1/demo/pdf \
+  -H "Content-Type: application/json" \
+  -d '{"html":"&lt;h1&gt;Hello from PDFMint&lt;/h1&gt;"}' \
+  -o hello.pdf</code></pre>
+</div>
+
+<p>That is the <a href="#demo">keyless demo</a> &mdash; five renders an hour per address, HTML only,
+no options. For the real thing, create an account at <a href="/signup">/signup</a>: the API key is
+shown immediately, with no email confirmation, and the free plan&rsquo;s 10 documents are there
+straight away. Then the same call with a key and the full option set:</p>
 
 <div class="code">
 <button class="copy" type="button">Copy</button>
@@ -250,6 +262,41 @@ Drive, S3 or Slack — no download step in between.</p>
 
 <!-- ================================================================= AUTH -->
 <section id="authentication">
+<h2>POST /v1/demo/pdf <a class="anchor" href="#demo">#</a></h2>
+
+<p>A keyless render, so you can check that this works before creating anything. It takes
+<code>html</code> and nothing else, and returns the PDF bytes.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>curl -X POST https://pdf.mintapis.com/v1/demo/pdf \
+  -H "Content-Type: application/json" \
+  -d '{"html":"&lt;h1&gt;Hello&lt;/h1&gt;"}' \
+  -o hello.pdf</code></pre>
+</div>
+
+<p>What it will not do, and why &mdash; an endpoint that needs no key has to be narrow:</p>
+
+<ul>
+  <li><b>Only <code>html</code>.</b> No <code>url</code>, so nothing here can be pointed at a
+    network address. No <code>template</code>, so it never reads anyone&rsquo;s saved data. No
+    options, so no option can be turned into a way to exhaust the renderer. Anything else you
+    send is ignored rather than rejected.</li>
+  <li><b>16 KB of HTML.</b> Larger gives <code>413 demo_payload_too_large</code>. The real API
+    has no such limit.</li>
+  <li><b>Five renders an hour per address.</b> The sixth gives <code>429
+    demo_limit_reached</code> with a <code>Retry-After</code> header. Consumed before the
+    request is validated, so a malformed call still costs one.</li>
+  <li><b>Synchronous only.</b> <code>async</code> and <code>webhookUrl</code> are ignored;
+    nothing here outlives the request.</li>
+  <li><b>No credits, no account, nothing stored.</b> The document is returned and forgotten.</li>
+</ul>
+
+<p>It runs on the same renderer as <a href="#pdf"><code>POST /v1/pdf</code></a>, so what you get
+back is what the paid endpoint would produce for the same markup &mdash; that is the point of it.
+For Markdown, a URL, templates, page options or anything asynchronous, use the real endpoint with
+a key from <a href="/signup">/signup</a>.</p>
+
 <h2>Authentication <a class="anchor" href="#authentication">#</a></h2>
 
 <p>Every <code>/v1/*</code> request needs an API key. Keys start with <code>pm_live_</code> and are

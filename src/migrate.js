@@ -96,6 +96,16 @@ const STATEMENTS = [
    )`,
   `CREATE INDEX IF NOT EXISTS jobs_queue_idx ON jobs(status, created_at)`,
   `CREATE INDEX IF NOT EXISTS jobs_account_idx ON jobs(account_id, created_at DESC)`,
+  // The keyless demo's budget. In-memory buckets were per-process, and the
+  // service runs more than one, so the published "five an hour" was really five
+  // times however many instances happened to be up. One row per address per hour.
+  `CREATE TABLE IF NOT EXISTS demo_usage (
+     ip          TEXT NOT NULL,
+     hour_start  TIMESTAMPTZ NOT NULL,
+     used        INTEGER NOT NULL DEFAULT 0,
+     PRIMARY KEY (ip, hour_start)
+   )`,
+
   `CREATE TABLE IF NOT EXISTS stripe_events (
      id          TEXT PRIMARY KEY,
      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()

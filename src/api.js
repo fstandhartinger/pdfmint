@@ -828,30 +828,44 @@ async function producePdf(account, body, prepared, ctx = {}) {
  */
 const DEMO_MAX_HTML_BYTES = 16 * 1024;
 const DEMO_PER_IP_PER_HOUR = 5;
-const demoBuckets = new Map();
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, b] of demoBuckets) if (b.resetAt <= now) demoBuckets.delete(ip);
-}, 600_000).unref();
-
-function demoTake(ip) {
-  const now = Date.now();
-  let b = demoBuckets.get(ip);
-  if (!b || b.resetAt <= now) {
-    b = { used: 0, resetAt: now + 3600_000 };
-    demoBuckets.set(ip, b);
+/**
+ * The demo budget lives in Postgres, not in memory.
+ *
+ * It was an in-memory Map first, and that was wrong in a way only production
+ * showed: the service runs more than one process, each got its own Map, and the
+ * remaining-counter came back 1, 3, 0, 3 across four consecutive calls. The
+ * published limit of five an hour was really five times however many instances
+ * were up. A documented number that is not true is the same defect as a
+ * benchmark nobody can reproduce.
+ *
+ * One upsert per request, keyed by address and hour, and the returning value is
+ * the authoritative count. The row is tiny and old hours are swept below.
+ */
+async function demoTake(ip) {
+  const { rows } = await query(
+    `INSERT INTO demo_usage (ip, hour_start, used)
+     VALUES ($1, date_trunc('hour', now()), 1)
+     ON CONFLICT (ip, hour_start) DO UPDATE SET used = demo_usage.used + 1
+     RETURNING used, hour_start`,
+    [ip],
+  );
+  const used = rows[0].used;
+  const resetAt = new Date(rows[0].hour_start).getTime() + 3600_000;
+  if (used > DEMO_PER_IP_PER_HOUR) {
+    return { ok: false, remaining: 0, retryAfterSeconds: Math.max(1, Math.ceil((resetAt - Date.now()) / 1000)) };
   }
-  if (b.used >= DEMO_PER_IP_PER_HOUR) {
-    return { ok: false, retryAfterSeconds: Math.max(1, Math.ceil((b.resetAt - now) / 1000)), remaining: 0 };
-  }
-  b.used += 1;
-  return { ok: true, remaining: DEMO_PER_IP_PER_HOUR - b.used };
+  return { ok: true, remaining: DEMO_PER_IP_PER_HOUR - used };
 }
+
+// Old hours are dead weight; drop them occasionally rather than never.
+setInterval(() => {
+  query(`DELETE FROM demo_usage WHERE hour_start < now() - interval '3 hours'`).catch(() => {});
+}, 1800_000).unref();
 
 router.post('/demo/pdf', asyncRoute(async (req, res) => {
   const ip = String(req.ip || req.connection?.remoteAddress || 'unknown');
-  const budget = demoTake(ip);
+  const budget = await demoTake(ip);
   res.set('X-PDFMint-Demo-Remaining', String(budget.remaining));
   if (!budget.ok) {
     res.set('Retry-After', String(budget.retryAfterSeconds));
