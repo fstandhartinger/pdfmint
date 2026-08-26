@@ -129,12 +129,12 @@ curl -X POST https://pdf.mintapis.com/v1/pdf \
 
     <div class="measured">
       <div>
-        <div class="n">328 ms</div>
-        <div class="t">A one-page Markdown document, rendered through the live public API.</div>
+        <div class="n">502 ms</div>
+        <div class="t">Median of 25 runs of the curl example above against the live API, p95 733 ms, measured 2026-08-26 with <code>bench/render-latency.mjs</code>. Wall clock from one machine in Germany, so it includes the network round trip.</div>
       </div>
       <div>
-        <div class="n">128 MB</div>
-        <div class="t">Peak memory for 8 concurrent renders, in a 512 MB container.</div>
+        <div class="n">1 render</div>
+        <div class="t">Concurrency limit on the single instance that serves this API. A large document makes everyone else queue - that is the honest shape of a one-instance service.</div>
       </div>
       <div>
         <div class="n">$0.0018</div>
@@ -396,7 +396,7 @@ curl -X POST https://pdf.mintapis.com/v1/pdf \
       </table>
     </div>
     <p class="scroll-hint">Scroll the table sideways to see every column.</p>
-    <p class="cmp-note">Sources: CraftMyPDF&rsquo;s published OpenAPI specification (<code>craftmypdf_api.yaml</code>) and pricing page; pdforge&rsquo;s pricing page and the source of its n8n node; PDFMint&rsquo;s own source and plan table. Dashes mean we did not find a published figure and would rather leave the cell empty than guess. These are good products with a different bet — a hosted drag-and-drop template designer. If that is what you want, buy that. PDFMint is for people who already have the HTML.</p>
+    <p class="cmp-note">Sources, and when we looked: CraftMyPDF&rsquo;s published OpenAPI specification (<code>craftmypdf_api.yaml</code>) and pricing page, and pdforge&rsquo;s pricing page and the source of its n8n node, both read on <b>26 August 2026</b>; PDFMint&rsquo;s own source and plan table. Every competitor cell describes what those documents said on that date and nothing more &mdash; if either vendor ships an HTML endpoint tomorrow, this table is out of date rather than right. Tell us and we will correct it. Dashes mean we did not find a published figure and would rather leave the cell empty than guess. These are good products with a different bet — a hosted drag-and-drop template designer. If that is what you want, buy that. PDFMint is for people who already have the HTML.</p>
   </div>
 </section>
 
