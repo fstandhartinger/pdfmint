@@ -43,6 +43,8 @@ function shell(title, body, opts = {}) {
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(opts.description || 'PDFMint turns HTML, Markdown or a URL into a PDF in one HTTP call.')}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="robots" content="${opts.robots || 'noindex, nofollow'}">${opts.canonical ? `
+<link rel="canonical" href="${config.publicUrl}${opts.canonical}">` : ''}
 <style>${css}</style></head><body>${body}</body></html>`;
 }
 

@@ -187,7 +187,13 @@ router.get('/status', asyncRoute(async (req, res) => {
 .spark i{flex:1;border-radius:2px 2px 0 0;min-width:3px;display:block;align-self:flex-end}
 .spark i.empty{height:3px;background:var(--rule)}
 .rows th{width:52%;font-weight:500}
-</style>`));
+</style>`, {
+    // Everything else shell() draws is an account page. This one is public and
+    // is the honest answer to "is it up", so it is the one that may be indexed.
+    robots: 'index, follow',
+    canonical: '/status',
+    description: 'Live PDFMint availability: documents rendered, failures and p95 latency over the last 24 hours, read from the production usage log.',
+  }));
 }));
 
 module.exports = { router, snapshot };

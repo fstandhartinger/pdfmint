@@ -1,0 +1,11 @@
+# PDFMint — https://pdf.mintapis.com
+# The dashboard and the API are behind a key; there is nothing there for a crawler.
+
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /v1/
+Disallow: /stripe/
+Disallow: /f/
+
+Sitemap: https://pdf.mintapis.com/sitemap.xml
