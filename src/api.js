@@ -842,6 +842,27 @@ const DEMO_PER_IP_PER_HOUR = 5;
  * One upsert per request, keyed by address and hour, and the returning value is
  * the authoritative count. The row is tiny and old hours are swept below.
  */
+/**
+ * The client address for the demo budget.
+ *
+ * `req.ip` was wrong here and production proved it: the counter came back
+ * 4, 4, 4, 3, 3, 2 for six calls from one machine, meaning several distinct keys.
+ * `trust proxy` is 1, so Express walks back exactly one hop, and Render has more
+ * than one — leaving an intermediate address that varies. The leftmost
+ * X-Forwarded-For entry is the original client, which is the thing the published
+ * "five an hour per address" is actually about.
+ *
+ * Falls back to req.ip when the header is absent, e.g. running locally.
+ */
+function demoClientIp(req) {
+  const fwd = req.headers['x-forwarded-for'];
+  if (typeof fwd === 'string' && fwd.trim()) {
+    const first = fwd.split(',')[0].trim();
+    if (first) return first;
+  }
+  return String(req.ip || req.connection?.remoteAddress || 'unknown');
+}
+
 async function demoTake(ip) {
   const { rows } = await query(
     `INSERT INTO demo_usage (ip, hour_start, used)
@@ -864,7 +885,7 @@ setInterval(() => {
 }, 1800_000).unref();
 
 router.post('/demo/pdf', asyncRoute(async (req, res) => {
-  const ip = String(req.ip || req.connection?.remoteAddress || 'unknown');
+  const ip = demoClientIp(req);
   const budget = await demoTake(ip);
   res.set('X-PDFMint-Demo-Remaining', String(budget.remaining));
   if (!budget.ok) {
