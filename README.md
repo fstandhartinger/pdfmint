@@ -90,6 +90,9 @@ on the free plan.
 
 ## Related
 
+- Ready-made workflows: [Generate PDF invoices from webhook requests](https://n8n.io/workflows/18734-generate-pdf-invoices-from-webhook-requests-with-pdfmint)
+  and [Send branded PDF receipts for Stripe payments](https://n8n.io/workflows/18793) —
+  two published n8n templates built on this API, openable and importable from inside n8n.
 - [n8n-nodes-pdfmint](https://github.com/fstandhartinger/n8n-nodes-pdfmint) — the n8n
   community node, verified by n8n, zero runtime dependencies.
 - [DocMint](https://github.com/fstandhartinger/docmint) — the same idea for Word, Excel
