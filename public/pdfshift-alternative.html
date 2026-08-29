@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PDFShift alternative &mdash; the same $9 buys 500 documents there and 5,000 here</title>
+<meta name="description" content="PDFShift charges $9 for 500 credits and counts one credit per 5&nbsp;MB of output, so a 14&nbsp;MB PDF is three credits &mdash; their example. PDFMint charges $9 for 5,000 documents, one credit each whatever the size. Every figure read from pdfshift.io/pricing on 29 August 2026.">
+<link rel="canonical" href="https://pdf.mintapis.com/pdfshift-alternative">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:url" content="https://pdf.mintapis.com/pdfshift-alternative">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="PDFMint">
+<meta property="og:title" content="PDFShift alternative &mdash; the same $9 buys 500 documents there and 5,000 here">
+<meta property="og:description" content="PDFShift charges $9 for 500 credits and counts one credit per 5&nbsp;MB of output, so a 14&nbsp;MB PDF is three credits &mdash; their example. PDFMint charges $9 for 5,000 documents, one credit each whatever the size. Every figure read from pdfshift.io/pricing on 29 August 2026.">
+<meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
+<meta property="og:image:alt" content="PDFMint: HTML in, PDF bytes out, from one HTTP call.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/docs.css">
+</head>
+<body class="docs">
+
+<header class="docs-top">
+  <a class="logo" href="/">PDF<span>Mint</span></a>
+  <nav>
+    <a href="/docs">API reference</a>
+    <a href="/html-to-pdf-api">HTML to PDF</a>
+    <a href="/status">Status</a>
+    <a href="/dashboard">Dashboard</a>
+    <a class="cta" href="/signup">Get an API key</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="toc">
+    <button class="toc-toggle" id="tocToggle" aria-expanded="false" aria-controls="tocBody">On this page</button>
+    <div class="toc-body" id="tocBody">
+      <h2>PDFShift</h2>
+      <ul>
+        <li><a href="#price">The full rate card</a></li>
+        <li><a href="#credit">What a credit is</a></li>
+        <li><a href="#table">Side by side</a></li>
+      </ul>
+      <h2>The differences</h2>
+      <ul>
+        <li><a href="#errors">What happens when it fails</a></li>
+        <li><a href="#free">The free tiers are not comparable</a></li>
+        <li><a href="#workflow">In a workflow tool</a></li>
+      </ul>
+      <h2>Then</h2>
+      <ul>
+        <li><a href="#code">The same call, here</a></li>
+        <li><a href="#stay">When to stay on PDFShift</a></li>
+        <li><a href="#honest">What we cannot claim</a></li>
+        <li><a href="#try">Try it</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="content">
+<h1>PDFShift alternative</h1>
+<p class="lede">PDFShift is a good, focused HTML-to-PDF API and has been around long enough to be
+the default answer. Two things about it are worth checking against your own numbers before you
+renew: <strong>$9 a month buys 500 credits</strong>, and <strong>a credit is five megabytes of
+output, not one document</strong>. PDFMint&rsquo;s $9 plan is 5,000 documents, one credit each,
+whatever they weigh.</p>
+
+<div class="note">
+<p><strong>Where these numbers come from.</strong> PDFShift prices its plans through a calculator on
+<code>pdfshift.io/pricing</code>: you type a monthly volume and it names a plan. The table below was
+produced on <strong>29 August 2026</strong> by entering 500, 1,000, 5,000, 20,000, 100,000 and
+500,000 into that calculator and reading back what it recommended. The credit rule and the free-tier
+limits are quoted verbatim from the same page. Rate cards change; re-check both before deciding.</p>
+</div>
+
+<section id="price">
+<h2>The full rate card <a class="anchor" href="#price">#</a></h2>
+
+<div class="tw">
+<table>
+<thead><tr><th>PDFShift plan</th><th>Monthly</th><th>Credits</th><th>Per credit</th><th>Overage</th></tr></thead>
+<tbody>
+<tr><td>Free</td><td>$0</td><td>50</td><td>&mdash;</td><td>none</td></tr>
+<tr><td>Starter</td><td>$9</td><td>500</td><td>$0.018</td><td>$0.04</td></tr>
+<tr><td>Boost</td><td>$24</td><td>2,500</td><td>$0.0096</td><td>$0.03</td></tr>
+<tr><td>Growth</td><td>$39</td><td>5,000</td><td>$0.0078</td><td>$0.025</td></tr>
+<tr><td>Business</td><td>$99</td><td>25,000</td><td>$0.00396</td><td>$0.02</td></tr>
+<tr><td>Shift 100k</td><td>$249</td><td>100,000</td><td>$0.00249</td><td>$0.01</td></tr>
+<tr><td>Shift 500k</td><td>$799</td><td>500,000</td><td>$0.0016</td><td>$0.003</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th>PDFMint plan</th><th>Monthly</th><th>Documents</th><th>Per document</th><th>Overage</th></tr></thead>
+<tbody>
+<tr><td>Free</td><td>$0</td><td>10</td><td>&mdash;</td><td>none</td></tr>
+<tr><td>Starter</td><td>$9</td><td>5,000</td><td>$0.0018</td><td>none &mdash; upgrade or wait</td></tr>
+<tr><td>Pro</td><td>$29</td><td>50,000</td><td>$0.00058</td><td>none</td></tr>
+<tr><td>Scale</td><td>$99</td><td>250,000</td><td>$0.000396</td><td>none</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Line the two up at the points where they touch. <strong>$9: 500 credits against 5,000
+documents. $99: 25,000 credits against 250,000 documents.</strong> The gap is an order of magnitude
+at both ends, and it holds all the way up: PDFShift&rsquo;s largest published plan, $799 for 500,000
+credits, is two and a half times the price of PDFMint&rsquo;s $99 tier for twice the volume.</p>
+</section>
+
+<section id="credit">
+<h2>What a credit is, and why this is the part to check first <a class="anchor" href="#credit">#</a></h2>
+
+<p>PDFShift states the rule twice on its own pricing page, in these words:</p>
+
+<div class="note">
+<p>&ldquo;We count one document per 5Mb of generated data. A 14Mb document will count for 3
+credits.&rdquo;</p>
+</div>
+
+<p>That is a defensible way to price &mdash; a big render costs them more &mdash; but it means the
+per-credit column above is not the per-document price unless your output is small. Take a catalogue
+or a photo-heavy report at 14&nbsp;MB: on Starter it costs three credits, so 500 credits is 166
+documents, and the real price is <strong>$0.054 a document</strong>, thirty times PDFMint&rsquo;s
+$0.0018. Take a 300&nbsp;kB invoice and the rule never fires and the honest comparison is the
+$0.018 in the table.</p>
+
+<p>So the question is not which product is cheaper in the abstract. It is: <em>how many megabytes
+does your average document weigh?</em> Generate ten typical ones and look. At PDFMint the answer
+does not change the bill &mdash; one credit is one document, at any page count and any size.</p>
+</section>
+
+<section id="table">
+<h2>Side by side <a class="anchor" href="#table">#</a></h2>
+
+<div class="tw">
+<table>
+<thead><tr><th></th><th>PDFShift</th><th>PDFMint</th></tr></thead>
+<tbody>
+<tr><td>Billing unit</td><td>1 credit per 5&nbsp;MB of output</td><td>1 credit per document, any size</td></tr>
+<tr><td>$9 a month buys</td><td>500 credits</td><td>5,000 documents</td></tr>
+<tr><td>Free tier</td><td>50 credits, 15&nbsp;MB max, 30&nbsp;s timeout</td><td>10 documents, no size or timeout cap</td></tr>
+<tr><td>Timeout on paid plans</td><td>up to 15 minutes</td><td>yours to set per request</td></tr>
+<tr><td>Failed render</td><td>not stated on the pricing page</td><td>credit refunded before the error reaches you</td></tr>
+<tr><td>Inputs</td><td>HTML or a URL</td><td>HTML, Markdown, a URL, or a stored template</td></tr>
+<tr><td>Merge PDFs</td><td>&mdash;</td><td><code>POST /v1/merge</code>, one credit</td></tr>
+<tr><td>Screenshot / image output</td><td>&mdash;</td><td><code>POST /v1/image</code>, one credit</td></tr>
+<tr><td>Password protection</td><td>&ldquo;Encryption and Watermark&rdquo;, listed on all plans</td><td>AES-256 via qpdf, free tier included</td></tr>
+<tr><td>Published live latency</td><td>&mdash;</td><td><a href="/status">/status</a>, no account needed</td></tr>
+<tr><td>n8n node</td><td>&mdash;</td><td><a href="/n8n-html-to-pdf"><code>n8n-nodes-pdfmint</code></a></td></tr>
+<tr><td>Track record</td><td>&ldquo;48,000+ developers&rdquo;, &ldquo;74+ millions of generated documents&rdquo;, 57 Capterra reviews</td><td>none &mdash; see <a href="#honest">below</a></td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section id="errors">
+<h2>What happens when the render fails <a class="anchor" href="#errors">#</a></h2>
+
+<p>This is the difference that shows up at 3am rather than on an invoice. A PDF render fails for a
+small number of boring reasons: an asset 404&rsquo;d, a font never loaded, a selector you waited for
+never appeared, a placeholder had no value. PDFMint answers with the reason and a
+<code>request_id</code>:</p>
+
+<div class="code"><div class="cap">A real error from the live service</div><pre>{
+  "error": {
+    "code": "unresolved_placeholders",
+    "message": "The template uses 1 placeholder that \"data\" does not provide: amount.",
+    "hint": "Pass every placeholder in \"data\", or set \"strict\": false.",
+    "request_id": "529616e4ed2f7cf1"
+  }
+}</pre><button class="copy" type="button">Copy</button></div>
+
+<p>There is a second layer under that. A page can render <em>successfully</em> and still be wrong
+&mdash; an empty div, a chart that never drew. Those come back as a <code>warnings</code> array
+alongside a perfectly valid PDF, so a workflow can branch on them instead of mailing a blank page to
+a customer. The full error and warning list is in the <a href="/docs#errors">API reference</a>.</p>
+</section>
+
+<section id="free">
+<h2>The free tiers are not comparable, and ours is the smaller one <a class="anchor" href="#free">#</a></h2>
+
+<p>PDFShift gives 50 conversions a month; PDFMint gives 10. That is a real advantage for PDFShift
+and it is worth saying without spin: if you want to evaluate over several weeks without paying, they
+give you five times the room. PDFShift&rsquo;s free tier does cap output at 15&nbsp;MB and the
+timeout at 30 seconds, where the PDFMint free tier has the same limits as the paid ones &mdash; but
+50 is 50. Ours is sized to prove the thing works, not to run anything on.</p>
+</section>
+
+<section id="workflow">
+<h2>If the caller is a workflow tool rather than your code <a class="anchor" href="#workflow">#</a></h2>
+
+<p>PDFShift is an API you call from your own code. If the caller is n8n, Make or Zapier, the
+question becomes whether there is a node that hands the binary to the next step correctly, which is
+the part that is fiddly to do by hand with an HTTP node.</p>
+
+<p>PDFMint publishes <code>n8n-nodes-pdfmint</code>, which had <strong>958 installs in the week to
+28 August 2026</strong> by npm&rsquo;s own download API. It attaches the PDF as binary data and puts
+<code>pages</code>, <code>durationMs</code>, <code>creditsRemaining</code> and any warnings on the
+item&rsquo;s JSON next to it, so a downstream IF node can act on them. Details on
+<a href="/n8n-html-to-pdf">the n8n page</a>. That number is installs, not customers &mdash; see
+<a href="#honest">below</a>.</p>
+</section>
+
+<section id="code">
+<h2>The same call, here <a class="anchor" href="#code">#</a></h2>
+
+<div class="code"><div class="cap">PDFShift</div><pre>curl -X POST https://api.pdfshift.io/v3/convert/pdf \
+  -u "api:$PDFSHIFT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"source": "&lt;h1&gt;Invoice&lt;/h1&gt;"}' \
+  --output invoice.pdf</pre><button class="copy" type="button">Copy</button></div>
+
+<div class="code"><div class="cap">PDFMint</div><pre>curl -X POST https://pdf.mintapis.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"html": "&lt;h1&gt;Invoice&lt;/h1&gt;", "format": "A4"}' \
+  --output invoice.pdf</pre><button class="copy" type="button">Copy</button></div>
+
+<p>Both return the bytes in the response body, so a migration is the URL, the auth header and the
+name of one field. If you need the PDF as base64 or as a hosted link instead, set
+<code>"output": "base64"</code> or <code>"output": "link"</code>.</p>
+</section>
+
+<section id="stay">
+<h2>When to stay on PDFShift <a class="anchor" href="#stay">#</a></h2>
+<ul>
+<li><strong>Your documents are small and your volume is under about 400 a month.</strong> At that
+size the difference is a few dollars and switching is not worth an afternoon.</li>
+<li><strong>You want the free tier to carry a real evaluation.</strong> 50 a month against 10.</li>
+<li><strong>You need a vendor with years of public track record.</strong> They have tens of
+thousands of developers and public reviews on three sites. We have none of that, and no amount of
+argument changes it.</li>
+<li><strong>You are already integrated and it works.</strong> A renderer that has never surprised
+you is worth more than a price list.</li>
+</ul>
+</section>
+
+<section id="honest">
+<h2>What we cannot claim <a class="anchor" href="#honest">#</a></h2>
+<p>Nobody outside this project has paid for PDFMint yet, so there is no customer, no case study and
+no reference. The 958 weekly installs are npm downloads of the n8n node &mdash; that counts machines
+running <code>npm install</code>, including CI, and it is not a user count. PDFMint runs as a single
+service in one region with no SLA, and its status page&rsquo;s uptime figure resets on every deploy,
+which it says on the page. Everything else here can be checked with one <code>curl</code> and the
+two pricing pages, before you spend anything.</p>
+</section>
+
+<section id="try">
+<h2>Try it against your own worst document <a class="anchor" href="#try">#</a></h2>
+<p>Take the page your current renderer gets wrong &mdash; the web font, the JavaScript chart, the
+table that breaks across a page &mdash; and send it to both. Then weigh the output, because that is
+what decides which of these two rate cards applies to you.</p>
+<p><a class="cta" href="/signup">Get an API key</a> &nbsp; <a href="/docs">API reference</a>
+&nbsp; <a href="/status">Live latency and success rate</a></p>
+</section>
+
+<section id="more">
+<h2>Other comparisons <a class="anchor" href="#more">#</a></h2>
+<div class="cards">
+  <div class="c"><strong><a href="/html-to-pdf-api">HTML to PDF API</a></strong><span>What the job really involves, and what six products charge.</span></div>
+  <div class="c"><strong><a href="/craftmypdf-alternative">vs CraftMyPDF</a></strong><span>A drag-and-drop designer we do not have &mdash; and passwords from $99.</span></div>
+  <div class="c"><strong><a href="/pdfmonkey-alternative">vs PDFMonkey</a></strong><span>&euro;5 for 300 documents kept one day, against $9 for 5,000.</span></div>
+  <div class="c"><strong><a href="/n8n-html-to-pdf">HTML to PDF in n8n</a></strong><span>Three ways to do it in a workflow, and what each costs.</span></div>
+</div>
+</section>
+  </main>
+</div>
+
+<footer style="border-top:1px solid var(--rule);padding:1.6rem 1.25rem;text-align:center;font-size:.86rem;color:var(--muted)">
+  <a href="/">PDFMint</a> &middot;
+  <a href="/docs">API reference</a> &middot;
+  <a href="/html-to-pdf-api">HTML to PDF API</a> &middot;
+  <a href="/n8n-html-to-pdf">n8n</a> &middot;
+  <a href="/status">Status</a> &middot;
+  <a href="/legal">Legal</a>
+</footer>
+
+<script src="/docs.js"></script>
+</body>
+</html>

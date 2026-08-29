@@ -2190,26 +2190,28 @@ dependencies</strong>, built and tested against n8n 2.35 on Node.js 20 and 22. I
 <code>usableAsTool</code>, so an n8n AI Agent can call it directly.</p>
 
 <h3 id="n8n-install">Install <a class="anchor" href="#n8n-install">#</a></h3>
-<p class="notice"><strong>Self-hosted n8n only, for now.</strong> n8n's own rule is that
-&ldquo;unverified community nodes aren't available on n8n cloud and require self-hosting n8n.&rdquo;
-PDFMint's node is <a href="https://creators.n8n.io/nodes">submitted for verification</a> and is
-currently in n8n's automated review, so <strong>n8n Cloud cannot install it yet</strong>. On a
-self-hosted instance it installs normally:</p>
+<p class="notice"><strong>Verified by n8n &mdash; it works on n8n Cloud and on self-hosted.</strong>
+<code>n8n-nodes-pdfmint</code> is listed in n8n's community-node registry with
+<code>isPublished: true</code>, which is the list n8n Cloud installs from. You can check that
+yourself without an account: the entry is in the response of
+<code>https://api.n8n.io/api/community-nodes</code>.</p>
 
-<p>Settings &rarr; Community Nodes &rarr; Install, then enter <code>n8n-nodes-pdfmint</code>.</p>
+<p><strong>On n8n Cloud:</strong> Settings &rarr; Community Nodes &rarr; Install, then enter
+<code>n8n-nodes-pdfmint</code>. Verified nodes can also be found straight from the node panel when
+you search for &ldquo;PDFMint&rdquo;.</p>
 
-<p>Or from the CLI:</p>
+<p><strong>On self-hosted n8n:</strong> the same Settings &rarr; Community Nodes &rarr; Install
+path, or from the CLI:</p>
 <pre><code>cd ~/.n8n/nodes
 npm install n8n-nodes-pdfmint</code></pre>
 <p>Then restart n8n. The package is published with an npm provenance attestation, so
 <code>npm audit signatures</code> can verify it was built by the GitHub Actions workflow in the
 repository, from a specific commit.</p>
 
-<p>If you are on n8n Cloud, the HTTP API works today with an HTTP Request node &mdash; see
-<a href="#pdf">POST /v1/pdf</a>. It returns the PDF bytes, so set the node's response format to
-File and you get the same binary the PDFMint node would have handed you.</p>
-</div>
-<p>Then restart n8n.</p>
+<p>The node is a thin client and you never need it: the HTTP API works from a plain HTTP Request
+node too &mdash; see <a href="#pdf">POST /v1/pdf</a>. It returns the PDF bytes, so set that
+node's response format to File and you get the same binary the PDFMint node would have handed
+you.</p>
 
 <h3 id="n8n-credential">Credential <a class="anchor" href="#n8n-credential">#</a></h3>
 <ol>

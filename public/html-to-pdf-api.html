@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HTML to PDF API &mdash; what the job actually involves, and what the six products charge</title>
+<meta name="description" content="A worked comparison of HTML-to-PDF APIs, with every price read off the vendor&rsquo;s own page on 29 August 2026: PDFShift, CraftMyPDF, PDFMonkey, Doppio, Api2Pdf and PDFMint. Includes what a headless-Chrome renderer gets wrong and when to self-host instead.">
+<link rel="canonical" href="https://pdf.mintapis.com/html-to-pdf-api">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:url" content="https://pdf.mintapis.com/html-to-pdf-api">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="PDFMint">
+<meta property="og:title" content="HTML to PDF API &mdash; what the job actually involves, and what the six products charge">
+<meta property="og:description" content="A worked comparison of HTML-to-PDF APIs, with every price read off the vendor&rsquo;s own page on 29 August 2026: PDFShift, CraftMyPDF, PDFMonkey, Doppio, Api2Pdf and PDFMint. Includes what a headless-Chrome renderer gets wrong and when to self-host instead.">
+<meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
+<meta property="og:image:alt" content="PDFMint: HTML in, PDF bytes out, from one HTTP call.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/docs.css">
+</head>
+<body class="docs">
+
+<header class="docs-top">
+  <a class="logo" href="/">PDF<span>Mint</span></a>
+  <nav>
+    <a href="/docs">API reference</a>
+    <a href="/html-to-pdf-api">HTML to PDF</a>
+    <a href="/status">Status</a>
+    <a href="/dashboard">Dashboard</a>
+    <a class="cta" href="/signup">Get an API key</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="toc">
+    <button class="toc-toggle" id="tocToggle" aria-expanded="false" aria-controls="tocBody">On this page</button>
+    <div class="toc-body" id="tocBody">
+      <h2>The job</h2>
+      <ul>
+        <li><a href="#job">What the job really is</a></li>
+        <li><a href="#hard">The five parts that are hard</a></li>
+        <li><a href="#selfhost">When to self-host instead</a></li>
+      </ul>
+      <h2>The market</h2>
+      <ul>
+        <li><a href="#prices">What the six charge</a></li>
+        <li><a href="#units">The unit of billing is the trap</a></li>
+        <li><a href="#gates">What sits behind a higher plan</a></li>
+      </ul>
+      <h2>Then</h2>
+      <ul>
+        <li><a href="#pdfmint">Where PDFMint sits</a></li>
+        <li><a href="#honest">What we cannot claim</a></li>
+        <li><a href="#try">Try it</a></li>
+        <li><a href="#more">The individual comparisons</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="content">
+<h1>HTML to PDF API</h1>
+<p class="lede">Turning HTML into a PDF looks like one function call and is really about six of them.
+This page describes the whole job honestly, then puts the current prices of six HTML-to-PDF APIs
+next to each other &mdash; every figure read off the vendor&rsquo;s own pricing page on
+<strong>29 August 2026</strong>, several of them by driving the vendor&rsquo;s own calculator rather
+than by trusting a summary. It also says plainly where a competitor is the better buy.</p>
+
+<div class="note">
+<p><strong>Who wrote this.</strong> We build PDFMint, one of the six. That is a reason to check the
+numbers, not to discount them, so every one of them is attributed to the page it came from and can
+be re-read in a minute. Where a rival is better for a given job, this page says so by name.</p>
+</div>
+
+<section id="job">
+<h2>What the job really is <a class="anchor" href="#job">#</a></h2>
+
+<p>A PDF endpoint that only converts markup is the easy quarter of the problem. In a real workflow
+the same call has to do all of this:</p>
+
+<ol>
+<li><strong>Render the page the way a browser would</strong> &mdash; modern CSS, web fonts, flexbox
+and grid, SVG, and the print stylesheet if there is one.</li>
+<li><strong>Know when the page is finished.</strong> A chart drawn by JavaScript, a font still
+loading, an image that arrives late: convert too early and you ship a blank box to a customer.</li>
+<li><strong>Paginate.</strong> Page size, margins, a header and footer on every page, page numbers,
+and not breaking a table row in half.</li>
+<li><strong>Fail in a way you can act on.</strong> Which asset 404&rsquo;d, which selector never
+appeared, which placeholder had no value &mdash; not <code>500 Internal Server Error</code>.</li>
+<li><strong>Survive being called from a workflow.</strong> Retries that do not double-charge,
+timeouts that are yours to set, and binary output that the next node can actually attach.</li>
+<li><strong>Not become a security hole.</strong> Rendering user-supplied HTML on your own
+infrastructure means running somebody else&rsquo;s markup in a browser you own.</li>
+</ol>
+
+<p>Points 2, 4 and 6 are what people underestimate, and points 2 and 4 are where the products in
+this table differ most.</p>
+</section>
+
+<section id="hard">
+<h2>The five parts that are hard <a class="anchor" href="#hard">#</a></h2>
+
+<div class="cards">
+  <div class="c"><strong>Knowing the page is done</strong><span>Chrome will happily screenshot a
+  half-drawn page. Every serious product exposes some form of &ldquo;wait until this selector
+  exists&rdquo; or &ldquo;wait until the network is quiet&rdquo;. If yours only has a fixed sleep,
+  you are trading latency for a blank chart.</span></div>
+  <div class="c"><strong>Fonts</strong><span>A font that fails to load does not throw &mdash; it
+  substitutes, and the layout shifts. This is the single most common cause of &ldquo;it looked fine
+  in my browser&rdquo;.</span></div>
+  <div class="c"><strong>Headers, footers and page numbers</strong><span>Chrome&rsquo;s own header
+  and footer templates are a separate, quietly different HTML context with their own CSS rules.
+  Products that hide this behind options are doing you a favour.</span></div>
+  <div class="c"><strong>Concurrency</strong><span>A browser per request is expensive. Every hosted
+  product is really selling you a pool of warm browsers and the discipline to restart them before
+  they leak.</span></div>
+  <div class="c"><strong>Billing units</strong><span>&ldquo;One credit&rdquo; means a document at
+  some vendors, five megabytes of output at another, and a half-credit for a merge at a third. See
+  <a href="#units">below</a> &mdash; this is where an estimate goes wrong by 5&times;.</span></div>
+</div>
+</section>
+
+<section id="selfhost">
+<h2>When to self-host instead <a class="anchor" href="#selfhost">#</a></h2>
+
+<p>Puppeteer or Playwright plus Chromium in a container is a genuinely reasonable answer, and if any
+of these is true it is probably the right one:</p>
+
+<ul>
+<li>The documents contain data that must not leave your network, and a DPA is not enough.</li>
+<li>You already run a browser pool for scraping or screenshots, so the hard part is paid for.</li>
+<li>Volume is high and steady enough that the per-document price of any API stops being noise.</li>
+<li>You need a rendering engine that is not Chrome &mdash; Prince or WeasyPrint for real print
+typography, for instance.</li>
+</ul>
+
+<p>What you take on: Chromium in a container is roughly 400&nbsp;MB and needs its fonts installed
+explicitly; a leaked browser process will eat a box overnight; and rendering untrusted HTML wants a
+sandbox you maintain. That is a week of work and then a permanent, small, recurring one. If the
+answer to &ldquo;who owns this at 3am&rdquo; is nobody, buy it.</p>
+</section>
+
+<section id="prices">
+<h2>What the six charge, on 29 August 2026 <a class="anchor" href="#prices">#</a></h2>
+
+<p>Entry paid tier and the tier nearest 5,000 documents a month, so the columns are comparable.
+Every cell is the vendor&rsquo;s published figure; the per-document column is arithmetic on it.</p>
+
+<div class="tw">
+<table>
+<thead><tr><th>Product</th><th>Free tier</th><th>Entry paid plan</th><th>Around 5,000 docs/mo</th><th>Per document there</th></tr></thead>
+<tbody>
+<tr><td><a href="/pdfshift-alternative">PDFShift</a></td><td>50 credits</td><td>$9 / 500 credits</td><td>$39 / 5,000 credits</td><td>$0.0078 <span class="t">1 credit per 5&nbsp;MB</span></td></tr>
+<tr><td><a href="/craftmypdf-alternative">CraftMyPDF</a></td><td>50 PDFs</td><td>$29 / 1,200</td><td>$49 / 3,000</td><td>$0.0163</td></tr>
+<tr><td><a href="/pdfmonkey-alternative">PDFMonkey</a></td><td>20 docs</td><td>&euro;5 / 300</td><td>&euro;15 / 3,000</td><td>&euro;0.005 <span class="t">excl. VAT</span></td></tr>
+<tr><td>Doppio</td><td>400 docs</td><td>$16 / 4,000</td><td>$16 / 4,000</td><td>$0.004</td></tr>
+<tr><td>Api2Pdf</td><td>&mdash;</td><td>$1/mo + usage</td><td>metered</td><td>see note</td></tr>
+<tr><td><strong>PDFMint</strong></td><td>10 docs</td><td>$9 / 5,000</td><td>$9 / 5,000</td><td><strong>$0.0018</strong></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Api2Pdf does not sell tiers: it is <strong>$1 a month plus $0.001 per MB of bandwidth and
+$0.00019551 per second of compute</strong>, and their own calculator assumes two seconds per file.
+A 1&nbsp;MB PDF at two seconds is therefore about $0.0014 &mdash; genuinely cheap, and genuinely
+hard to forecast, which is the trade they are offering.</p>
+
+<p>Two figures deserve to be read twice. <strong>$9 a month buys 500 documents at PDFShift and
+5,000 here</strong>, and <strong>PDFMint&rsquo;s free tier is the smallest in the table</strong> at
+10 documents a month against PDFShift&rsquo;s and CraftMyPDF&rsquo;s 50 and Doppio&rsquo;s 400. If
+what you want is a generous free tier to run a small real workflow on, Doppio&rsquo;s 400 a month
+is the honest recommendation on this page.</p>
+</section>
+
+<section id="units">
+<h2>The unit of billing is where an estimate goes wrong <a class="anchor" href="#units">#</a></h2>
+
+<p>&ldquo;Credits&rdquo; is not a unit. It means something different at each vendor, and the
+differences are not small:</p>
+
+<div class="tw">
+<table>
+<thead><tr><th>Product</th><th>What one credit buys</th><th>Their words</th></tr></thead>
+<tbody>
+<tr><td>PDFShift</td><td>5&nbsp;MB of <em>generated output</em></td><td>&ldquo;We count one document per 5Mb of generated data. A 14Mb document will count for 3 credits.&rdquo;</td></tr>
+<tr><td>CraftMyPDF</td><td>One PDF; other operations cost half</td><td>&ldquo;Operations such as adding text or merging PDFs consume 0.5 credit.&rdquo;</td></tr>
+<tr><td>PDFMonkey</td><td>One document</td><td>Retention differs by plan: 1 day on Starter, 7 on Pro.</td></tr>
+<tr><td>Api2Pdf</td><td>Nothing &mdash; you buy MB and seconds</td><td>&ldquo;$0.001 / MB bandwidth &middot; $0.00019551 / sec compute&rdquo;</td></tr>
+<tr><td>PDFMint</td><td>One document, any size, any page count</td><td>A failed render is refunded before the error reaches you.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>A 60-page catalogue with photographs is one document everywhere in that table except PDFShift,
+where a 14&nbsp;MB result is three credits by their own example. If your documents are image-heavy,
+recompute PDFShift&rsquo;s column with your real output size before you compare anything.</p>
+</section>
+
+<section id="gates">
+<h2>What sits behind a higher plan <a class="anchor" href="#gates">#</a></h2>
+
+<p>Price per document is the visible axis. The one that bites later is which capability is gated.</p>
+
+<div class="tw">
+<table>
+<thead><tr><th>Capability</th><th>Cheapest plan that has it</th></tr></thead>
+<tbody>
+<tr><td>PDF password protection &mdash; CraftMyPDF</td><td>Professional, <strong>$99/mo</strong></td></tr>
+<tr><td>PDF password protection &mdash; PDFMint</td><td>Free</td></tr>
+<tr><td>Unlimited document retention &mdash; PDFMonkey</td><td>Pro+, <strong>&euro;60/mo</strong> (Starter keeps documents 1 day)</td></tr>
+<tr><td>Asynchronous renders &mdash; Doppio</td><td>Premium, <strong>$16/mo</strong> (free tier is sync only)</td></tr>
+<tr><td>Unlimited file size and a timeout above 30&nbsp;s &mdash; PDFShift</td><td>Starter, <strong>$9/mo</strong> (free tier caps at 15&nbsp;MB / 30&nbsp;s)</td></tr>
+<tr><td>Async and webhooks &mdash; PDFMint</td><td>Free</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>These are read from the feature matrices on the same pricing pages on the same day. They move;
+check them.</p>
+</section>
+
+<section id="pdfmint">
+<h2>Where PDFMint sits, and the one number nobody else publishes <a class="anchor" href="#pdfmint">#</a></h2>
+
+<p>PDFMint is an HTTP endpoint, not a document builder. You <code>POST</code> HTML, Markdown, a URL
+or the name of a stored template, and the PDF bytes come back in the response body. Every feature is
+on every plan, including the free one: password protection, headers and footers, page numbers,
+custom page sizes, watermarks, images, merging, hosted links, async and webhooks.</p>
+
+<p>The thing worth clicking is not on this page. <a href="/status">/status</a> is generated from the
+service&rsquo;s own request log and is public without an account &mdash; success rate, refused
+requests, and median, 95th-percentile and slowest render time over the last 24 hours and 7 days.
+When this page was written it read <strong>median 55&nbsp;ms, 95th percentile 618&nbsp;ms, slowest
+4,804&nbsp;ms</strong>, over <strong>126 documents in 24 hours and 3,033 in 7 days at a 100% success
+rate</strong>. Those numbers will be different when you read them, which is the point: none of the
+five other products publishes its own latency at all, so this is the only cell in the comparison you
+can verify yourself before paying anybody.</p>
+
+<div class="code"><div class="cap">The whole product, in one call</div><pre>curl -X POST https://pdf.mintapis.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"html":"&lt;h1&gt;Invoice 2026-0042&lt;/h1&gt;","format":"A4"}' \
+  --output invoice.pdf</pre><button class="copy" type="button">Copy</button></div>
+</section>
+
+<section id="honest">
+<h2>What we cannot claim <a class="anchor" href="#honest">#</a></h2>
+<p>No outside customer has paid for PDFMint yet, so there is no case study and no reference to give
+you. The free tier is the smallest in the table and is sized to prove the thing works, not to run a
+workflow on. PDFMint runs as a single service in one region &mdash; the status page&rsquo;s uptime
+figure resets on every deploy, and it says so &mdash; so there is no multi-region story and no SLA.
+And there is no drag-and-drop template designer: if a non-developer has to lay the document out,
+<a href="/craftmypdf-alternative">CraftMyPDF</a> and <a href="/pdfmonkey-alternative">PDFMonkey</a>
+are built for that and this is not.</p>
+</section>
+
+<section id="try">
+<h2>Try it against your own worst page <a class="anchor" href="#try">#</a></h2>
+<p>A feature table is not a test. The test is the page your current renderer gets wrong &mdash; the
+one with the web font, the JavaScript chart and the table that breaks across a page. Send it to
+<code>POST /v1/pdf</code> and look at what comes back, including the <code>warnings</code> array,
+which tells you when the page rendered but was probably not what you meant.</p>
+<p><a class="cta" href="/signup">Get an API key</a> &nbsp; <a href="/docs">Read the API reference</a>
+&nbsp; <a href="/status">See the live numbers</a></p>
+</section>
+
+<section id="more">
+<h2>The individual comparisons <a class="anchor" href="#more">#</a></h2>
+<div class="cards">
+  <div class="c"><strong><a href="/pdfshift-alternative">vs PDFShift</a></strong><span>Same $9, ten times the documents &mdash; and their credit is 5&nbsp;MB, not one file.</span></div>
+  <div class="c"><strong><a href="/craftmypdf-alternative">vs CraftMyPDF</a></strong><span>A template designer we do not have, and a password feature that starts at $99.</span></div>
+  <div class="c"><strong><a href="/pdfmonkey-alternative">vs PDFMonkey</a></strong><span>&euro;5 for 300 documents kept for one day, against $9 for 5,000 you never store.</span></div>
+  <div class="c"><strong><a href="/n8n-html-to-pdf">HTML to PDF in n8n</a></strong><span>The three ways to do it in a workflow, and what each one costs you.</span></div>
+</div>
+</section>
+  </main>
+</div>
+
+<footer style="border-top:1px solid var(--rule);padding:1.6rem 1.25rem;text-align:center;font-size:.86rem;color:var(--muted)">
+  <a href="/">PDFMint</a> &middot;
+  <a href="/docs">API reference</a> &middot;
+  <a href="/html-to-pdf-api">HTML to PDF API</a> &middot;
+  <a href="/n8n-html-to-pdf">n8n</a> &middot;
+  <a href="/status">Status</a> &middot;
+  <a href="/legal">Legal</a>
+</footer>
+
+<script src="/docs.js"></script>
+</body>
+</html>

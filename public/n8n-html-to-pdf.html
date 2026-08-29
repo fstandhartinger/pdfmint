@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HTML to PDF in n8n &mdash; the three ways, and what each one costs you</title>
+<meta name="description" content="There are three ways to turn HTML into a PDF inside an n8n workflow: the Convert to File node (which cannot do it), an HTTP Request node against a PDF API, or a dedicated community node. What each one actually does with the binary, and what it costs. With the n8n-nodes-pdfmint node, verified by n8n.">
+<link rel="canonical" href="https://pdf.mintapis.com/n8n-html-to-pdf">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:url" content="https://pdf.mintapis.com/n8n-html-to-pdf">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="PDFMint">
+<meta property="og:title" content="HTML to PDF in n8n &mdash; the three ways, and what each one costs you">
+<meta property="og:description" content="There are three ways to turn HTML into a PDF inside an n8n workflow: the Convert to File node (which cannot do it), an HTTP Request node against a PDF API, or a dedicated community node. What each one actually does with the binary, and what it costs. With the n8n-nodes-pdfmint node, verified by n8n.">
+<meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
+<meta property="og:image:alt" content="PDFMint: HTML in, PDF bytes out, from one HTTP call.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/docs.css">
+</head>
+<body class="docs">
+
+<header class="docs-top">
+  <a class="logo" href="/">PDF<span>Mint</span></a>
+  <nav>
+    <a href="/docs">API reference</a>
+    <a href="/html-to-pdf-api">HTML to PDF</a>
+    <a href="/status">Status</a>
+    <a href="/dashboard">Dashboard</a>
+    <a class="cta" href="/signup">Get an API key</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="toc">
+    <button class="toc-toggle" id="tocToggle" aria-expanded="false" aria-controls="tocBody">On this page</button>
+    <div class="toc-body" id="tocBody">
+      <h2>The three ways</h2>
+      <ul>
+        <li><a href="#builtin">1. A built-in node</a></li>
+        <li><a href="#http">2. HTTP Request</a></li>
+        <li><a href="#node">3. A community node</a></li>
+      </ul>
+      <h2>Doing it</h2>
+      <ul>
+        <li><a href="#install">Install and credential</a></li>
+        <li><a href="#binary">Where the file ends up</a></li>
+        <li><a href="#recipes">Three real workflows</a></li>
+        <li><a href="#errors">When it goes wrong</a></li>
+      </ul>
+      <h2>Then</h2>
+      <ul>
+        <li><a href="#cost">What it costs</a></li>
+        <li><a href="#honest">What we cannot claim</a></li>
+        <li><a href="#try">Try it</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="content">
+<h1>HTML to PDF in n8n</h1>
+<p class="lede">This is one of the most-asked questions in the n8n community, and the first answer
+people find is wrong. There are three real ways to turn HTML into a PDF inside a workflow. This page
+describes all three, including the two that do not involve us, and says what each does with the
+binary afterwards &mdash; which is the part that actually costs you an evening.</p>
+
+<section id="builtin">
+<h2>1. A built-in node &mdash; it does not exist <a class="anchor" href="#builtin">#</a></h2>
+
+<p>The <strong>Convert to File</strong> node handles CSV, JSON, XML, spreadsheets, text and base64.
+It does not render HTML, and it does not produce PDFs. Neither does <strong>Extract from File</strong>,
+which reads PDFs rather than writing them. There is no core n8n node that renders a web page.</p>
+
+<p>The reason is not an oversight: rendering HTML faithfully means shipping a browser. n8n would
+have to bundle Chromium into every installation to do what a one-line HTTP call can do instead. So
+every real answer is one of the next two.</p>
+</section>
+
+<section id="http">
+<h2>2. An HTTP Request node against any PDF API <a class="anchor" href="#http">#</a></h2>
+
+<p>This works today, on Cloud and self-hosted, with no installs and no community-node policy to
+think about. It is the right answer if you already pay for a PDF API, or if your organisation does
+not allow community nodes.</p>
+
+<p>The one thing to get right is the response format. By default n8n will try to parse the response
+as JSON and you will get mojibake instead of a file. Set <strong>Response &rarr; Format &rarr;
+File</strong> and name the output binary property.</p>
+
+<div class="code"><div class="cap">HTTP Request node, configured by hand</div><pre>Method:        POST
+URL:           https://pdf.mintapis.com/v1/pdf
+Authentication: Generic Credential Type &rarr; Header Auth
+  Name:        Authorization
+  Value:       Bearer pm_live_...
+Body:          JSON
+  {"html": "{{ $json.html }}", "format": "A4"}
+Response:
+  Format:      File
+  Output field: data</pre><button class="copy" type="button">Copy</button></div>
+
+<p>What you give up doing it this way: the response headers. PDFMint returns
+<code>X-PDFMint-Pages</code>, <code>X-PDFMint-Duration-Ms</code>,
+<code>X-PDFMint-Credits-Remaining</code> and <code>X-PDFMint-Warning</code>, and an HTTP Request node
+in File mode drops them. If you never branch on page count or warnings, you will not miss them.</p>
+</section>
+
+<section id="node">
+<h2>3. A community node <a class="anchor" href="#node">#</a></h2>
+
+<p>A dedicated node exists so that the fiddly parts &mdash; binary handling, the headers above,
+per-item execution, and a credential that tests itself &mdash; are configured rather than rebuilt.
+<code>n8n-nodes-pdfmint</code> is a thin client over the same HTTP API, with <strong>zero runtime
+dependencies</strong>, built and tested against n8n 2.35 on Node.js 20 and 22, and marked
+<code>usableAsTool</code> so an AI Agent node can call it directly.</p>
+
+<p>It is <strong>verified by n8n</strong>: the package is in n8n's community-node registry with
+<code>isPublished: true</code>, which is the list n8n Cloud installs from. You can confirm that
+without an account &mdash; the entry is in the response of
+<code>https://api.n8n.io/api/community-nodes</code>. npm recorded
+<strong>958 installs in the week to 28 August 2026</strong>.</p>
+
+<div class="tw">
+<table>
+<thead><tr><th>Operation</th><th>Calls</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Generate PDF</td><td><code>POST /v1/pdf</code></td><td>Source: HTML, Markdown, a URL or a saved template. Runs once per input item.</td></tr>
+<tr><td>Generate Image</td><td><code>POST /v1/image</code></td><td>PNG or JPEG screenshot of the same markup.</td></tr>
+<tr><td>Merge PDFs</td><td><code>POST /v1/merge</code></td><td>Runs <strong>once for the whole branch</strong>, not once per item.</td></tr>
+<tr><td>Get Usage</td><td><code>GET /v1/me</code></td><td>Plan, quota and documents remaining, on <code>json</code>.</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section id="install">
+<h2>Install and credential <a class="anchor" href="#install">#</a></h2>
+
+<p><strong>Cloud or self-hosted:</strong> Settings &rarr; Community Nodes &rarr; Install, then enter
+<code>n8n-nodes-pdfmint</code>. On self-hosted you can also install it from the CLI:</p>
+
+<div class="code"><div class="cap">Self-hosted install</div><pre>cd ~/.n8n/nodes
+npm install n8n-nodes-pdfmint
+# then restart n8n</pre><button class="copy" type="button">Copy</button></div>
+
+<p>The package carries an npm provenance attestation, so <code>npm audit signatures</code> can
+verify it was built by the GitHub Actions workflow in the repository, from a specific commit. That
+is worth doing for any community node before you let it hold a credential.</p>
+
+<p>Then add a <strong>PDFMint API</strong> credential and paste a key from
+<a href="/signup">the dashboard</a> &mdash; it starts with <code>pm_live_</code>. The credential
+tests itself with <code>GET /v1/me</code>, so n8n tells you immediately whether the key works
+instead of failing on the first real run.</p>
+</section>
+
+<section id="binary">
+<h2>Where the file ends up &mdash; the part that decides everything downstream <a class="anchor" href="#binary">#</a></h2>
+
+<p>With the default <strong>File (Binary)</strong> output, the PDF is attached to the output item's
+binary field (<code>data</code>, unless you rename it), so Gmail, Google Drive, S3, Slack, Nextcloud
+and HTTP Request nodes can consume it directly. There is no download step and no base64 dance.</p>
+
+<p>Alongside it, on <code>json</code>:</p>
+
+<div class="tw">
+<table>
+<thead><tr><th>Field</th><th>What it tells you</th></tr></thead>
+<tbody>
+<tr><td><code>fileName</code>, <code>mimeType</code>, <code>size</code></td><td>the usual, for the next node</td></tr>
+<tr><td><code>pages</code></td><td>page count &mdash; useful for &ldquo;this invoice should be one page&rdquo;</td></tr>
+<tr><td><code>durationMs</code></td><td>how long the render took</td></tr>
+<tr><td><code>creditsRemaining</code></td><td>so a workflow can alert you before it runs out</td></tr>
+<tr><td><code>warning</code></td><td>present when the render succeeded but was probably not what you meant</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Choose <strong>Hosted URL</strong> or <strong>Base64 in JSON</strong> instead and the item carries
+the API's JSON response with no binary attached &mdash; the right choice when the next step is a
+webhook or a database row rather than an attachment.</p>
+</section>
+
+<section id="recipes">
+<h2>Three workflows people actually build <a class="anchor" href="#recipes">#</a></h2>
+
+<div class="cards">
+  <div class="c"><strong>Invoice on a new order</strong><span>Webhook &rarr; Set (build the HTML, or
+  name a stored template) &rarr; PDFMint &rarr; Gmail. The binary attaches straight to the mail.</span></div>
+  <div class="c"><strong>Weekly report</strong><span>Schedule &rarr; Postgres or Sheets &rarr; Code
+  (render rows into a table) &rarr; PDFMint &rarr; Slack or Drive. One credit, any page count.</span></div>
+  <div class="c"><strong>Statement per customer, merged</strong><span>Loop the customers through
+  Generate PDF, then a single Merge PDFs node at the end &mdash; it runs once for the whole branch,
+  not per item, so one archive comes out.</span></div>
+</div>
+
+<p>For the template case, store the layout once with <code>PUT /v1/templates/&lt;name&gt;</code> and
+then send only data from the workflow. That keeps a 300-line invoice out of a Set node, where it is
+unreadable and undiffable.</p>
+</section>
+
+<section id="errors">
+<h2>When it goes wrong <a class="anchor" href="#errors">#</a></h2>
+
+<p>Four failures cover almost everything, and each has a named error rather than a 500:</p>
+
+<div class="tw">
+<table>
+<thead><tr><th>Symptom</th><th>What it means</th></tr></thead>
+<tbody>
+<tr><td><code>unresolved_placeholders</code></td><td>A template placeholder had no value in <code>data</code>. The message names the field. Set <code>strict: false</code> to render anyway.</td></tr>
+<tr><td>A <code>warning</code> on <code>json</code>, PDF looks empty</td><td>The page rendered before its content existed &mdash; a JavaScript chart, a late image. Use <code>waitFor</code> with a selector.</td></tr>
+<tr><td>Fonts look wrong</td><td>A web font failed to load and the browser substituted silently. Reference it by absolute URL, or inline it.</td></tr>
+<tr><td>Node output is text, not a file</td><td>You are on the HTTP Request path and the response format is not set to File.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>Failed renders refund the credit before the error reaches the workflow, so a retry loop on a
+broken template does not quietly spend your quota.</p>
+</section>
+
+<section id="cost">
+<h2>What it costs <a class="anchor" href="#cost">#</a></h2>
+
+<p>One credit per successful document, whatever the page count and whatever the file size. The free
+tier is 10 documents a month with no card &mdash; enough to wire the node up and see a real PDF, not
+enough to run a daily workflow, which needs Starter at <strong>$9 for 5,000 documents</strong>.
+Every feature is on every plan including free: password protection, headers and footers, page
+numbers, custom page sizes, watermarks, merging, images and hosted links.</p>
+
+<p>How that compares with the other HTML-to-PDF APIs, with every figure read off the vendor's own
+page: <a href="/html-to-pdf-api">the comparison page</a>.</p>
+</section>
+
+<section id="honest">
+<h2>What we cannot claim <a class="anchor" href="#honest">#</a></h2>
+<p>No outside customer has paid for PDFMint yet, so there is no case study and no reference. The 958
+weekly figure is npm downloads &mdash; machines running <code>npm install</code>, including CI &mdash;
+not users. n8n's registry currently shows <code>0.1.0</code> as this package's top-level version
+while also listing <code>0.4.2</code>; npm's <code>latest</code> tag is <code>0.4.2</code>, so a
+normal install gets the current node, but the registry display is n8n's and not something we can
+correct. PDFMint runs as a single service in one region with no SLA; its
+<a href="/status">status page</a> is generated from its own request log and its uptime figure resets
+on every deploy, which it says on the page.</p>
+</section>
+
+<section id="try">
+<h2>Try it <a class="anchor" href="#try">#</a></h2>
+<p>Install the node, paste a key, drop it after any node that produces HTML, and run once. If it
+does what you need, the rest of this page was unnecessary; if it does not, the
+<a href="/docs">API reference</a> has every option and every error code.</p>
+<p><a class="cta" href="/signup">Get an API key</a> &nbsp; <a href="/docs#n8n">The node, in the reference</a>
+&nbsp; <a href="/status">Live latency and success rate</a></p>
+</section>
+
+<section id="more">
+<h2>Comparisons <a class="anchor" href="#more">#</a></h2>
+<div class="cards">
+  <div class="c"><strong><a href="/html-to-pdf-api">HTML to PDF API</a></strong><span>What the job really involves, and what six products charge.</span></div>
+  <div class="c"><strong><a href="/pdfshift-alternative">vs PDFShift</a></strong><span>Same $9, ten times the documents &mdash; and their credit is 5&nbsp;MB.</span></div>
+  <div class="c"><strong><a href="/craftmypdf-alternative">vs CraftMyPDF</a></strong><span>A drag-and-drop designer we do not have &mdash; and passwords from $99.</span></div>
+  <div class="c"><strong><a href="/pdfmonkey-alternative">vs PDFMonkey</a></strong><span>&euro;5 for 300 documents kept one day, against $9 for 5,000.</span></div>
+</div>
+</section>
+  </main>
+</div>
+
+<footer style="border-top:1px solid var(--rule);padding:1.6rem 1.25rem;text-align:center;font-size:.86rem;color:var(--muted)">
+  <a href="/">PDFMint</a> &middot;
+  <a href="/docs">API reference</a> &middot;
+  <a href="/html-to-pdf-api">HTML to PDF API</a> &middot;
+  <a href="/n8n-html-to-pdf">n8n</a> &middot;
+  <a href="/status">Status</a> &middot;
+  <a href="/legal">Legal</a>
+</footer>
+
+<script src="/docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PDFMonkey alternative &mdash; &euro;5 for 300 documents kept one day, or $9 for 5,000 you never store</title>
+<meta name="description" content="PDFMonkey charges &euro;5/month for 300 documents with one-day retention and &euro;60 before retention is unlimited; prices exclude VAT. PDFMint returns the bytes in the response and stores nothing, 5,000 documents for $9. Read from pdfmonkey.io/pricing on 29 August 2026.">
+<link rel="canonical" href="https://pdf.mintapis.com/pdfmonkey-alternative">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:url" content="https://pdf.mintapis.com/pdfmonkey-alternative">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="PDFMint">
+<meta property="og:title" content="PDFMonkey alternative &mdash; &euro;5 for 300 documents kept one day, or $9 for 5,000 you never store">
+<meta property="og:description" content="PDFMonkey charges &euro;5/month for 300 documents with one-day retention and &euro;60 before retention is unlimited; prices exclude VAT. PDFMint returns the bytes in the response and stores nothing, 5,000 documents for $9. Read from pdfmonkey.io/pricing on 29 August 2026.">
+<meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
+<meta property="og:image:alt" content="PDFMint: HTML in, PDF bytes out, from one HTTP call.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/docs.css">
+</head>
+<body class="docs">
+
+<header class="docs-top">
+  <a class="logo" href="/">PDF<span>Mint</span></a>
+  <nav>
+    <a href="/docs">API reference</a>
+    <a href="/html-to-pdf-api">HTML to PDF</a>
+    <a href="/status">Status</a>
+    <a href="/dashboard">Dashboard</a>
+    <a class="cta" href="/signup">Get an API key</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="toc">
+    <button class="toc-toggle" id="tocToggle" aria-expanded="false" aria-controls="tocBody">On this page</button>
+    <div class="toc-body" id="tocBody">
+      <h2>PDFMonkey</h2>
+      <ul>
+        <li><a href="#price">The rate card</a></li>
+        <li><a href="#retention">Retention is the hidden axis</a></li>
+        <li><a href="#vat">Euros, excluding VAT</a></li>
+      </ul>
+      <h2>The differences</h2>
+      <ul>
+        <li><a href="#model">Stored document vs. bytes back</a></li>
+        <li><a href="#table">Side by side</a></li>
+        <li><a href="#code">The same job, here</a></li>
+      </ul>
+      <h2>Then</h2>
+      <ul>
+        <li><a href="#stay">When to stay</a></li>
+        <li><a href="#honest">What we cannot claim</a></li>
+        <li><a href="#try">Try it</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="content">
+<h1>PDFMonkey alternative</h1>
+<p class="lede">PDFMonkey is a well-made template-and-dashboard product with a genuinely cheap
+entry price: <strong>&euro;5 a month for 300 documents</strong>. The two things to check before you
+commit are that <strong>documents are kept for one day on that plan</strong>, and that unlimited
+retention starts at <strong>&euro;60</strong>. PDFMint takes a different position entirely: the
+bytes come back in the response and nothing is stored, 5,000 documents for $9.</p>
+
+<div class="note">
+<p><strong>Where these numbers come from.</strong> Read from <code>pdfmonkey.io/pricing</code> on
+<strong>29 August 2026</strong>. Their page carries its own note, &ldquo;Last updated: March
+2026&rdquo;, and states that prices exclude VAT and taxes. Amounts are in euros as published; we
+have not converted them, because the exchange rate on the day you buy is not ours to guess.</p>
+</div>
+
+<section id="price">
+<h2>The rate card <a class="anchor" href="#price">#</a></h2>
+
+<div class="tw">
+<table>
+<thead><tr><th>PDFMonkey plan</th><th>Monthly</th><th>Documents</th><th>Retention</th><th>Per document</th></tr></thead>
+<tbody>
+<tr><td>Free</td><td>&euro;0</td><td>20</td><td>&mdash;</td><td>&mdash;</td></tr>
+<tr><td>Starter</td><td>&euro;5</td><td>300</td><td>1 day</td><td>&euro;0.0167</td></tr>
+<tr><td>Pro</td><td>&euro;15</td><td>3,000</td><td>7 days</td><td>&euro;0.005</td></tr>
+<tr><td>Pro+</td><td>&euro;60</td><td>5,000</td><td>unlimited</td><td>&euro;0.012</td></tr>
+<tr><td>Premium</td><td>&euro;300</td><td>60,000</td><td>unlimited</td><td>&euro;0.005</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="tw">
+<table>
+<thead><tr><th>PDFMint plan</th><th>Monthly</th><th>Documents</th><th>Retention</th><th>Per document</th></tr></thead>
+<tbody>
+<tr><td>Free</td><td>$0</td><td>10</td><td>none &mdash; bytes come back</td><td>&mdash;</td></tr>
+<tr><td>Starter</td><td>$9</td><td>5,000</td><td>none</td><td>$0.0018</td></tr>
+<tr><td>Pro</td><td>$29</td><td>50,000</td><td>none</td><td>$0.00058</td></tr>
+<tr><td>Scale</td><td>$99</td><td>250,000</td><td>none</td><td>$0.000396</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>The line that repays a second look is <strong>Pro+ at &euro;60 for 5,000 documents</strong>: it
+costs four times Pro for two thirds more volume, because what you are actually buying at that step
+is unlimited retention and collaborators, not throughput. PDFMint&rsquo;s equivalent volume, 5,000
+documents, is the $9 plan &mdash; and retention is not a feature there because there is nothing
+stored to retain.</p>
+</section>
+
+<section id="retention">
+<h2>Retention is the axis that decides this <a class="anchor" href="#retention">#</a></h2>
+
+<p>PDFMonkey generates a document, stores it, and gives you a URL. That is a real convenience: the
+file has a home, a dashboard shows you every document, and share links exist on the higher plans.
+It also means the plan&rsquo;s retention window is a deadline. On Starter you have <strong>one
+day</strong> to fetch and file the PDF somewhere of your own; on Pro, seven. Miss it &mdash; a
+downstream job fails overnight, an S3 upload silently 403s &mdash; and the document is gone and has
+to be regenerated, which costs another credit.</p>
+
+<p>PDFMint has no such window because it has no storage. <code>POST /v1/pdf</code> returns the PDF
+bytes in the response body; where they go next is your decision, made in your code, at the moment
+you already have them. If you do want a URL, <code>"output": "link"</code> gives you a hosted one
+&mdash; opt-in, per request, rather than the default.</p>
+
+<p>Which of those is better depends entirely on whether you already have somewhere to put files. If
+you do not, PDFMonkey&rsquo;s storage is doing real work for you and this section is an argument in
+their favour.</p>
+</section>
+
+<section id="vat">
+<h2>Euros, excluding VAT <a class="anchor" href="#vat">#</a></h2>
+<p>PDFMonkey&rsquo;s page states that the prices shown exclude VAT and taxes. For a business with a
+valid VAT ID inside the EU that is usually a wash; for a private buyer or a non-registered business
+it is not, and &euro;15 becomes &euro;17.85 at 19%. PDFMint prices are in US dollars and checkout
+runs on Stripe, where a VAT ID can be added to the invoice if you need one. Neither approach is
+better &mdash; but compare like with like when you put the two columns side by side.</p>
+</section>
+
+<section id="model">
+<h2>Stored document versus bytes back <a class="anchor" href="#model">#</a></h2>
+
+<div class="cards">
+  <div class="c"><strong>PDFMonkey</strong><span>Create a document from a template and data, poll or
+  receive a webhook when it is ready, then download from a URL. Asynchronous by nature, with a
+  dashboard listing every document you have made.</span></div>
+  <div class="c"><strong>PDFMint</strong><span>One request, the bytes in the response. Synchronous
+  by default, with async and webhooks available on every plan when you want them. No dashboard of
+  past documents, because there are none.</span></div>
+</div>
+
+<p>For a workflow tool the synchronous shape is usually simpler: one node, binary out, next node
+attaches it to an email. For a high-volume batch the asynchronous shape is usually kinder to your
+own timeouts. Both products can do both; the difference is which one is the default and therefore
+which one is less code.</p>
+</section>
+
+<section id="table">
+<h2>Side by side <a class="anchor" href="#table">#</a></h2>
+
+<div class="tw">
+<table>
+<thead><tr><th></th><th>PDFMonkey</th><th>PDFMint</th></tr></thead>
+<tbody>
+<tr><td>Currency</td><td>EUR, excluding VAT</td><td>USD, Stripe checkout</td></tr>
+<tr><td>5,000 documents a month</td><td>&euro;60 (Pro+)</td><td>$9 (Starter)</td></tr>
+<tr><td>Free tier</td><td>20 documents</td><td>10 documents</td></tr>
+<tr><td>Document storage</td><td>yes &mdash; 1 day / 7 days / unlimited by plan</td><td>none; bytes in the response, or an opt-in hosted link</td></tr>
+<tr><td>Template editor</td><td>yes, in the dashboard</td><td>no &mdash; your HTML, stored by name through the API</td></tr>
+<tr><td>Templates included</td><td>by plan</td><td>unlimited on every plan</td></tr>
+<tr><td>Failed render</td><td>not stated on the pricing page</td><td>credit refunded automatically</td></tr>
+<tr><td>Inputs</td><td>JSON into a stored template</td><td>HTML, Markdown, a URL, or a stored template</td></tr>
+<tr><td>Merge, images, passwords, watermarks</td><td>&mdash; / share links on Pro+</td><td>all on every plan including free</td></tr>
+<tr><td>Published live latency</td><td>&mdash;</td><td><a href="/status">/status</a>, no account needed</td></tr>
+<tr><td>n8n</td><td>&mdash;</td><td><a href="/n8n-html-to-pdf"><code>n8n-nodes-pdfmint</code></a></td></tr>
+<tr><td>Public track record</td><td>years, five published plans, an established user base</td><td>none &mdash; see <a href="#honest">below</a></td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section id="code">
+<h2>The same job, here <a class="anchor" href="#code">#</a></h2>
+
+<div class="code"><div class="cap">Store the layout once, then send only data</div><pre>curl -X PUT https://pdf.mintapis.com/v1/templates/receipt \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"html":"&lt;h1&gt;Receipt {{number}}&lt;/h1&gt;&lt;p&gt;{{amount}}&lt;/p&gt;","format":"A4"}'
+
+curl -X POST https://pdf.mintapis.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"template":"receipt","data":{"number":"2026-0042","amount":"1.190,00 EUR"}}' \
+  --output receipt.pdf</pre><button class="copy" type="button">Copy</button></div>
+
+<p>No document ID, no polling, no retention clock. If you would rather have a URL after all, add
+<code>"output": "link"</code> and you get one back instead of the bytes.</p>
+</section>
+
+<section id="stay">
+<h2>When to stay on PDFMonkey <a class="anchor" href="#stay">#</a></h2>
+<ul>
+<li><strong>You want the documents stored for you.</strong> If you have nowhere to put files, their
+storage plus share links is doing work you would otherwise build.</li>
+<li><strong>A non-developer edits the templates.</strong> Their dashboard editor exists; ours does
+not.</li>
+<li><strong>You are under 300 documents a month.</strong> &euro;5 is a good price and switching
+would save you a few euros a year.</li>
+<li><strong>You want an established vendor.</strong> They have one; we do not.</li>
+</ul>
+</section>
+
+<section id="honest">
+<h2>What we cannot claim <a class="anchor" href="#honest">#</a></h2>
+<p>No outside customer has paid for PDFMint yet &mdash; no case study, no reference. There is no
+dashboard listing your past documents and no visual template editor, and neither is planned. The
+free tier is 10 a month against PDFMonkey&rsquo;s 20. PDFMint runs as a single service in one
+region with no SLA; the uptime figure on the status page resets on every deploy and says so.</p>
+</section>
+
+<section id="try">
+<h2>Try it <a class="anchor" href="#try">#</a></h2>
+<p>Answer one question first: do you need the PDF to have a home, or do you already have one? That
+decides this comparison more than any per-document price does.</p>
+<p><a class="cta" href="/signup">Get an API key</a> &nbsp; <a href="/docs">API reference</a>
+&nbsp; <a href="/status">Live latency and success rate</a></p>
+</section>
+
+<section id="more">
+<h2>Other comparisons <a class="anchor" href="#more">#</a></h2>
+<div class="cards">
+  <div class="c"><strong><a href="/html-to-pdf-api">HTML to PDF API</a></strong><span>What the job really involves, and what six products charge.</span></div>
+  <div class="c"><strong><a href="/pdfshift-alternative">vs PDFShift</a></strong><span>Same $9, ten times the documents &mdash; and their credit is 5&nbsp;MB.</span></div>
+  <div class="c"><strong><a href="/craftmypdf-alternative">vs CraftMyPDF</a></strong><span>A drag-and-drop designer we do not have &mdash; and passwords from $99.</span></div>
+  <div class="c"><strong><a href="/n8n-html-to-pdf">HTML to PDF in n8n</a></strong><span>Three ways to do it in a workflow, and what each costs.</span></div>
+</div>
+</section>
+  </main>
+</div>
+
+<footer style="border-top:1px solid var(--rule);padding:1.6rem 1.25rem;text-align:center;font-size:.86rem;color:var(--muted)">
+  <a href="/">PDFMint</a> &middot;
+  <a href="/docs">API reference</a> &middot;
+  <a href="/html-to-pdf-api">HTML to PDF API</a> &middot;
+  <a href="/n8n-html-to-pdf">n8n</a> &middot;
+  <a href="/status">Status</a> &middot;
+  <a href="/legal">Legal</a>
+</footer>
+
+<script src="/docs.js"></script>
+</body>
+</html>
