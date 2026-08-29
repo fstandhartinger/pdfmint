@@ -924,7 +924,7 @@ into a broken link. If you need footnotes, write that part as <code>html</code>.
 <tbody>
 <tr><td><code>binary</code><br><span class="muted">default</span></td><td class="wrap"><code>application/pdf</code> (or <code>image/png</code> / <code>image/jpeg</code>) bytes, with <code>Content-Disposition: attachment</code>. Metadata rides in the <code>X-PDFMint-*</code> headers.</td><td class="wrap">Almost always. No size limit, one round trip.</td></tr>
 <tr><td><code>url</code></td><td class="wrap">JSON with a temporary hosted link: <code>{ filename, pages, size, url, expires_in_minutes, duration_ms, credits_remaining }</code></td><td class="wrap">You want to email or Slack a link instead of moving bytes. Capped at <strong>20&nbsp;MB</strong> per file.</td></tr>
-<tr><td><code>base64</code></td><td class="wrap">The same JSON plus a <code>base64</code> string. <span class="muted">Not supported by <code>/v1/merge</code>.</span></td><td class="wrap">Your client cannot deal with a binary body.</td></tr>
+<tr><td><code>base64</code></td><td class="wrap">The same JSON plus a <code>base64</code> string. Supported by <code>/v1/pdf</code>, <code>/v1/image</code> and <code>/v1/merge</code>.</td><td class="wrap">Your client cannot deal with a binary body.</td></tr>
 </tbody></table></div>
 
 <h3 id="output-hosted">Hosted files <a class="anchor" href="#output-hosted">#</a></h3>
