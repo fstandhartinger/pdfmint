@@ -58,10 +58,19 @@ router.use((req, res, next) => {
   // werden: die echten Render-Warnungen sind wichtiger als diese hier.
   const end = res.end.bind(res);
   res.end = (...args) => {
-    if (!res.headersSent) {
-      const prev = res.get('X-PDFMint-Warning');
-      res.set('X-PDFMint-Warning', prev ? `${prev} | ${LEGACY_HOST_NOTICE}` : LEGACY_HOST_NOTICE);
-    }
+    // warningHeader() statt res.set() mit rohem Text: der Hinweis enthaelt einen
+    // Gedankenstrich, und Node wirft bei jedem Zeichen ausserhalb von Latin-1 im
+    // Headerwert ERR_INVALID_CHAR. Beim ersten Deploy passierte das im
+    // on-finished-Listener, also ausserhalb jeder Fehlerbehandlung von Express -
+    // der Prozess starb an einer Hoeflichkeitsmeldung. Deshalb zusaetzlich das
+    // try/catch: ein Hinweis darf unter keinen Umstaenden einen Request toeten,
+    // erst recht nicht auf dem Host des einzigen zahlenden Kunden.
+    try {
+      if (!res.headersSent) {
+        const prev = res.get('X-PDFMint-Warning');
+        res.set('X-PDFMint-Warning', warningHeader(prev ? [prev, LEGACY_HOST_NOTICE] : [LEGACY_HOST_NOTICE]));
+      }
+    } catch { /* lieber ohne Hinweis ausliefern als gar nicht */ }
     return end(...args);
   };
   next();
