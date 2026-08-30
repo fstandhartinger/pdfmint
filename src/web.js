@@ -182,6 +182,7 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
   ${req.query.welcome ? '<div class="notice"><strong>Your account is ready.</strong> Copy the API key below into the PDFMint credential in n8n and you are done. The free plan is 10 documents a month; a plan below raises it.</div>' : ''}
   ${req.query.checkout === 'success' ? '<div class="notice ok"><strong>Payment received.</strong> Your new quota is live — it is shown below.</div>' : ''}
   ${req.query.checkout === 'cancelled' ? '<div class="notice">Checkout cancelled. Nothing was charged.</div>' : ''}
+  ${account.plan === 'free' && account.credits_used >= account.credits_limit ? '<div class="notice"><strong>You used all 10 free documents this month.</strong> Choose a paid plan below to keep generating now; the higher quota becomes available as soon as Stripe confirms payment. <a href="#plans">See plans</a>.</div>' : ''}
   <h1>Dashboard</h1>
   <section class="card">
     <h2>API key</h2>
@@ -249,7 +250,7 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
         <td>${r.ok ? '<span class="ok">ok</span>' : `<span class="bad">${escapeHtml(r.error_code || 'error')}</span>`}</td></tr>`).join('')}</table>` : '<p class="muted">No documents generated yet.</p>'}
   </section>
 
-  <section class="card">
+  <section class="card" id="plans">
     <h2>Plan</h2>
     <div class="plans">
       ${purchasable.map((p) => `<div class="plan${account.plan === p.id ? ' current' : ''}">
