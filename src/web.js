@@ -192,6 +192,9 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
         ${escapeHtml(String(plan.credits ?? account.credits_limit))} free documents, and writes <code>hello.pdf</code> in this directory:</p>
       <p class="keybox"><code id="firstcall">curl -X POST https://pdf.mintapis.com/v1/pdf -H "X-Api-Key: ${escapeHtml(fullKey)}" -H "Content-Type: application/json" -d '{"html":"&lt;h1&gt;Hello from PDFMint&lt;/h1&gt;&lt;p&gt;My first render.&lt;/p&gt;","filename":"hello"}' -o hello.pdf</code><button class="copy" data-target="firstcall">Copy</button></p>
       <p class="muted">Using n8n instead? Install the <code>n8n-nodes-pdfmint</code> community node and paste the key into its credential — <a href="/docs#n8n">step by step in the docs</a>.</p>` : ''}
+    ${!fullKey && account.credits_used === 0 ? `<div class="notice"><strong>Make your first PDF now</strong> — you have ${escapeHtml(String(plan.credits ?? account.credits_limit))} free documents waiting and none used yet. Create a new key above (it is shown once), then paste this into a terminal with your key in place of <code>YOUR_KEY</code>:</div>
+      <p class="keybox"><code>curl -X POST https://pdf.mintapis.com/v1/pdf -H "X-Api-Key: YOUR_KEY" -H "Content-Type: application/json" -d '{"html":"&lt;h1&gt;Hello from PDFMint&lt;/h1&gt;&lt;p&gt;My first render.&lt;/p&gt;","filename":"hello"}' -o hello.pdf</code></p>
+      <p class="muted">Using n8n? Install the <code>n8n-nodes-pdfmint</code> community node and paste the key into its credential — <a href="/docs#n8n">step by step in the docs</a>.</p>` : ''}
     ${req.query.newkey && !fullKey ? '<div class="error">That key has already been shown. Create another one if you need it.</div>' : ''}
     <table class="rows">
       <tr><th>Key</th><th>Label</th><th>Created</th><th>Last used</th><th></th></tr>
