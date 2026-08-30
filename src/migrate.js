@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('./db');
+const { SQL_PREDICATE } = require('./internal');
 
 const STATEMENTS = [
   // gen_random_bytes lives in pgcrypto; gen_random_uuid is core but this is not.
@@ -110,6 +111,21 @@ const STATEMENTS = [
      id          TEXT PRIMARY KEY,
      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
    )`,
+
+  // Whose traffic this is. The public status page reports on the world's usage,
+  // not on ours, and without this flag it could not tell the two apart: on
+  // 2026-08-30 it published 2,387 documents for the week when only 772 came from
+  // outside the house. See internal.js for the rule and why it lives in one place.
+  `ALTER TABLE accounts ADD COLUMN IF NOT EXISTS internal BOOLEAN NOT NULL DEFAULT false`,
+
+  // One-time backfill for everything created before the column existed. Guarded by
+  // `NOT internal` so it is a no-op on every later boot rather than a full rewrite
+  // of the table, and so a human who marks an account internal by hand is not
+  // silently overruled -- this can only ever set the flag, never clear it.
+  `UPDATE accounts SET internal = true WHERE NOT internal AND (${SQL_PREDICATE})`,
+
+  // The status queries ask only for external accounts, so index that side.
+  `CREATE INDEX IF NOT EXISTS accounts_external_idx ON accounts(id) WHERE NOT internal`,
 ];
 
 async function migrate() {

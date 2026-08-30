@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
 const { query } = require('./db');
+const { isInternalEmail } = require('./internal');
 const { ApiError } = require('./errors');
 const { config, PLANS } = require('./config');
 
@@ -25,10 +26,14 @@ async function createAccount(email, password) {
   const normalised = String(email).trim().toLowerCase();
   const hash = await bcrypt.hash(String(password), 10);
   const plan = PLANS.free;
+  // Stamp our own accounts at birth so the public status page never has to guess
+  // later. Doing it here rather than in a nightly sweep means a load test started
+  // one minute from now is already excluded from the numbers it would otherwise
+  // inflate.
   const { rows } = await query(
-    `INSERT INTO accounts (email, password_hash, plan, credits_limit, webhook_secret)
-     VALUES ($1, $2, 'free', $3, encode(gen_random_bytes(24), 'hex')) RETURNING *`,
-    [normalised, hash, plan.credits],
+    `INSERT INTO accounts (email, password_hash, plan, credits_limit, webhook_secret, internal)
+     VALUES ($1, $2, 'free', $3, encode(gen_random_bytes(24), 'hex'), $4) RETURNING *`,
+    [normalised, hash, plan.credits, isInternalEmail(normalised)],
   );
   const account = rows[0];
   const key = await issueApiKey(account.id, 'default');

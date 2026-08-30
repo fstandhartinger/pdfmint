@@ -15,6 +15,12 @@ const BOOTED_AT = new Date();
  * Everything here is measured from this instance's own request log. It is
  * self-reported, and the page says so — but it is real data rather than a
  * claim, and it is the same data we would look at ourselves.
+ *
+ * It counts external accounts only. Our own load tests and manual probes run
+ * against this same deployment, and until 2026-08-30 they were being published
+ * as demand: the week's figure read 2,387 documents when 1,330 of them were
+ * ours and 772 were the world's. A visitor reads this page to check a claim we
+ * made, so padding it with our own traffic breaks the one thing it is for.
  */
 /**
  * Not every failure is our failure. A page that answers 403, a host that does not
@@ -33,25 +39,28 @@ const CALLER_OR_UPSTREAM = [
 
 async function snapshot() {
   const [day, week, hours] = await Promise.all([
+    // Every column is table-qualified: `accounts` carries its own `created_at`,
+    // so the unqualified name that worked before the join now means nothing to
+    // Postgres, and /status answered 500 rather than a wrong number.
     query(`SELECT count(*)::int AS n,
-                  count(*) FILTER (WHERE ok)::int AS ok,
-                  count(*) FILTER (WHERE NOT ok AND error_code = ANY($2))::int AS caller,
-                  percentile_disc(0.5) WITHIN GROUP (ORDER BY duration_ms) AS p50,
-                  percentile_disc(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95,
-                  max(duration_ms) AS worst
-           FROM usage_events
-           WHERE created_at > now() - interval '24 hours' AND coalesce(origin, $1) = $1`,
+                  count(*) FILTER (WHERE u.ok)::int AS ok,
+                  count(*) FILTER (WHERE NOT u.ok AND u.error_code = ANY($2))::int AS caller,
+                  percentile_disc(0.5) WITHIN GROUP (ORDER BY u.duration_ms) AS p50,
+                  percentile_disc(0.95) WITHIN GROUP (ORDER BY u.duration_ms) AS p95,
+                  max(u.duration_ms) AS worst
+           FROM usage_events u JOIN accounts a ON a.id = u.account_id AND NOT a.internal
+           WHERE u.created_at > now() - interval '24 hours' AND coalesce(u.origin, $1) = $1`,
       [config.origin, CALLER_OR_UPSTREAM]),
-    query(`SELECT count(*)::int AS n, count(*) FILTER (WHERE ok)::int AS ok,
-                  count(*) FILTER (WHERE NOT ok AND error_code = ANY($2))::int AS caller
-           FROM usage_events
-           WHERE created_at > now() - interval '7 days' AND coalesce(origin, $1) = $1`,
+    query(`SELECT count(*)::int AS n, count(*) FILTER (WHERE u.ok)::int AS ok,
+                  count(*) FILTER (WHERE NOT u.ok AND u.error_code = ANY($2))::int AS caller
+           FROM usage_events u JOIN accounts a ON a.id = u.account_id AND NOT a.internal
+           WHERE u.created_at > now() - interval '7 days' AND coalesce(u.origin, $1) = $1`,
       [config.origin, CALLER_OR_UPSTREAM]),
-    query(`SELECT date_trunc('hour', created_at) AS hour,
+    query(`SELECT date_trunc('hour', u.created_at) AS hour,
                   count(*)::int AS n,
-                  count(*) FILTER (WHERE NOT ok AND NOT (error_code = ANY($2)))::int AS failed
-           FROM usage_events
-           WHERE created_at > now() - interval '24 hours' AND coalesce(origin, $1) = $1
+                  count(*) FILTER (WHERE NOT u.ok AND NOT (u.error_code = ANY($2)))::int AS failed
+           FROM usage_events u JOIN accounts a ON a.id = u.account_id AND NOT a.internal
+           WHERE u.created_at > now() - interval '24 hours' AND coalesce(u.origin, $1) = $1
            GROUP BY 1 ORDER BY 1`,
       [config.origin, CALLER_OR_UPSTREAM]),
   ]);
