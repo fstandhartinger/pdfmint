@@ -17,6 +17,56 @@ const { assertPublicUrl } = require('./net');
 
 const router = express.Router();
 
+/* ------------------------------------------------- Abkuendigung Render-Host */
+
+// Der alte Render-Host bleibt an, weil der einzige zahlende Kunde (Konto 1501)
+// noch ueber ihn rendert: elf von elf Aufrufen am 29./30.08. gingen dorthin,
+// der letzte vier Minuten nach seiner ersten Zahlung. Ihn abzuschalten haette
+// seinen Workflow zerstoert. Also stattdessen dieser Hinweis — nicht brechend,
+// nur sichtbar.
+//
+// Warum ueber die Warnung und nicht per Mail: Kaltakquise am einzigen Kunden
+// ist das groessere Risiko. Der n8n-Node blendet `X-PDFMint-Warning` als Feld
+// `warning` in seine Ausgabe ein — nachgesehen in 0.1.0 UND 0.3.0, also in jeder
+// Version, die er installiert haben kann, und auch im Binaermodus, den er nutzt.
+//
+// Die Bedingung haengt am Host, nicht an einer Umgebungsvariablen: damit wirkt
+// der Block ausschliesslich auf *.onrender.com und auf pdf.mintapis.com
+// nachweislich gar nicht. Wenn der Verkehr auf dem alten Host versiegt, kann
+// dieser ganze Abschnitt ersatzlos weg.
+const LEGACY_HOST_NOTICE = 'This host (pdfmint-b9tt.onrender.com) is being retired. '
+  + 'Point the Base URL in your PDFMint credentials at https://pdf.mintapis.com — '
+  + 'same API key, same endpoints, nothing else changes.';
+
+router.use((req, res, next) => {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
+  if (!host.includes('onrender.com')) return next();
+
+  const json = res.json.bind(res);
+  res.json = (body) => {
+    if (body && typeof body === 'object' && !Array.isArray(body)) {
+      body.warnings = Array.isArray(body.warnings)
+        ? [...body.warnings, LEGACY_HOST_NOTICE]
+        : [LEGACY_HOST_NOTICE];
+    }
+    return json(body);
+  };
+
+  // Der Binaermodus schickt gar kein JSON — dort ist der Header der einzige Weg
+  // nach draussen, und `res.end` ist die letzte Stelle, an der er noch gesetzt
+  // werden kann. Ein vorhandener Warntext bleibt stehen, statt ueberschrieben zu
+  // werden: die echten Render-Warnungen sind wichtiger als diese hier.
+  const end = res.end.bind(res);
+  res.end = (...args) => {
+    if (!res.headersSent) {
+      const prev = res.get('X-PDFMint-Warning');
+      res.set('X-PDFMint-Warning', prev ? `${prev} | ${LEGACY_HOST_NOTICE}` : LEGACY_HOST_NOTICE);
+    }
+    return end(...args);
+  };
+  next();
+});
+
 /* --------------------------------------------------------------- helpers */
 
 const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
