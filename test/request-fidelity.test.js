@@ -129,13 +129,27 @@ describe('a template reports the placeholders it uses', () => {
   test('PUT and GET both report the same list, with a kind on each entry', async () => {
     const get = await req(`/v1/templates/${name}`, { key });
     assert.equal(get.res.status, 200);
-    const byName = Object.fromEntries(get.json.placeholders.map((p) => [p.name, p.kind]));
+    // Fields inside a {{#section}} belong in this list, and they belong in it WITH
+    // their scope. Until c3b41a1 the scan never walked into a section, so every
+    // line-item column was missing and the usage example offered {"lines": "value"}
+    // -- a string, which is the one thing a repeat block cannot take. This
+    // expectation still encoded that old behaviour and is corrected here.
+    // The scope is asserted rather than dropped: a flat name->kind map cannot tell
+    // "one input for desc" from "one input for desc per row", which is precisely
+    // the distinction that made the old list unusable.
+    const byName = Object.fromEntries(get.json.placeholders.map((p) => [p.name, { kind: p.kind, scope: p.scope ?? null }]));
     assert.deepEqual(byName, {
-      title: 'scalar',
-      'customer.name': 'scalar',
-      lines: 'section',
-      invoice_number: 'scalar',
+      title: { kind: 'scalar', scope: null },
+      'customer.name': { kind: 'scalar', scope: null },
+      lines: { kind: 'section', scope: null },
+      desc: { kind: 'scalar', scope: 'lines' },
+      invoice_number: { kind: 'scalar', scope: null },
     }, 'a client builds one input field per entry, so the shape has to be usable');
+
+    // The usage example is the other half of the same promise: a section has to
+    // come back as an array of rows carrying that block's own fields.
+    assert.deepEqual(get.json.usage.data.lines, [{ desc: 'value' }],
+      'a repeat block must be offered as a row array, not as a string');
 
     const put = await req(`/v1/templates/${name}`, { method: 'PUT', key, body: { html, options: { headerHtml: '<div>{{invoice_number}}</div>' } } });
     assert.deepEqual(put.json.placeholders, get.json.placeholders, 'PUT must answer with the same list GET does');
@@ -148,9 +162,25 @@ describe('a template reports the placeholders it uses', () => {
     const { res, json } = await req('/v1/pdf', { method: 'POST', key, body: { template: name, data: {}, strict: true } });
     assert.equal(res.status, 400);
     const get = await req(`/v1/templates/${name}`, { key });
-    const listed = get.json.placeholders.filter((p) => p.kind !== 'inverted').map((p) => p.name).sort();
-    assert.deepEqual(json.error.details.unresolved.slice().sort(), listed,
-      'every name the client can offer must be a name the renderer looks for, and vice versa');
+    // Only the top level can be compared this way, and that is not a loosening.
+    // A field inside {{#lines}} is not "unresolved" when lines is empty -- nothing
+    // needs it, so the renderer is right not to name it. Since c3b41a1 the scanner
+    // deliberately reports those fields anyway, because a client drawing a form
+    // must know a row has a desc column. Asserting equality across both levels
+    // asserted that one of those two correct behaviours is wrong.
+    const topLevel = get.json.placeholders
+      .filter((p) => p.kind !== 'inverted' && !p.scope).map((p) => p.name).sort();
+    assert.deepEqual(json.error.details.unresolved.slice().sort(), topLevel,
+      'every top-level name the client can offer must be a name the renderer looks for, and vice versa');
+
+    // The other half of the guarantee, so the pair still pins the whole contract:
+    // a scoped field must NOT be demanded when its section is empty.
+    const scoped = get.json.placeholders.filter((p) => p.scope).map((p) => p.name);
+    assert.ok(scoped.length > 0, 'this fixture has a scoped field; if it stops having one the test proves nothing');
+    for (const nameInScope of scoped) {
+      assert.ok(!json.error.details.unresolved.includes(nameInScope),
+        `${nameInScope} sits inside an empty section, so nothing needs it and strict mode must not demand it`);
+    }
   });
 
   test('a template with no placeholders reports an empty list, not a missing field', async () => {
