@@ -13,11 +13,12 @@ const POLL_MS = Number(process.env.JOB_POLL_MS || 1500);
  * redeploy restarts the process, and a job that only lived in memory would be
  * lost with no way for the caller to find out.
  */
-async function enqueue(accountId, kind, request, webhookUrl) {
+async function enqueue(accountId, kind, request, webhookUrl, client = null) {
   const id = `job_${crypto.randomBytes(12).toString('base64url')}`;
   await query(
-    `INSERT INTO jobs (id, account_id, kind, request, webhook_url) VALUES ($1, $2, $3, $4, $5)`,
-    [id, accountId, kind, JSON.stringify(request), webhookUrl || null],
+    `INSERT INTO jobs (id, account_id, kind, request, webhook_url, client)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [id, accountId, kind, JSON.stringify(request), webhookUrl || null, client],
   );
   return id;
 }

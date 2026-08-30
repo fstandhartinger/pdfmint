@@ -126,6 +126,19 @@ const STATEMENTS = [
 
   // The status queries ask only for external accounts, so index that side.
   `CREATE INDEX IF NOT EXISTS accounts_external_idx ON accounts(id) WHERE NOT internal`,
+
+  // Which integration made the call. Added 2026-08-30, after npm reported 1,002
+  // weekly downloads of the n8n node against 16 external renders and nothing in
+  // the system could say whether a single one of those renders came through it.
+  // Nullable on purpose: rows written before this existed genuinely do not know,
+  // and backfilling them with a guess would be inventing the answer.
+  `ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS client TEXT`,
+
+  // The async worker renders long after the caller is gone, so the label is taken
+  // at enqueue time and carried on the job rather than guessed at render time.
+  `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client TEXT`,
+
+  `CREATE INDEX IF NOT EXISTS usage_events_client_time_idx ON usage_events(client, created_at DESC)`,
 ];
 
 async function migrate() {

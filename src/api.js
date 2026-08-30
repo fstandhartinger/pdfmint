@@ -4,6 +4,7 @@ const express = require('express');
 const crypto = require('node:crypto');
 
 const { config, PLANS } = require('./config');
+const { clientOf } = require('./client');
 const { ApiError, bad } = require('./errors');
 const { query } = require('./db');
 const { authenticate, consumeCredits, refundCredits, issueApiKey, revokeApiKey } = require('./auth');
@@ -405,9 +406,10 @@ function absoluteUrl(req, pathname) {
 
 function logUsage(accountId, kind, ok, extra = {}) {
   query(
-    `INSERT INTO usage_events (account_id, kind, pages, duration_ms, ok, error_code, origin)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-    [accountId, kind, extra.pages ?? null, extra.durationMs ?? null, ok, extra.errorCode ?? null, config.origin],
+    `INSERT INTO usage_events (account_id, kind, pages, duration_ms, ok, error_code, origin, client)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [accountId, kind, extra.pages ?? null, extra.durationMs ?? null, ok, extra.errorCode ?? null,
+     config.origin, extra.client ?? null],
   ).catch(() => {});
 }
 
@@ -972,7 +974,8 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
   if (wantsAsync) {
     if (webhookUrl) await assertPublicUrl(String(webhookUrl), 'webhookUrl');
     const credits = await consumeCredits(req.account.id, 1);
-    const jobId = await jobs.enqueue(req.account.id, 'pdf', body, webhookUrl ? String(webhookUrl) : null);
+    const jobId = await jobs.enqueue(req.account.id, 'pdf', body, webhookUrl ? String(webhookUrl) : null,
+      clientOf(req));
     return res.status(202).json({
       job_id: jobId,
       status: 'queued',
@@ -989,7 +992,7 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
     out = await producePdf(req.account, body, prepared, ctx);
   } catch (e) {
     await refundCredits(req.account.id, 1);
-    logUsage(req.account.id, 'pdf', false, { errorCode: e.code });
+    logUsage(req.account.id, 'pdf', false, { errorCode: e.code, client: clientOf(req) });
     throw e;
   }
   // Storing or encrypting can still fail after the render succeeded. The caller
@@ -997,12 +1000,12 @@ router.post('/pdf', withAuth, asyncRoute(async (req, res) => {
   const refundOnFailure = async (fn) => {
     try { return await fn(); } catch (e) {
       await refundCredits(req.account.id, 1);
-      logUsage(req.account.id, 'pdf', false, { errorCode: e.code });
+      logUsage(req.account.id, 'pdf', false, { errorCode: e.code, client: clientOf(req) });
       throw e;
     }
   };
   const { buffer, pages, filename, durationMs, debug } = out;
-  logUsage(req.account.id, 'pdf', true, { pages, durationMs });
+  logUsage(req.account.id, 'pdf', true, { pages, durationMs, client: clientOf(req) });
 
   res.set({
     'X-PDFMint-Duration-Ms': String(durationMs),
@@ -1131,10 +1134,10 @@ router.post('/image', withAuth, asyncRoute(async (req, res) => {
     if (problem) throw problem;
   } catch (e) {
     await refundCredits(req.account.id, 1);
-    logUsage(req.account.id, 'image', false, { errorCode: e.code });
+    logUsage(req.account.id, 'image', false, { errorCode: e.code, client: clientOf(req) });
     throw e;
   }
-  logUsage(req.account.id, 'image', true, { durationMs: result.durationMs });
+  logUsage(req.account.id, 'image', true, { durationMs: result.durationMs, client: clientOf(req) });
   const filename = imageFilename(body.filename, type, warnings);
   const outputMode = imageOutputMode;
   res.set({ 'X-PDFMint-Duration-Ms': String(result.durationMs), 'X-PDFMint-Credits-Remaining': String(credits.remaining) });
@@ -1199,13 +1202,13 @@ router.post('/merge', withAuth, asyncRoute(async (req, res) => {
     merged = out.buffer;
   } catch (e) {
     await refundCredits(req.account.id, 1);
-    logUsage(req.account.id, 'merge', false, { errorCode: e.code });
+    logUsage(req.account.id, 'merge', false, { errorCode: e.code, client: clientOf(req) });
     throw e;
   }
   if (body.metadata) merged = await render.applyMetadata(merged, body.metadata);
   const pages = await render.countPages(merged);
   const filename = sanitiseFilename(body.filename, 'merged.pdf').replace(/(\.pdf)?$/i, '.pdf');
-  logUsage(req.account.id, 'merge', true, { pages });
+  logUsage(req.account.id, 'merge', true, { pages, client: clientOf(req) });
   res.set({ 'X-PDFMint-Pages': String(pages), 'X-PDFMint-Credits-Remaining': String(credits.remaining) });
   if (warnings.length) res.set('X-PDFMint-Warning', warningHeader(warnings));
   if (mergeOutputMode === 'url') {
@@ -1388,11 +1391,11 @@ async function runJob(job) {
     out = await producePdf(account, body, prepared, ctx);
   } catch (e) {
     await refundCredits(account.id, 1);
-    logUsage(account.id, 'pdf', false, { errorCode: e.code });
+    logUsage(account.id, 'pdf', false, { errorCode: e.code, client: job.client ?? null });
     throw e;
   }
   const { buffer, pages, filename, durationMs } = out;
-  logUsage(account.id, 'pdf', true, { pages, durationMs });
+  logUsage(account.id, 'pdf', true, { pages, durationMs, client: job.client ?? null });
   const stored = await storeFile(account.id, buffer, filename, 'application/pdf', body.expiresInMinutes ?? body.expiration);
   return {
     filename, pages, size: buffer.length,
