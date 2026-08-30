@@ -187,7 +187,11 @@ router.get('/dashboard', asyncRoute(async (req, res) => {
     <h2>API key</h2>
     ${fullKey ? `<p class="keybox"><code id="k">${escapeHtml(fullKey)}</code><button class="copy" data-target="k">Copy</button></p>
       <p class="muted">This is shown once and cannot be read back — not here, not by support. Store it now.
-      If you lose it, create another key below; the old one keeps working until you revoke it.</p>` : ''}
+      If you lose it, create another key below; the old one keeps working until you revoke it.</p>
+      <p class="muted"><strong>Make your first PDF now</strong> — paste this into a terminal. It uses your key and one of your
+        ${escapeHtml(String(plan.credits ?? account.credits_limit))} free documents, and writes <code>hello.pdf</code> in this directory:</p>
+      <p class="keybox"><code id="firstcall">curl -X POST https://pdf.mintapis.com/v1/pdf -H "X-Api-Key: ${escapeHtml(fullKey)}" -H "Content-Type: application/json" -d '{"html":"&lt;h1&gt;Hello from PDFMint&lt;/h1&gt;&lt;p&gt;My first render.&lt;/p&gt;","filename":"hello"}' -o hello.pdf</code><button class="copy" data-target="firstcall">Copy</button></p>
+      <p class="muted">Using n8n instead? Install the <code>n8n-nodes-pdfmint</code> community node and paste the key into its credential — <a href="/docs#n8n">step by step in the docs</a>.</p>` : ''}
     ${req.query.newkey && !fullKey ? '<div class="error">That key has already been shown. Create another one if you need it.</div>' : ''}
     <table class="rows">
       <tr><th>Key</th><th>Label</th><th>Created</th><th>Last used</th><th></th></tr>
