@@ -193,6 +193,14 @@ webhook or a database row rather than an attachment.</p>
   not per item, so one archive comes out.</span></div>
 </div>
 
+<p><strong>Two of those three are published n8n templates you can import instead of building.</strong>
+<a href="https://n8n.io/workflows/18734-generate-pdf-invoices-from-webhook-requests-with-pdfmint">Generate PDF invoices from webhook requests</a>
+is the first shape: a webhook takes the customer and the line items, the arithmetic happens in one Code node, and a broken
+payload gets a 422 with the reason rather than an invoice that says <code>undefined</code>.
+<a href="https://n8n.io/workflows/18793-send-branded-pdf-receipts-for-stripe-payments-with-pdfmint-gmail-and-drive">Send branded PDF receipts for Stripe payments</a>
+carries a <code>checkout.session.completed</code> event through to a receipt in Gmail and Drive. Both are ours, both are free,
+and both need self-hosted n8n, because they use a community node.</p>
+
 <p>For the template case, store the layout once with <code>PUT /v1/templates/&lt;name&gt;</code> and
 then send only data from the workflow. That keeps a 300-line invoice out of a Set node, where it is
 unreadable and undiffable.</p>
