@@ -39,6 +39,16 @@ const INTERNAL_DOMAINS = [
 const TIMESTAMP_IN_LOCAL = /[0-9]{6}/;
 const OWNER_LOCALPARTS = ['florian.standhartinger'];
 
+// Die Testsuite legt Konten als pdfmint-test-<hex>@gmail.com an. Hex-Localparts
+// wie 86f6e74b6d0f741e enthalten oft keine sechs zusammenhaengenden Ziffern, also
+// greift TIMESTAMP_IN_LOCAL bei ihnen nicht -- 26 solcher Konten standen deshalb
+// als "extern" in der Produktion. Ohne diesen Eintrag stempelt jeder weitere
+// Suite-Lauf neue dazu und die Statuszahl waechst wieder.
+// Bewusst nur dieses eine Praefix: es ist produktspezifisch und kann keinen echten
+// Nutzer treffen. Kandidaten wie 'ten-' oder 'loop-' waeren geraten, und ihre
+// echten Vertreter tragen ohnehin einen Zeitstempel.
+const INTERNAL_LOCAL_PREFIXES = ['pdfmint-test-'];
+
 function localOf(email) {
   return String(email || '').trim().toLowerCase().split('@')[0] || '';
 }
@@ -54,6 +64,7 @@ function isInternalEmail(email) {
   const l = localOf(email);
   // Plus-addressing is the same mailbox, so compare on the part before the '+'.
   if (OWNER_LOCALPARTS.includes(l.split('+')[0])) return true;
+  if (INTERNAL_LOCAL_PREFIXES.some((pre) => l.startsWith(pre))) return true;
   return TIMESTAMP_IN_LOCAL.test(l);
 }
 
@@ -66,6 +77,7 @@ const SQL_PREDICATE = [
   // Postgres has no /[0-9]{6}/ literal; ~ with the same class is the equivalent.
   `split_part(email, '@', 1) ~ '[0-9]{6}'`,
   `split_part(split_part(email, '@', 1), '+', 1) = ANY (ARRAY[${OWNER_LOCALPARTS.map((l) => `'${l}'`).join(', ')}])`,
+  ...INTERNAL_LOCAL_PREFIXES.map((pre) => `split_part(email, '@', 1) LIKE '${pre}%'`),
 ].join(' OR ');
 
-module.exports = { isInternalEmail, SQL_PREDICATE, RESERVED_SUFFIXES, INTERNAL_DOMAINS, OWNER_LOCALPARTS };
+module.exports = { isInternalEmail, SQL_PREDICATE, RESERVED_SUFFIXES, INTERNAL_DOMAINS, OWNER_LOCALPARTS, INTERNAL_LOCAL_PREFIXES };
