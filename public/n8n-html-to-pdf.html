@@ -118,7 +118,16 @@ dependencies</strong>, built and tested against n8n 2.35 on Node.js 20 and 22, a
 <code>isPublished: true</code>, which is the list n8n Cloud installs from. You can confirm that
 without an account &mdash; the entry is in the response of
 <code>https://api.n8n.io/api/community-nodes</code>. npm recorded
-<strong>958 installs in the week to 28 August 2026</strong>.</p>
+<strong>1,002 installs in the week to 29 August 2026</strong> (npm’s own
+<code>downloads/point/last-week</code> figure, read on 30 August).</p>
+
+<p class="notice"><strong>One thing to check after installing.</strong> n8n’s registry entry
+currently names version <strong>0.1.0</strong> while npm’s latest is <strong>0.4.3</strong>, and
+0.1.0’s credential defaults to the service’s older address rather than
+<code>https://pdf.mintapis.com</code>. That address still answers and shares the same accounts and
+credits, so nothing breaks — but set the base URL, and prefer an npm install if you use the node’s
+error output. The reason, and how to tell which version you have, is on the
+<a href="https://pdf.mintapis.com/docs#n8n-install">docs page</a>.</p>
 
 <div class="tw">
 <table>
