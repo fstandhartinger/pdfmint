@@ -196,12 +196,10 @@ timeout at 30 seconds, where the PDFMint free tier has the same limits as the pa
 question becomes whether there is a node that hands the binary to the next step correctly, which is
 the part that is fiddly to do by hand with an HTTP node.</p>
 
-<p>PDFMint publishes <code>n8n-nodes-pdfmint</code>, which had <strong>958 installs in the week to
-28 August 2026</strong> by npm&rsquo;s own download API. It attaches the PDF as binary data and puts
+<p>PDFMint publishes <a href="https://www.npmjs.com/package/n8n-nodes-pdfmint" rel="noopener"><code>n8n-nodes-pdfmint</code></a> &mdash; we build and run the service and we publish the node. It attaches the PDF as binary data and puts
 <code>pages</code>, <code>durationMs</code>, <code>creditsRemaining</code> and any warnings on the
 item&rsquo;s JSON next to it, so a downstream IF node can act on them. Details on
-<a href="/n8n-html-to-pdf">the n8n page</a>. That number is installs, not customers &mdash; see
-<a href="#honest">below</a>.</p>
+<a href="/n8n-html-to-pdf">the n8n page</a>. </p>
 </section>
 
 <section id="code">
@@ -240,9 +238,7 @@ you is worth more than a price list.</li>
 
 <section id="honest">
 <h2>What we cannot claim <a class="anchor" href="#honest">#</a></h2>
-<p>Nobody outside this project has paid for PDFMint yet, so there is no customer, no case study and
-no reference. The 958 weekly installs are npm downloads of the n8n node &mdash; that counts machines
-running <code>npm install</code>, including CI, and it is not a user count. PDFMint runs as a single
+<p>PDFMint has exactly one paying customer, so there is no case study and no reference yet. We used to quote npm&rsquo;s weekly download count here as if it meant adoption. On 30 August 2026 we checked, and it does not: the downloads are spread almost evenly across every published version, including week-old ones nobody would install, which is what mirrors and scanners look like rather than people. We publish no adoption number now, because we do not have one worth publishing. PDFMint runs as a single
 service in one region with no SLA, and its status page&rsquo;s uptime figure resets on every deploy,
 which it says on the page. Everything else here can be checked with one <code>curl</code> and the
 two pricing pages, before you spend anything.</p>
