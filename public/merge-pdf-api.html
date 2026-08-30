@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Merge PDF API &mdash; several documents into one file, in one call</title>
+<meta name="description" content="Combine PDFs over HTTP: public URLs or base64, mixed in one request, one credit regardless of file count. A real three-file merge measured on 30 August 2026 at 268 ms, 3 pages, 135,506 bytes — and what a bad input actually returns.">
+<link rel="canonical" href="https://pdf.mintapis.com/merge-pdf-api">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:url" content="https://pdf.mintapis.com/merge-pdf-api">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="PDFMint">
+<meta property="og:title" content="Merge PDF API &mdash; several documents into one file, in one call">
+<meta property="og:description" content="Combine PDFs over HTTP: public URLs or base64, mixed in one request, one credit regardless of file count. A real three-file merge measured on 30 August 2026 at 268 ms, 3 pages, 135,506 bytes — and what a bad input actually returns.">
+<meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
+<meta property="og:image:alt" content="PDFMint: HTML in, PDF bytes out, from one HTTP call.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/docs.css">
+</head>
+<body class="docs">
+
+<header class="docs-top">
+  <a class="logo" href="/">PDF<span>Mint</span></a>
+  <nav>
+    <a href="/docs">API reference</a>
+    <a href="/html-to-pdf-api">HTML to PDF</a>
+    <a href="/status">Status</a>
+    <a href="/dashboard">Dashboard</a>
+    <a class="cta" href="/signup">Get an API key</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="toc">
+    <button class="toc-toggle" id="tocToggle" aria-expanded="false" aria-controls="tocBody">On this page</button>
+    <div class="toc-body" id="tocBody">
+      <h2>The job</h2>
+      <ul>
+        <li><a href="#why">The case this exists for</a></li>
+        <li><a href="#call">One call, two input shapes</a></li>
+        <li><a href="#measured">Measured</a></li>
+      </ul>
+      <h2>Details</h2>
+      <ul>
+        <li><a href="#order">Order, metadata and the file name</a></li>
+        <li><a href="#errors">What a bad input looks like</a></li>
+        <li><a href="#big">Fifty files, and what to do past that</a></li>
+      </ul>
+      <h2>Then</h2>
+      <ul>
+        <li><a href="#stay">When not to use us</a></li>
+        <li><a href="#honest">What we cannot claim</a></li>
+        <li><a href="#try">Try it</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="content">
+
+<h1>Merge PDF API</h1>
+<p class="lede">Several PDFs in, one PDF out, in a single call. No temporary files, no
+<code>pdftk</code> in your container, no upload form. This page is one real merge measured against
+the live service on 30&nbsp;August&nbsp;2026.</p>
+
+<section id="why">
+<h2>The case this exists for <a class="anchor" href="#why">#</a></h2>
+<p>Merging is almost never the job by itself. It is the last step of a job that already generated
+documents: an invoice plus your terms plus a signed annex; a monthly statement pack; a shipment
+folder with the delivery note, the customs form and the photos. You have just rendered two or three
+PDFs from an API and now you need them to be one attachment on one email.</p>
+<p>Doing it in-process means adding a PDF library to whatever runtime you are in &mdash; and in a
+workflow tool like n8n, Make or Zapier there is no runtime to add it to. That is the gap: those
+platforms can call an HTTP endpoint and cannot easily run <code>qpdf</code>.</p>
+</section>
+
+<section id="call">
+<h2>One call, two input shapes <a class="anchor" href="#call">#</a></h2>
+<p>Each entry in <code>files</code> is either a public URL string or an object with
+<code>base64</code>. You can mix them in one request.</p>
+<pre><code>curl -X POST https://pdf.mintapis.com/v1/merge \
+  -H "Authorization: Bearer $PDFMINT_KEY" -H "content-type: application/json" \
+  -d '{
+    "files": [
+      {"base64": "JVBERi0xLjcK&hellip;"},
+      "https://example.com/terms-2026.pdf",
+      {"base64": "JVBERi0xLjcK&hellip;"}
+    ],
+    "filename": "pack.pdf",
+    "metadata": {"title": "August pack"}
+  }' --output pack.pdf</code></pre>
+<p>The base64 shape is what makes this work as the step after a render: ask
+<code>/v1/pdf</code> for <code>"output": "base64"</code> and hand the string straight to
+<code>/v1/merge</code> without the bytes ever touching a disk. The URL shape is fetched by our
+servers, so it is subject to the same rule as
+<a href="/url-to-pdf-api#blocked">URL rendering</a> &mdash; a private or loopback address is refused,
+and a link behind a login will not be reachable.</p>
+</section>
+
+<section id="measured">
+<h2>Measured <a class="anchor" href="#measured">#</a></h2>
+<p>Three PDFs produced earlier the same session &mdash; the one-page invoice from the
+<a href="/invoice-pdf-api">invoice page</a>, the one-page Markdown report from the
+<a href="/markdown-to-pdf-api">Markdown page</a>, and a one-page probe &mdash; merged as base64:</p>
+<table>
+<thead><tr><th>Measure</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Round trip from Germany</td><td><strong>268&nbsp;ms</strong> for 3 files</td></tr>
+<tr><td>Output</td><td>3 pages, 135,506 bytes</td></tr>
+<tr><td>Sum of the three inputs</td><td>153,781 bytes</td></tr>
+<tr><td>Credits</td><td>1, regardless of how many files</td></tr>
+</tbody>
+</table>
+<p>The result is <em>smaller</em> than its parts because shared resources are written once rather
+than three times. Read back with <code>pdftotext</code>, page&nbsp;1 is the invoice and page&nbsp;3
+is the probe &mdash; input order is output order. A merge is one credit whether it joins two files
+or fifty, which is the sane way round: the expensive operation is rendering, not concatenating.</p>
+</section>
+
+<section id="order">
+<h2>Order, metadata and the file name <a class="anchor" href="#order">#</a></h2>
+<ul>
+<li><strong>Order is exactly the array order.</strong> Nothing is sorted, nothing is deduplicated.</li>
+<li><strong><code>metadata</code></strong> sets the document title, author and subject on the result
+&mdash; otherwise a merged pack inherits nothing useful and shows up in a viewer&rsquo;s tab as the
+file name.</li>
+<li><strong><code>filename</code></strong> is what the download is called, and <code>.pdf</code> is
+appended if you leave it off.</li>
+<li><strong><code>output</code></strong> works as everywhere else: binary body, <code>base64</code>,
+or <code>url</code> for a temporary link.</li>
+</ul>
+<p>What merging does <em>not</em> do: it does not renumber pages, rebuild a table of contents, or
+reconcile page sizes. An A4 document merged with a Letter document keeps both sizes, page by page,
+which is correct and occasionally surprising. If a pack needs continuous numbering, put the number
+in a footer at render time, before the merge.</p>
+</section>
+
+<section id="errors">
+<h2>What a bad input looks like <a class="anchor" href="#errors">#</a></h2>
+<p>The realistic failure is not a corrupt file &mdash; it is a URL that returns an HTML error page
+with a PDF-looking name. That is why the message says what it says. Measured live:</p>
+<pre><code>{"files": [{"base64": "aGVsbG8="}, {"base64": "d29ybGQ="}]}
+&rarr; HTTP 400 invalid_pdf
+   "Input 1 is not a readable PDF."
+   hint: "Each input must be a PDF. Check that the URL returns a PDF and not an HTML error page."</code></pre>
+<p>The failing input is named, so you do not have to bisect a fifty-file array by hand. Fewer than
+two files is refused as <code>invalid_input</code> rather than silently returning the one file back.
+<strong>Neither rejection costs a credit</strong>, and a merge that fails after the credit was taken
+has it refunded &mdash; verified on the account used for this page, which ended the session with
+exactly one credit spent per document produced.</p>
+</section>
+
+<section id="big">
+<h2>Fifty files, and what to do past that <a class="anchor" href="#big">#</a></h2>
+<p>Fifty inputs per merge is the limit, and it is stated in the error rather than discovered as a
+timeout. Past fifty, merge in batches and then merge the batches &mdash; the output of a merge is a
+perfectly good input to the next one, and each batch is one credit.</p>
+<p>Very large packs are better assembled with <code>"output": "url"</code> for the intermediate
+steps than by passing megabytes of base64 back and forth: base64 is a third larger than the bytes it
+carries, and in a workflow tool that difference is memory in a place you cannot tune.</p>
+</section>
+
+<section id="stay">
+<h2>When not to use us <a class="anchor" href="#stay">#</a></h2>
+<ul>
+<li><strong>You are in a runtime that can do it.</strong> <code>pypdf</code>, <code>pdf-lib</code> and
+<code>qpdf</code> merge PDFs locally, for free, without a network hop. If you are in Python or Node
+and the files are already local, use them. This endpoint earns its place where there is no runtime
+&mdash; a workflow tool &mdash; or where the parts are being rendered by an API anyway.</li>
+<li><strong>You need to split, rotate, stamp, redact or reorder pages.</strong> This endpoint
+concatenates. It does not edit.</li>
+<li><strong>The documents must not leave your network.</strong> Then they must not be POSTed
+anywhere, including here.</li>
+<li><strong>You need PDF/A output or signatures preserved through the merge.</strong> We do not emit
+PDF/A, and merging invalidates an existing digital signature &mdash; that is inherent to changing
+the file, not a limitation of this implementation.</li>
+</ul>
+</section>
+
+<section id="honest">
+<h2>What we cannot claim <a class="anchor" href="#honest">#</a></h2>
+<p>No outside customer has paid for PDFMint yet. The free tier is 10 documents a month. One region,
+one service, no SLA, no SOC&nbsp;2. The 268&nbsp;ms above is a single merge of three small one-page
+files on one day; a pack of fifty scanned documents will not look like that. We have not measured
+merge behaviour on encrypted or malformed PDFs beyond the rejection shown above.</p>
+</section>
+
+<section id="try">
+<h2>Try it <a class="anchor" href="#try">#</a></h2>
+<p>Merge the real pack &mdash; the one where one of the parts is a scan and another is landscape.
+Mixed page sizes and a scanned page are what separate a merge that works from a demo that works.</p>
+<p><a class="cta" href="/signup">Get an API key</a> &nbsp; <a href="/docs#merge">Merge reference</a>
+&nbsp; <a href="/status">Live latency and success rate</a></p>
+</section>
+
+<section id="more">
+<h2>Related <a class="anchor" href="#more">#</a></h2>
+<div class="cards">
+  <div class="c"><strong><a href="/invoice-pdf-api">Invoice PDF API</a></strong><span>A line-item table, VAT and a per-page footer.</span></div>
+  <div class="c"><strong><a href="/html-to-pdf-api">HTML to PDF API</a></strong><span>What the job really involves, and what six products charge.</span></div>
+  <div class="c"><strong><a href="/markdown-to-pdf-api">Markdown to PDF</a></strong><span>GFM tables, page numbers, no toolchain.</span></div>
+  <div class="c"><strong><a href="/url-to-pdf-api">URL to PDF</a></strong><span>Print a page you do not control, and what stops it.</span></div>
+</div>
+</section>
+  </main>
+</div>
+
+<footer style="border-top:1px solid var(--rule);padding:1.6rem 1.25rem;text-align:center;font-size:.86rem;color:var(--muted)">
+  <a href="/">PDFMint</a> &middot;
+  <a href="/docs">API reference</a> &middot;
+  <a href="/html-to-pdf-api">HTML to PDF API</a> &middot;
+  <a href="/invoice-pdf-api">Invoices</a> &middot;
+  <a href="/markdown-to-pdf-api">Markdown</a> &middot;
+  <a href="/url-to-pdf-api">URL to PDF</a> &middot;
+  <a href="/merge-pdf-api">Merge</a> &middot;
+  <a href="/n8n-html-to-pdf">n8n</a> &middot;
+  <a href="/status">Status</a> &middot;
+  <a href="/legal">Legal</a>
+</footer>
+
+<script src="/docs.js"></script>
+</body>
+</html>

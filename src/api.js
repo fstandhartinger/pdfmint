@@ -143,6 +143,20 @@ const PDF_FIELDS = new Set([
   'mediaType', 'preferCssPageSize', 'preferCSSPageSize', 'tagged', 'outline',
 ]);
 
+/**
+ * What a STORED template may carry as options. The render endpoints have named
+ * their unknown fields since day one, but PUT /v1/templates did not: it ran the
+ * options through normalisePdfOptions — which validates the values it knows and
+ * ignores keys it does not — so {"fromat": "A5"} was stored with a 200 and then
+ * silently ignored on every render after that. The endpoint you call once
+ * caught the typo; the one you set up and then render a thousand times from did
+ * not. The content keys are absent on purpose: a template's markup lives in
+ * "html" next to the options, not inside them.
+ */
+const TEMPLATE_OPTION_FIELDS = new Set(
+  [...PDF_FIELDS].filter((f) => !['html', 'markdown', 'url', 'template', 'data', 'options'].includes(f)),
+);
+
 const IMAGE_FIELDS = new Set([
   'html', 'markdown', 'url', 'type', 'output', 'filename', 'quality', 'width', 'height',
   'deviceScaleFactor', 'fullPage', 'omitBackground', 'waitFor', 'timeout', 'timeoutMs',
@@ -245,10 +259,19 @@ function unprintableType(v) {
  */
 function fillTemplate(tpl, data, opts = {}) {
   const escapeValues = opts.escape !== false;
+  // Walk into a repeat block even when no row data exists, so the markers
+  // inside it get reported. Only the placeholder scan asks for this; a render
+  // must keep leaving an absent section empty.
+  const scanSections = opts.scanSections === true;
   const unresolved = new Set();
   const unprintable = new Map();
   const seen = new Map();
-  const record = (name, kind) => { if (!seen.has(name)) seen.set(name, kind); };
+  // Two blocks may both use {{amount}} and mean different columns, so the key
+  // is the scope and the name together, not the name alone.
+  const record = (name, kind, scope) => {
+    const key = `${scope || ''}\u0000${name}`;
+    if (!seen.has(key)) seen.set(key, scope ? { name, kind, scope } : { name, kind });
+  };
   const lookup = (ctxStack, path) => {
     if (path === '.') return ctxStack[ctxStack.length - 1];
     const parts = path.split('.');
@@ -266,7 +289,7 @@ function fillTemplate(tpl, data, opts = {}) {
   const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   const sectionRe = /\{\{([#^])\s*([\w.$]+)\s*\}\}([\s\S]*?)\{\{\/\s*\2\s*\}\}/;
-  const renderStr = (str, ctxStack) => {
+  const renderStr = (str, ctxStack, scope) => {
     let out = str;
     let guard = 0;
     let m;
@@ -274,24 +297,31 @@ function fillTemplate(tpl, data, opts = {}) {
       guard += 1;
       const [full, kind, name, inner] = m;
       const val = lookup(ctxStack, name);
-      record(name, kind === '#' ? 'section' : 'inverted');
+      record(name, kind === '#' ? 'section' : 'inverted', scope);
       let replacement = '';
+      const rendered = kind === '#'
+        ? (Array.isArray(val) ? val.length > 0 : Boolean(val))
+        : (!val || (Array.isArray(val) && val.length === 0));
       if (kind === '#') {
         // A key that is present and holds an empty list is a real invoice with
         // no extras. A key that is absent altogether is a misspelling, and the
         // section — usually the whole line-item table — silently disappears.
         if (val === undefined) unresolved.add(name);
-        if (Array.isArray(val)) replacement = val.map((item) => renderStr(inner, ctxStack.concat([item]))).join('');
-        else if (val) replacement = renderStr(inner, ctxStack.concat([typeof val === 'object' ? val : {}]));
-      } else if (!val || (Array.isArray(val) && val.length === 0)) {
+        if (Array.isArray(val)) replacement = val.map((item) => renderStr(inner, ctxStack.concat([item]), name)).join('');
+        else if (val) replacement = renderStr(inner, ctxStack.concat([typeof val === 'object' ? val : {}]), name);
+      } else if (rendered) {
         // An inverted section exists to handle the missing case, so a missing
         // key here is the author doing what the syntax is for, not a mistake.
-        replacement = renderStr(inner, ctxStack);
+        replacement = renderStr(inner, ctxStack, scope);
       }
+      // Nothing was walked, so the markers inside are still unseen. Walk the
+      // body once against an empty row purely to record them; the output is
+      // thrown away, and only the scan turns this on.
+      if (scanSections && !rendered) renderStr(inner, ctxStack.concat([{}]), kind === '#' ? name : scope);
       out = out.slice(0, m.index) + replacement + out.slice(m.index + full.length);
     }
     out = out.replace(/\{\{\{\s*([\w.$]+)\s*\}\}\}/g, (_, p) => {
-      record(p, 'raw');
+      record(p, 'raw', scope);
       const v = lookup(ctxStack, p);
       if (v === undefined || v === null) { unresolved.add(p); return ''; }
       const bad = unprintableType(v);
@@ -299,7 +329,7 @@ function fillTemplate(tpl, data, opts = {}) {
       return String(v);
     });
     out = out.replace(/\{\{\s*([\w.$]+)\s*\}\}/g, (_, p) => {
-      record(p, 'scalar');
+      record(p, 'scalar', scope);
       const v = lookup(ctxStack, p);
       if (v === undefined || v === null) { unresolved.add(p); return ''; }
       const bad = unprintableType(v);
@@ -308,12 +338,12 @@ function fillTemplate(tpl, data, opts = {}) {
     });
     return out;
   };
-  const html = renderStr(String(tpl), [data && typeof data === 'object' ? data : {}]);
+  const html = renderStr(String(tpl), [data && typeof data === 'object' ? data : {}], null);
   return {
     html,
     unresolved: Array.from(unresolved),
     unprintable: Array.from(unprintable, ([name, type]) => ({ name, type })),
-    placeholders: Array.from(seen, ([name, kind]) => ({ name, kind })),
+    placeholders: Array.from(seen.values()),
   };
 }
 
@@ -1205,7 +1235,10 @@ function templatePlaceholders(html, options) {
   const seen = new Map();
   const scan = (text) => {
     if (typeof text !== 'string' || !text.includes('{{')) return;
-    for (const ph of fillTemplate(text, {}).placeholders) if (!seen.has(ph.name)) seen.set(ph.name, ph);
+    for (const ph of fillTemplate(text, {}, { scanSections: true }).placeholders) {
+      const key = `${ph.scope || ''}\u0000${ph.name}`;
+      if (!seen.has(key)) seen.set(key, ph);
+    }
   };
   scan(html);
   const o = options && typeof options === 'object' ? options : {};
@@ -1213,6 +1246,40 @@ function templatePlaceholders(html, options) {
   scan(o.footerHtml || o.footerTemplate);
   scan(typeof o.watermark === 'string' ? o.watermark : (o.watermark && o.watermark.text));
   return Array.from(seen.values());
+}
+
+/**
+ * A copy-paste "data" object of the right SHAPE, not just the right names.
+ *
+ * The old version mapped every marker to the string "value", so a template with
+ * a line-item table suggested {"items": "value"} — and a string is exactly what
+ * a repeat block cannot take. Whoever pasted it got an invoice with no rows and
+ * no error, because a present-but-not-an-array section renders once and empty.
+ * A section now comes back as a one-row array carrying that block's own fields.
+ */
+function templateUsageData(placeholders) {
+  const top = {};
+  const rows = new Map();
+  for (const ph of placeholders) {
+    if (ph.scope) {
+      if (!rows.has(ph.scope)) rows.set(ph.scope, {});
+      if (ph.kind !== 'section' && ph.kind !== 'inverted') rows.get(ph.scope)[ph.name] = 'value';
+    } else if (ph.kind === 'section') {
+      top[ph.name] = null; // filled in below, once its own fields are known
+    } else if (ph.kind === 'inverted') {
+      // An inverted block prints when the key is missing or empty; suggesting a
+      // value for it would tell the reader to switch it off.
+    } else {
+      top[ph.name] = 'value';
+    }
+  }
+  for (const name of Object.keys(top)) {
+    if (top[name] === null) {
+      const row = rows.get(name);
+      top[name] = row && Object.keys(row).length ? [row] : [];
+    }
+  }
+  return top;
 }
 
 /* ------------------------------------------------------------ /v1/templates */
@@ -1245,6 +1312,7 @@ router.put('/templates/:name', withAuth, asyncRoute(async (req, res) => {
     });
   }
   const options = req.body?.options && typeof req.body.options === 'object' ? req.body.options : {};
+  rejectUnknownFields(options, TEMPLATE_OPTION_FIELDS, 'a template\'s "options"');
   normalisePdfOptions(options); // validate now rather than at render time
   const { rows } = await query(
     `INSERT INTO templates (account_id, name, html, options) VALUES ($1,$2,$3,$4)
@@ -1256,14 +1324,17 @@ router.put('/templates/:name', withAuth, asyncRoute(async (req, res) => {
   res.json({
     template: rows[0],
     placeholders,
-    usage: { template: name, data: Object.fromEntries(placeholders.map((ph) => [ph.name, 'value'])) },
+    usage: { template: name, data: templateUsageData(placeholders) },
   });
 }));
 
 router.get('/templates/:name', withAuth, asyncRoute(async (req, res) => {
   const { rows } = await query(`SELECT name, html, options, updated_at FROM templates WHERE account_id = $1 AND name = $2`, [req.account.id, String(req.params.name)]);
   if (!rows.length) throw bad('template_not_found', `You have no template called "${req.params.name}".`, { docs: '/docs#templates' });
-  res.json({ ...rows[0], placeholders: templatePlaceholders(rows[0].html, rows[0].options) });
+  const placeholders = templatePlaceholders(rows[0].html, rows[0].options);
+  // GET is the call a client makes to draw a form, so it needs the same
+  // ready-to-paste data shape that PUT hands back.
+  res.json({ ...rows[0], placeholders, usage: { template: rows[0].name, data: templateUsageData(placeholders) } });
 }));
 
 router.delete('/templates/:name', withAuth, asyncRoute(async (req, res) => {
@@ -1331,4 +1402,4 @@ async function runJob(job) {
   };
 }
 
-module.exports = { router, fillTemplate, storeFile, runJob, absoluteUrl, STRICT };
+module.exports = { router, fillTemplate, templatePlaceholders, templateUsageData, storeFile, runJob, absoluteUrl, STRICT };

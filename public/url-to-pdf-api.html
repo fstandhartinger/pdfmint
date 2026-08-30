@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>URL to PDF API &mdash; and why a page behind a login still returns HTTP 200</title>
+<meta name="description" content="Render any public URL to PDF over HTTP. A 25-page capture measured at 5,978 ms on 30 August 2026, why that is thirty times slower than sending HTML, why a page behind a login returns a successful PDF of the login form, and which addresses are refused.">
+<link rel="canonical" href="https://pdf.mintapis.com/url-to-pdf-api">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:url" content="https://pdf.mintapis.com/url-to-pdf-api">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="PDFMint">
+<meta property="og:title" content="URL to PDF API &mdash; and why a page behind a login still returns HTTP 200">
+<meta property="og:description" content="Render any public URL to PDF over HTTP. A 25-page capture measured at 5,978 ms on 30 August 2026, why that is thirty times slower than sending HTML, why a page behind a login returns a successful PDF of the login form, and which addresses are refused.">
+<meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
+<meta property="og:image:alt" content="PDFMint: HTML in, PDF bytes out, from one HTTP call.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/docs.css">
+</head>
+<body class="docs">
+
+<header class="docs-top">
+  <a class="logo" href="/">PDF<span>Mint</span></a>
+  <nav>
+    <a href="/docs">API reference</a>
+    <a href="/html-to-pdf-api">HTML to PDF</a>
+    <a href="/status">Status</a>
+    <a href="/dashboard">Dashboard</a>
+    <a class="cta" href="/signup">Get an API key</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="toc">
+    <button class="toc-toggle" id="tocToggle" aria-expanded="false" aria-controls="tocBody">On this page</button>
+    <div class="toc-body" id="tocBody">
+      <h2>The job</h2>
+      <ul>
+        <li><a href="#call">One call</a></li>
+        <li><a href="#measured">A real page, measured</a></li>
+        <li><a href="#waiting">Waiting for the page to be ready</a></li>
+      </ul>
+      <h2>What stops it</h2>
+      <ul>
+        <li><a href="#login">Anything behind a login</a></li>
+        <li><a href="#blocked">Addresses we refuse</a></li>
+        <li><a href="#errors">What the failures look like</a></li>
+      </ul>
+      <h2>Then</h2>
+      <ul>
+        <li><a href="#legal">Before you archive someone else&rsquo;s page</a></li>
+        <li><a href="#stay">When not to use us</a></li>
+        <li><a href="#honest">What we cannot claim</a></li>
+        <li><a href="#try">Try it</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="content">
+
+<h1>URL to PDF API</h1>
+<p class="lede">Give it a public URL, get the printed page back. Useful for archiving a receipt
+page, snapshotting a dashboard, or keeping evidence of what a page said on a date. This page is one
+real capture &mdash; a 25-page Wikipedia article &mdash; plus every way it failed, measured against
+the live service on 30&nbsp;August&nbsp;2026.</p>
+
+<section id="call">
+<h2>One call <a class="anchor" href="#call">#</a></h2>
+<pre><code>curl -X POST https://pdf.mintapis.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_KEY" -H "content-type: application/json" \
+  -d '{"url": "https://en.wikipedia.org/wiki/Portable_Document_Format",
+       "format": "A4", "margin": "14mm", "pageNumbers": true}' --output page.pdf</code></pre>
+<p>The same page options apply as everywhere else: <code>format</code>, <code>margin</code>,
+<code>landscape</code>, <code>scale</code>, <code>pageRanges</code>, a header or footer.
+<code>"mediaType": "screen"</code> renders what a visitor sees rather than what the site&rsquo;s print
+stylesheet says &mdash; worth trying when a capture comes back stripped of its layout, because many
+sites hide navigation and images for print.</p>
+</section>
+
+<section id="measured">
+<h2>A real page, measured <a class="anchor" href="#measured">#</a></h2>
+<p>That exact call, from Germany:</p>
+<table>
+<thead><tr><th>Measure</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Server-side render</td><td><strong>5,978&nbsp;ms</strong></td></tr>
+<tr><td>Round trip</td><td>6,385&nbsp;ms</td></tr>
+<tr><td>Output</td><td><strong>25 pages</strong>, 1,091,879 bytes</td></tr>
+<tr><td>Credits</td><td>1</td></tr>
+</tbody>
+</table>
+<p>Six seconds, against 187&nbsp;ms for an invoice from a stored template on the same account
+minutes earlier. That difference is the honest headline of this page: <strong>rendering a URL is
+dominated by someone else&rsquo;s site</strong> &mdash; their DNS, their TLS handshake, their server,
+their images, their fonts, their JavaScript. Almost none of it is the PDF step. Size a timeout and
+a retry policy for that, not for the numbers on our other pages.</p>
+<p>If you already have the markup, send it as <code>html</code> instead. It is the same renderer
+without the network round trip, and it is dramatically faster.</p>
+</section>
+
+<section id="waiting">
+<h2>Waiting for the page to be ready <a class="anchor" href="#waiting">#</a></h2>
+<p>A modern page is often empty at load and filled by JavaScript. Two controls:</p>
+<ul>
+<li><code>"waitFor"</code> &mdash; a CSS selector to wait for, or a number of milliseconds. A selector
+is far better than a sleep: it finishes as soon as the thing exists instead of always costing the
+full delay, and it fails loudly when the page changed.</li>
+<li><code>"timeout"</code> &mdash; the ceiling, in milliseconds. On a slow third-party site, raise it;
+the default is tuned for pages you control.</li>
+</ul>
+<p>For a capture that may take many seconds, <code>"async": true</code> returns HTTP&nbsp;202 with a
+<code>job_id</code> and a status URL immediately, and <code>"webhookUrl"</code> has the result
+delivered instead of polled. The credit is taken when the job is accepted.</p>
+</section>
+
+<section id="login">
+<h2>Anything behind a login <a class="anchor" href="#login">#</a></h2>
+<p>This is the thing people find out last, so it is here near the top: <strong>the render happens on
+our servers, in a fresh browser, with no session</strong>. Your cookies are not there. A page that
+needs a login renders as the login page, and it renders successfully &mdash; HTTP&nbsp;200, one page,
+a credit spent, and a PDF of a sign-in form. Nothing in the response says you got the wrong
+document, because from the renderer&rsquo;s point of view nothing went wrong.</p>
+<p>Options, honestly ranked:</p>
+<ol>
+<li><strong>Fetch the page yourself</strong> with your own session and POST the resulting markup as
+<code>html</code>. Correct, fast, and it works for every authentication scheme. This is the answer
+almost every time.</li>
+<li><strong>Send request headers.</strong> <code>"headers"</code> is passed to the fetch, so a bearer
+token or a signed URL can work &mdash; if the site accepts a header rather than a session cookie.</li>
+<li><strong>A signed public link</strong>, where the site offers one.</li>
+</ol>
+<p>Do not put a customer&rsquo;s session cookie in a third-party API call. Not to us, not to anyone.</p>
+</section>
+
+<section id="blocked">
+<h2>Addresses we refuse <a class="anchor" href="#blocked">#</a></h2>
+<p>A URL-to-PDF service is a request forwarder, and a naive one is a way to read things inside the
+network it runs in. Private, loopback and link-local addresses are refused before anything is
+fetched, and the refusal survives a redirect and a hostname that resolves to a private address:</p>
+<pre><code>{"url": "http://127.0.0.1:8080/admin"}
+&rarr; HTTP 400 private_address_blocked
+   "\"url\" points at the private address 127.0.0.1."</code></pre>
+<p>The same guard applies to <code>webhookUrl</code>, for the same reason. It also means the obvious
+local test &mdash; pointing the API at something on your own laptop &mdash; cannot work: our servers
+have no route to your machine. Use a tunnel with a public hostname, or send the markup.</p>
+</section>
+
+<section id="errors">
+<h2>What the failures look like <a class="anchor" href="#errors">#</a></h2>
+<p>Measured on the live service, same session as the capture above:</p>
+<table>
+<thead><tr><th>What was sent</th><th>Response</th><th>Credits</th></tr></thead>
+<tbody>
+<tr><td>A private address</td><td>400 <code>private_address_blocked</code></td><td><strong>0</strong></td></tr>
+<tr><td>A host that does not resolve</td><td>400 <code>dns_failed</code>, &ldquo;Check the spelling of the URL, and that the host is publicly resolvable.&rdquo;</td><td><strong>0</strong></td></tr>
+</tbody>
+</table>
+<p>Every error carries a machine-readable <code>code</code>, a sentence a human can act on, a link
+into the reference, and a <code>request_id</code> to quote. A call that returns no document is not
+billed, and a render that fails after the credit was taken has it refunded &mdash; so a retry loop
+against a flaky site does not quietly drain the month&rsquo;s quota.</p>
+<p>The failure that is <em>not</em> in that table is the important one: a site that answers with a
+cookie wall, a consent banner or a bot check returns HTTP&nbsp;200 and a perfectly good PDF of the
+wrong thing. Check the page count or the byte size against what you expect. A capture that came
+back as one short page when you expected twenty is the signal.</p>
+</section>
+
+<section id="legal">
+<h2>Before you archive someone else&rsquo;s page <a class="anchor" href="#legal">#</a></h2>
+<p>Printing a page you do not own is a decision about their terms of service, their robots policy
+and, in Europe, about personal data that happens to be on the page. We do not check any of that for
+you and we do not police it &mdash; but a page you are not allowed to scrape does not become
+allowable because the request went through an API. Capturing your own receipts, your own dashboards
+and pages you have permission for is the use we can defend without qualification.</p>
+</section>
+
+<section id="stay">
+<h2>When not to use us <a class="anchor" href="#stay">#</a></h2>
+<ul>
+<li><strong>You already have the HTML.</strong> Send <code>html</code> and skip the network
+entirely. An inline render on the same account the same afternoon took 57&nbsp;ms; the six seconds
+measured above is almost all someone else&rsquo;s site.</li>
+<li><strong>The page needs a session.</strong> See above &mdash; fetch it yourself.</li>
+<li><strong>You want a screenshot, not a document.</strong> <code>POST /v1/image</code> returns PNG,
+JPEG or WebP and takes <code>fullPage</code> and <code>deviceScaleFactor</code>.</li>
+<li><strong>You are crawling at scale.</strong> Thousands of arbitrary pages an hour is a scraping
+platform&rsquo;s job &mdash; proxy rotation, robots handling, retry policy. That is not what this is.</li>
+<li><strong>Legal-grade web archiving.</strong> Timestamped, signed, chain-of-custody captures are a
+specialist product. We print a PDF; we do not attest to when or from where.</li>
+</ul>
+</section>
+
+<section id="honest">
+<h2>What we cannot claim <a class="anchor" href="#honest">#</a></h2>
+<p>No outside customer has paid for PDFMint yet. The free tier is 10 documents a month. One region,
+one service, no SLA, no SOC&nbsp;2. We do not run a proxy pool, so a site that blocks datacentre
+addresses blocks us. The 5,978&nbsp;ms above is a single capture of one article on one day &mdash;
+your number depends almost entirely on the site you point at, not on us. No PDF/A, no signatures,
+no timestamping.</p>
+</section>
+
+<section id="try">
+<h2>Try it <a class="anchor" href="#try">#</a></h2>
+<p>Point it at the page you actually want to keep, and look at the page count before you look at
+anything else. That single number catches the consent banner, the bot wall and the login page in
+one glance.</p>
+<p><a class="cta" href="/signup">Get an API key</a> &nbsp; <a href="/docs#url">URL options</a>
+&nbsp; <a href="/status">Live latency and success rate</a></p>
+</section>
+
+<section id="more">
+<h2>Related <a class="anchor" href="#more">#</a></h2>
+<div class="cards">
+  <div class="c"><strong><a href="/html-to-pdf-api">HTML to PDF API</a></strong><span>What the job really involves, and what six products charge.</span></div>
+  <div class="c"><strong><a href="/invoice-pdf-api">Invoice PDF API</a></strong><span>A line-item table, VAT and a per-page footer.</span></div>
+  <div class="c"><strong><a href="/markdown-to-pdf-api">Markdown to PDF</a></strong><span>GFM tables, page numbers, no toolchain.</span></div>
+  <div class="c"><strong><a href="/merge-pdf-api">Merge PDFs</a></strong><span>Several captures into one file, in one call.</span></div>
+</div>
+</section>
+  </main>
+</div>
+
+<footer style="border-top:1px solid var(--rule);padding:1.6rem 1.25rem;text-align:center;font-size:.86rem;color:var(--muted)">
+  <a href="/">PDFMint</a> &middot;
+  <a href="/docs">API reference</a> &middot;
+  <a href="/html-to-pdf-api">HTML to PDF API</a> &middot;
+  <a href="/invoice-pdf-api">Invoices</a> &middot;
+  <a href="/markdown-to-pdf-api">Markdown</a> &middot;
+  <a href="/url-to-pdf-api">URL to PDF</a> &middot;
+  <a href="/merge-pdf-api">Merge</a> &middot;
+  <a href="/n8n-html-to-pdf">n8n</a> &middot;
+  <a href="/status">Status</a> &middot;
+  <a href="/legal">Legal</a>
+</footer>
+
+<script src="/docs.js"></script>
+</body>
+</html>

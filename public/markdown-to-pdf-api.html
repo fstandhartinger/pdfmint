@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Markdown to PDF API &mdash; GFM tables, page numbers, no toolchain</title>
+<meta name="description" content="Convert Markdown to PDF over HTTP: GitHub-flavoured tables with column alignment, fenced code, task lists drawn for print, page numbers and your own CSS. One real report measured against the live service on 30 August 2026 — 130 ms, 1 page, 96,129 bytes.">
+<link rel="canonical" href="https://pdf.mintapis.com/markdown-to-pdf-api">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:url" content="https://pdf.mintapis.com/markdown-to-pdf-api">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="PDFMint">
+<meta property="og:title" content="Markdown to PDF API &mdash; GFM tables, page numbers, no toolchain">
+<meta property="og:description" content="Convert Markdown to PDF over HTTP: GitHub-flavoured tables with column alignment, fenced code, task lists drawn for print, page numbers and your own CSS. One real report measured against the live service on 30 August 2026 — 130 ms, 1 page, 96,129 bytes.">
+<meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
+<meta property="og:image:alt" content="PDFMint: HTML in, PDF bytes out, from one HTTP call.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/docs.css">
+</head>
+<body class="docs">
+
+<header class="docs-top">
+  <a class="logo" href="/">PDF<span>Mint</span></a>
+  <nav>
+    <a href="/docs">API reference</a>
+    <a href="/html-to-pdf-api">HTML to PDF</a>
+    <a href="/status">Status</a>
+    <a href="/dashboard">Dashboard</a>
+    <a class="cta" href="/signup">Get an API key</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="toc">
+    <button class="toc-toggle" id="tocToggle" aria-expanded="false" aria-controls="tocBody">On this page</button>
+    <div class="toc-body" id="tocBody">
+      <h2>The job</h2>
+      <ul>
+        <li><a href="#why">Why Markdown at all</a></li>
+        <li><a href="#call">One call</a></li>
+        <li><a href="#supported">What the renderer supports</a></li>
+      </ul>
+      <h2>Getting it right</h2>
+      <ul>
+        <li><a href="#page">Page size, margins, page numbers</a></li>
+        <li><a href="#css">Your own CSS and fonts</a></li>
+        <li><a href="#data">Placeholders in Markdown</a></li>
+      </ul>
+      <h2>Then</h2>
+      <ul>
+        <li><a href="#numbers">What it cost and how long it took</a></li>
+        <li><a href="#stay">When not to use us</a></li>
+        <li><a href="#honest">What we cannot claim</a></li>
+        <li><a href="#try">Try it</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="content">
+
+<h1>Markdown to PDF API</h1>
+<p class="lede">Post Markdown, get a printed PDF back. No HTML in between, no headless browser in
+your container, no pandoc and no LaTeX toolchain. This page is one real report &mdash; GFM table,
+ordered list, blockquote, fenced code, task list &mdash; rendered against the live service on
+30&nbsp;August&nbsp;2026.</p>
+
+<section id="why">
+<h2>Why Markdown at all <a class="anchor" href="#why">#</a></h2>
+<p>Because a lot of text is already Markdown before anyone thinks about a PDF: release notes, an
+LLM&rsquo;s answer, a README, a runbook, a weekly report assembled from a database. Converting it to
+HTML yourself means picking a Markdown library, then a print stylesheet, then discovering that
+tables and code blocks need work before they look like a document.</p>
+<p>The alternatives each cost something real. <strong>pandoc plus LaTeX</strong> gives beautiful
+output and a container image measured in gigabytes, plus a font and template problem. <strong>A
+Markdown library plus your own Chromium</strong> is the flexible route and is roughly a day of work
+plus a print stylesheet you will maintain forever. <strong>md-to-pdf and friends</strong> pull
+Puppeteer into your dependency tree, which is fine on a laptop and awkward in a Lambda.</p>
+</section>
+
+<section id="call">
+<h2>One call <a class="anchor" href="#call">#</a></h2>
+<pre><code>curl -X POST https://pdf.mintapis.com/v1/pdf \
+  -H "Authorization: Bearer $PDFMINT_KEY" -H "content-type: application/json" \
+  -d '{
+    "markdown": "# Q3 Freight Review\n\n| Lane | Loads | On time |\n| --- | ---: | ---: |\n| Rotterdam &rarr; Passau | 412 | 94.2 % |\n",
+    "format": "A4",
+    "margin": "20mm",
+    "pageNumbers": true
+  }' --output report.pdf</code></pre>
+<p>Binary PDF in the response body by default. <code>"output": "base64"</code> puts the bytes in the
+JSON, and <code>"output": "url"</code> returns a temporary link &mdash; that one matters in n8n, Make
+and Zapier, where a base64 field is easier to hand to the next step than a binary body.</p>
+</section>
+
+<section id="supported">
+<h2>What the renderer supports <a class="anchor" href="#supported">#</a></h2>
+<p>GitHub-flavoured Markdown, and the print detail is where the work is. From the report rendered
+for this page, checked in the PDF&rsquo;s own text layer:</p>
+<ul>
+<li><strong>Tables, including column alignment.</strong> <code>| ---: |</code> right-aligns; the
+numeric columns came out right-aligned on the paper.</li>
+<li><strong>Ordered and unordered lists</strong>, nested.</li>
+<li><strong>Blockquotes</strong> and <strong>fenced code</strong>, monospaced, with the leading spaces
+preserved.</li>
+<li><strong>Task lists.</strong> <code>- [x]</code> is drawn as a real tick box. This is deliberate:
+a browser&rsquo;s native checkbox prints as a flat grey square because print has no widget rendering,
+so the stylesheet suppresses the bullet and draws the box and the tick itself.</li>
+<li><strong>Headings, emphasis, links, images, horizontal rules.</strong></li>
+</ul>
+<p>Unicode goes through untouched &mdash; <code>&rarr;</code>, &euro;, &szlig;, decimal commas. What
+is <em>not</em> here: footnotes, definition lists, math, Mermaid diagrams and admonition blocks are
+not part of GFM and are not rendered. Raw HTML inside Markdown does pass through, which is the
+escape hatch when you need one thing the syntax cannot express.</p>
+</section>
+
+<section id="page">
+<h2>Page size, margins, page numbers <a class="anchor" href="#page">#</a></h2>
+<p>The options are the same for Markdown as for HTML, because it is the same renderer.
+<code>format</code> (A4, Letter, A5, Legal&hellip;), or explicit <code>width</code> and
+<code>height</code>; <code>margin</code> as one value or per side; <code>landscape</code>;
+<code>scale</code>; <code>pageRanges</code>.</p>
+<p>For page numbers, <code>"pageNumbers": true</code> is the whole thing &mdash; it printed
+<em>Page 1 of 1</em> centred in the footer of the report on this page. When you need your own
+wording, <code>footerHtml</code> takes markup with Chromium&rsquo;s <code>pageNumber</code> and
+<code>totalPages</code> spans in it. There is no separate flag to switch the footer on: supplying
+one is the switch.</p>
+</section>
+
+<section id="css">
+<h2>Your own CSS and fonts <a class="anchor" href="#css">#</a></h2>
+<p>The default stylesheet is meant to look like a document rather than a web page, and you can
+replace or extend any of it with <code>"css"</code>. <code>"googleFonts"</code> loads a web font by
+name so a corporate typeface does not need a base64 blob in every request.</p>
+<pre><code>{ "markdown": "&hellip;", "googleFonts": "Source Serif 4", "css": "body{font-family:'Source Serif 4',serif} h1{border-bottom:2px solid #111}" }</code></pre>
+<p>One caveat worth knowing before you debug it: a font is fetched at render time, so the render
+waits on Google&rsquo;s CDN. If that matters, inline the font as a data URI in <code>css</code> and
+nothing external is fetched.</p>
+</section>
+
+<section id="data">
+<h2>Placeholders in Markdown <a class="anchor" href="#data">#</a></h2>
+<p><code>{{markers}}</code> work in Markdown exactly as they do in HTML, including
+<code>{{#rows}}&hellip;{{/rows}}</code> repeat blocks &mdash; which is how a table with an unknown
+number of rows gets built without string-concatenating Markdown in your own code:</p>
+<pre><code>{
+  "markdown": "# {{title}}\n\n| Lane | Loads |\n| --- | ---: |\n{{#lanes}}| {{name}} | {{loads}} |\n{{/lanes}}",
+  "data": {"title": "Q3", "lanes": [{"name": "Rotterdam &rarr; Passau", "loads": "412"}]},
+  "strict": true
+}</code></pre>
+<p><code>"strict": true</code> turns a marker your data does not fill into an HTTP&nbsp;400 that names
+the field, instead of a silent blank in the middle of a report. That rejection costs no credit.</p>
+</section>
+
+<section id="numbers">
+<h2>What it cost and how long it took <a class="anchor" href="#numbers">#</a></h2>
+<p>The report described above &mdash; heading, subtitle, a three-row aligned table, an ordered list,
+a blockquote, a fenced code block and a two-item task list &mdash; on a free account, from Germany,
+on 30&nbsp;August&nbsp;2026:</p>
+<table>
+<thead><tr><th>Measure</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Server-side render</td><td><strong>130&nbsp;ms</strong></td></tr>
+<tr><td>Round trip including TLS</td><td>237&nbsp;ms</td></tr>
+<tr><td>Output</td><td>1 page A4, 96,129 bytes</td></tr>
+<tr><td>Credits</td><td>1</td></tr>
+</tbody>
+</table>
+<p>The file is larger than an equivalent HTML render of the same length &mdash; 96&nbsp;KB against
+48&nbsp;KB for the invoice on the <a href="/invoice-pdf-api">invoice page</a> &mdash; because the
+Markdown stylesheet embeds a font subset for the monospaced code block. Worth knowing if you are
+storing millions of them.</p>
+</section>
+
+<section id="stay">
+<h2>When not to use us <a class="anchor" href="#stay">#</a></h2>
+<ul>
+<li><strong>You need typesetting, not printing.</strong> Real footnotes, an index, cross-references,
+proper widow and orphan control, a bibliography: that is pandoc with LaTeX or Typst, and the result
+is better than anything a browser prints. Do not fight this one.</li>
+<li><strong>Math.</strong> No KaTeX or MathJax pass. A formula stays the source text you wrote.</li>
+<li><strong>Mermaid or PlantUML diagrams.</strong> Not rendered. Turn them into an image first and
+reference it; images are fetched.</li>
+<li><strong>The content must never leave your network.</strong> Then it must not be POSTed anywhere,
+including here. Run a Markdown library plus Chromium yourself.</li>
+<li><strong>You convert a handful of files a month, at a desk.</strong> Your editor already exports
+PDF, and it is free.</li>
+</ul>
+</section>
+
+<section id="honest">
+<h2>What we cannot claim <a class="anchor" href="#honest">#</a></h2>
+<p>No outside customer has paid for PDFMint yet. The free tier is 10 documents a month. One region,
+one service, no SLA, no SOC&nbsp;2, no PDF/A. The timings above are single measurements on one day
+from one machine, not a benchmark &mdash; the <a href="/status">status page</a> carries the running
+record. We have not compared output quality against pandoc, and we would not expect to win that
+comparison on typesetting.</p>
+</section>
+
+<section id="try">
+<h2>Try it <a class="anchor" href="#try">#</a></h2>
+<p>Send the longest Markdown file you actually have &mdash; the one with the wide table and the code
+block &mdash; rather than a paragraph of lorem ipsum. Wide tables and long code lines are where a
+Markdown-to-PDF converter is decided.</p>
+<p><a class="cta" href="/signup">Get an API key</a> &nbsp; <a href="/docs">API reference</a>
+&nbsp; <a href="/status">Live latency and success rate</a></p>
+</section>
+
+<section id="more">
+<h2>Related <a class="anchor" href="#more">#</a></h2>
+<div class="cards">
+  <div class="c"><strong><a href="/html-to-pdf-api">HTML to PDF API</a></strong><span>What the job really involves, and what six products charge.</span></div>
+  <div class="c"><strong><a href="/invoice-pdf-api">Invoice PDF API</a></strong><span>A line-item table, VAT and a per-page footer.</span></div>
+  <div class="c"><strong><a href="/url-to-pdf-api">URL to PDF</a></strong><span>Print a page you do not control, and what stops it.</span></div>
+  <div class="c"><strong><a href="/merge-pdf-api">Merge PDFs</a></strong><span>Several documents into one file, in one call.</span></div>
+</div>
+</section>
+  </main>
+</div>
+
+<footer style="border-top:1px solid var(--rule);padding:1.6rem 1.25rem;text-align:center;font-size:.86rem;color:var(--muted)">
+  <a href="/">PDFMint</a> &middot;
+  <a href="/docs">API reference</a> &middot;
+  <a href="/html-to-pdf-api">HTML to PDF API</a> &middot;
+  <a href="/invoice-pdf-api">Invoices</a> &middot;
+  <a href="/markdown-to-pdf-api">Markdown</a> &middot;
+  <a href="/url-to-pdf-api">URL to PDF</a> &middot;
+  <a href="/merge-pdf-api">Merge</a> &middot;
+  <a href="/n8n-html-to-pdf">n8n</a> &middot;
+  <a href="/status">Status</a> &middot;
+  <a href="/legal">Legal</a>
+</footer>
+
+<script src="/docs.js"></script>
+</body>
+</html>

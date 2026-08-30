@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Invoice PDF API &mdash; store the layout once, POST the numbers</title>
+<meta name="description" content="Generate invoice PDFs from an API: a stored HTML template with a variable line-item table, VAT totals and a per-page footer. One real invoice measured against the live service on 30 August 2026 — 187 ms, 1 page, 47,819 bytes — including the three traps found while building it.">
+<link rel="canonical" href="https://pdf.mintapis.com/invoice-pdf-api">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:url" content="https://pdf.mintapis.com/invoice-pdf-api">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="PDFMint">
+<meta property="og:title" content="Invoice PDF API &mdash; store the layout once, POST the numbers">
+<meta property="og:description" content="Generate invoice PDFs from an API: a stored HTML template with a variable line-item table, VAT totals and a per-page footer. One real invoice measured against the live service on 30 August 2026 — 187 ms, 1 page, 47,819 bytes — including the three traps found while building it.">
+<meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
+<meta property="og:image:alt" content="PDFMint: HTML in, PDF bytes out, from one HTTP call.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/docs.css">
+</head>
+<body class="docs">
+
+<header class="docs-top">
+  <a class="logo" href="/">PDF<span>Mint</span></a>
+  <nav>
+    <a href="/docs">API reference</a>
+    <a href="/html-to-pdf-api">HTML to PDF</a>
+    <a href="/status">Status</a>
+    <a href="/dashboard">Dashboard</a>
+    <a class="cta" href="/signup">Get an API key</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="toc">
+    <button class="toc-toggle" id="tocToggle" aria-expanded="false" aria-controls="tocBody">On this page</button>
+    <div class="toc-body" id="tocBody">
+      <h2>The job</h2>
+      <ul>
+        <li><a href="#shape">What an invoice PDF really needs</a></li>
+        <li><a href="#template">Store the layout once</a></li>
+        <li><a href="#render">Fill it and print it</a></li>
+      </ul>
+      <h2>The traps</h2>
+      <ul>
+        <li><a href="#names">The field names nobody can retype</a></li>
+        <li><a href="#newlines">A newline in your data is not a line break</a></li>
+        <li><a href="#typo">A misspelling that costs money</a></li>
+      </ul>
+      <h2>Then</h2>
+      <ul>
+        <li><a href="#numbers">What it cost and how long it took</a></li>
+        <li><a href="#stay">When not to use us</a></li>
+        <li><a href="#honest">What we cannot claim</a></li>
+        <li><a href="#try">Try it</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="content">
+
+<h1>Invoice PDF API</h1>
+<p class="lede">Store the layout once, then POST the numbers. This page is one real invoice &mdash;
+three line items, VAT, a page footer &mdash; built against the live API on 30&nbsp;August&nbsp;2026,
+including the three things that went wrong while building it.</p>
+
+<section id="shape">
+<h2>What an invoice PDF really needs <a class="anchor" href="#shape">#</a></h2>
+<p>Almost every invoice is the same five parts, and only one of them is interesting:</p>
+<ul>
+<li>A header block: number, dates, who is billing whom.</li>
+<li><strong>A table with a variable number of rows.</strong> This is the part that makes a plain
+string-replace template unusable, and it is the only genuinely hard part.</li>
+<li>A totals block whose arithmetic you did before you called anything.</li>
+<li>A payment-terms paragraph.</li>
+<li>A footer that has to repeat on every page and know how many pages there are.</li>
+</ul>
+<p>PDFMint does not do the arithmetic and does not decide your VAT treatment. It takes markup
+with <code>{{markers}}</code> in it, substitutes your JSON, and prints the result with Chromium.
+Your accounting logic stays where it belongs &mdash; in your system, where it can be tested.</p>
+</section>
+
+<section id="template">
+<h2>Store the layout once <a class="anchor" href="#template">#</a></h2>
+<p>A stored template is addressed by a name you choose, not by an opaque id, so it can be written
+into a workflow and reviewed in a diff. Repeat blocks use <code>{{#items}}&hellip;{{/items}}</code>.</p>
+<pre><code>curl -X PUT https://pdf.mintapis.com/v1/templates/invoice-a4 \
+  -H "Authorization: Bearer $PDFMINT_KEY" -H "content-type: application/json" \
+  -d '{
+    "html": "&lt;h1&gt;Invoice {{invoice_number}}&lt;/h1&gt; &hellip; &lt;tbody&gt;{{#items}}&lt;tr&gt;&lt;td&gt;{{description}}&lt;/td&gt;&lt;td&gt;{{qty}}&lt;/td&gt;&lt;td&gt;{{amount}}&lt;/td&gt;&lt;/tr&gt;{{/items}}&lt;/tbody&gt; &hellip;",
+    "options": {
+      "format": "A4",
+      "margin": "18mm",
+      "footerHtml": "&lt;div&gt;{{invoice_number}} &middot; page &lt;span class=\"pageNumber\"&gt;&lt;/span&gt; of &lt;span class=\"totalPages\"&gt;&lt;/span&gt;&lt;/div&gt;"
+    }
+  }'</code></pre>
+<p>Two details that are easy to miss and cost a round trip each:</p>
+<ul>
+<li><strong>The footer is filled from the same data as the body.</strong> <code>{{invoice_number}}</code>
+inside <code>footerHtml</code> is substituted per render, so the invoice number can repeat on
+every page without being passed twice.</li>
+<li><strong><code>pageNumber</code> and <code>totalPages</code> are Chromium&rsquo;s own classes</strong>,
+not ours. They are spans you style yourself. There is also a shorthand:
+<code>"pageNumbers": true</code> prints a centred <em>Page&nbsp;n&nbsp;of&nbsp;m</em> and needs no
+markup at all.</li>
+</ul>
+<p>There is no <code>displayHeaderFooter</code> flag to set. A header or footer displays because
+you supplied one; sending the flag is rejected as an unknown field, with the accepted list in the
+error.</p>
+</section>
+
+<section id="render">
+<h2>Fill it and print it <a class="anchor" href="#render">#</a></h2>
+<pre><code>POST https://pdf.mintapis.com/v1/pdf
+{
+  "template": "invoice-a4",
+  "filename": "invoice-2026-0418.pdf",
+  "data": {
+    "invoice_number": "2026-0418",
+    "buyer_name": "Achterberg Handel BV",
+    "items": [
+      {"description": "Pallet freight Rotterdam &rarr; Passau", "qty": "4", "unit_price": "185,00", "amount": "740,00"},
+      {"description": "Customs clearance (EX-A)", "qty": "1", "unit_price": "65,00", "amount": "65,00"},
+      {"description": "Waiting time, 45 min", "qty": "0,75", "unit_price": "48,00", "amount": "36,00"}
+    ],
+    "net_total": "841,00", "vat_rate": "19 %", "vat_amount": "159,79",
+    "currency": "EUR", "grand_total": "1.000,79"
+  }
+}</code></pre>
+<p>That exact call, run against the live service from Germany on 30&nbsp;August&nbsp;2026, returned
+a one-page A4 PDF of <strong>47,819&nbsp;bytes</strong> in <strong>187&nbsp;ms</strong> server-side and
+<strong>291&nbsp;ms</strong> round trip. The text layer, read back with <code>pdftotext</code>, has all
+three rows, the totals, and the footer line <code>2026-0418 &middot; page 1 of 1</code>.</p>
+<p>Values are HTML-escaped on substitution, so a buyer called <code>M&amp;S &lt;Holdings&gt;</code>
+prints as written instead of breaking the table. Decimal commas, thousands dots and a
+<code>&rarr;</code> in a description all survive unchanged &mdash; they are just text.</p>
+</section>
+
+<section id="names">
+<h2>The field names nobody can retype <a class="anchor" href="#names">#</a></h2>
+<p>Saving a template returns the list of markers it uses, so a client &mdash; the n8n node, a form,
+your own admin screen &mdash; can draw one input per marker instead of asking someone to remember
+them. Building this page found that the list was <strong>wrong for exactly the case that matters</strong>.</p>
+<p>The scan ran the template against empty data. An absent repeat block correctly renders to
+nothing, so the scan never walked into it &mdash; and every column name inside the line-item table
+was missing from the list. Worse, the ready-to-paste example said:</p>
+<pre><code>"data": { "items": "value", "invoice_number": "value", &hellip; }</code></pre>
+<p>A string is precisely what a repeat block cannot take. Paste that and you get an invoice with a
+header, a totals row and <em>no line items at all</em>, with no error, because a section that is
+present but is not a list renders once and empty. The feature built to prevent retyping was
+handing out a shape that silently loses the invoice.</p>
+<p>Fixed on 30&nbsp;August&nbsp;2026. The scan now walks a repeat block once against an empty row,
+purely to record what is inside it, and each field carries the block it belongs to:</p>
+<pre><code>"placeholders": [
+  {"name": "items", "kind": "section"},
+  {"name": "description", "kind": "scalar", "scope": "items"},
+  {"name": "qty",         "kind": "scalar", "scope": "items"},
+  {"name": "amount",      "kind": "scalar", "scope": "items"},
+  {"name": "invoice_number", "kind": "scalar"}
+],
+"usage": { "data": { "invoice_number": "value", "items": [ {"description": "value", "qty": "value", "amount": "value"} ] } }</code></pre>
+<p>Two blocks may reuse a name &mdash; <code>{{#items}}{{amount}}{{/items}}</code> and
+<code>{{#fees}}{{amount}}{{/fees}}</code> are different columns &mdash; and they stay distinct.
+Rendering did not change: an absent block still prints nothing, and the walk is scan-only.
+<code>GET /v1/templates/{name}</code> now returns the same <code>usage</code> block as
+<code>PUT</code>, because <code>GET</code> is the call you make to draw a form.</p>
+</section>
+
+<section id="newlines">
+<h2>A newline in your data is not a line break <a class="anchor" href="#newlines">#</a></h2>
+<p>The buyer address went in as <code>"Keizersgracht 214\n1016 DX Amsterdam\nNetherlands"</code> and
+came out on the paper as one line. Nothing was broken: substitution puts text into HTML, and HTML
+collapses whitespace. Both behaviours in a single measured render:</p>
+<table>
+<thead><tr><th>Template</th><th>What printed</th></tr></thead>
+<tbody>
+<tr><td><code>&lt;div&gt;{{addr}}&lt;/div&gt;</code></td><td>Keizersgracht 214 1016 DX Amsterdam Netherlands</td></tr>
+<tr><td><code>&lt;div style="white-space:pre-line"&gt;{{addr}}&lt;/div&gt;</code></td><td>three lines, as sent</td></tr>
+</tbody>
+</table>
+<p>One CSS declaration, decided by you per field, which is right: an address wants the line breaks,
+a product description usually does not. The alternative &mdash; turning <code>\n</code> into
+<code>&lt;br&gt;</code> for you &mdash; would mean injecting markup into escaped values, and then
+a customer whose name legitimately contains a newline gets markup they did not ask for.</p>
+</section>
+
+<section id="typo">
+<h2>A misspelling that costs money <a class="anchor" href="#typo">#</a></h2>
+<p>Invoices are generated unattended. The failure that hurts is not a crash &mdash; it is a document
+that looks fine and is wrong. Two guards, both measured on the live service:</p>
+<p><strong>Strict placeholders.</strong> <code>"strict": true</code> refuses to print a marker that
+your data does not fill:</p>
+<pre><code>HTTP 400 unresolved_placeholders
+"The template uses 1 placeholder that \"data\" does not provide: clietn_name."</code></pre>
+<p><strong>Unknown fields are named, not ignored.</strong> Sending <code>"fromat": "A5"</code> to
+<code>/v1/pdf</code> returns HTTP&nbsp;400 with <em>Did you mean "format"?</em> rather than quietly
+printing A4.</p>
+<p>Building this page found a hole in that second guard, and it was in the worst possible place.
+<code>PUT /v1/templates/&hellip;</code> validated the <em>values</em> of the options it recognised but
+never checked the <em>keys</em>. Proven against the live service:</p>
+<pre><code>PUT  /v1/templates/typo-probe   {"options": {"fromat": "A5", "landscpae": true}}   &rarr; HTTP 200, stored
+POST /v1/pdf                    {"fromat": "A5"}                                   &rarr; HTTP 400</code></pre>
+<p>The endpoint you call once caught the typo. The endpoint you set up once and then render from a
+thousand times did not &mdash; it accepted it, stored it, and silently printed the default page size
+on every invoice afterwards. A stored template&rsquo;s options are now checked against the same list
+as a render, so the typo is refused where it is written instead of being obeyed forever.</p>
+</section>
+
+<section id="numbers">
+<h2>What it cost and how long it took <a class="anchor" href="#numbers">#</a></h2>
+<p>All of it on one free account created for this page on 30&nbsp;August&nbsp;2026.</p>
+<table>
+<thead><tr><th>Call</th><th>Server time</th><th>Result</th><th>Credits</th></tr></thead>
+<tbody>
+<tr><td>Invoice from stored template, 3 rows</td><td>187&nbsp;ms</td><td>1 page, 47,819 B</td><td>1</td></tr>
+<tr><td>Two-address probe, inline HTML</td><td>57&nbsp;ms</td><td>1 page, 9,833 B</td><td>1</td></tr>
+<tr><td>Strict mode, one misspelled field</td><td>&mdash;</td><td>HTTP 400</td><td><strong>0</strong></td></tr>
+<tr><td>Unknown option key</td><td>&mdash;</td><td>HTTP 400</td><td><strong>0</strong></td></tr>
+<tr><td>Saving and reading the template</td><td>126&nbsp;ms</td><td>HTTP 200</td><td><strong>0</strong></td></tr>
+</tbody>
+</table>
+<p>Across the whole session &mdash; five successful renders and five rejected calls &mdash; the account
+reported <code>credits_used: 5</code>. <strong>A call that returns no document is not billed</strong>, and a
+render that fails after the credit is taken has it refunded. Storing, reading and listing templates
+are free. Every response carries <code>X-PDFMint-Duration-Ms</code> and
+<code>X-PDFMint-Credits-Remaining</code>, so you can log both without a second request.</p>
+</section>
+
+<section id="stay">
+<h2>When not to use us <a class="anchor" href="#stay">#</a></h2>
+<ul>
+<li><strong>You need e-invoicing compliance</strong> &mdash; ZUGFeRD, Factur-X, XRechnung, Peppol, the
+Italian SdI. Those need structured XML embedded in, or instead of, the PDF, plus network delivery
+and archival. PDFMint prints a PDF. It does not embed a ZUGFeRD payload and does not sign anything.
+If a tax authority has to read your invoice, buy a product that names your regime.</li>
+<li><strong>Your invoices come out of your ERP already.</strong> SAP, Business Central, Odoo, Xero and
+Lexware all print PDFs. Adding an API to re-render what they already produce buys you nothing.</li>
+<li><strong>Non-developers must change the layout.</strong> There is no drag-and-drop editor and none
+is planned. If the finance team needs to move a logo without a deploy, a product with a designer
+is the honest answer.</li>
+<li><strong>You render a handful a month.</strong> A headless Chromium in your own container is free
+and this is not hard. Our <a href="/html-to-pdf-api">HTML to PDF page</a> says plainly when
+self-hosting is the right call.</li>
+<li><strong>Legally required long-term archival</strong> in PDF/A. We do not emit PDF/A.</li>
+</ul>
+</section>
+
+<section id="honest">
+<h2>What we cannot claim <a class="anchor" href="#honest">#</a></h2>
+<p>No outside customer has paid for PDFMint yet, so there is no invoicing case study and no
+reference to call. The free tier is 10 documents a month, the smallest of the hosted options. One
+service, one region, no SLA, no SOC&nbsp;2, no PDF/A, no digital signatures, no e-invoicing formats.
+The numbers on this page are single measurements from one machine in Germany on one day, not a
+benchmark; the <a href="/status">status page</a> is the running record. Two of the three problems
+described above were <em>found while writing this page</em> and fixed the same day &mdash; which is
+also a fair statement about how much production invoicing traffic this has seen.</p>
+</section>
+
+<section id="try">
+<h2>Try it <a class="anchor" href="#try">#</a></h2>
+<p>Take your ugliest real invoice &mdash; the one with the long product names, the credit note line
+and the address that needs three lines &mdash; and render that one. A template that survives your
+worst document will survive the rest.</p>
+<p><a class="cta" href="/signup">Get an API key</a> &nbsp; <a href="/docs#templates">Template reference</a>
+&nbsp; <a href="/status">Live latency and success rate</a></p>
+</section>
+
+<section id="more">
+<h2>Related <a class="anchor" href="#more">#</a></h2>
+<div class="cards">
+  <div class="c"><strong><a href="/html-to-pdf-api">HTML to PDF API</a></strong><span>What the job really involves, and what six products charge.</span></div>
+  <div class="c"><strong><a href="/markdown-to-pdf-api">Markdown to PDF</a></strong><span>A report written in Markdown, printed with page numbers.</span></div>
+  <div class="c"><strong><a href="/merge-pdf-api">Merge PDFs</a></strong><span>Invoice, terms and annex into one file, in one call.</span></div>
+  <div class="c"><strong><a href="/n8n-html-to-pdf">HTML to PDF in n8n</a></strong><span>Three ways to do it in a workflow, and what each costs.</span></div>
+</div>
+</section>
+  </main>
+</div>
+
+<footer style="border-top:1px solid var(--rule);padding:1.6rem 1.25rem;text-align:center;font-size:.86rem;color:var(--muted)">
+  <a href="/">PDFMint</a> &middot;
+  <a href="/docs">API reference</a> &middot;
+  <a href="/html-to-pdf-api">HTML to PDF API</a> &middot;
+  <a href="/invoice-pdf-api">Invoices</a> &middot;
+  <a href="/markdown-to-pdf-api">Markdown</a> &middot;
+  <a href="/url-to-pdf-api">URL to PDF</a> &middot;
+  <a href="/merge-pdf-api">Merge</a> &middot;
+  <a href="/n8n-html-to-pdf">n8n</a> &middot;
+  <a href="/status">Status</a> &middot;
+  <a href="/legal">Legal</a>
+</footer>
+
+<script src="/docs.js"></script>
+</body>
+</html>
