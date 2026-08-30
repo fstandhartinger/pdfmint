@@ -110,16 +110,14 @@ in File mode drops them. If you never branch on page count or warnings, you will
 
 <p>A dedicated node exists so that the fiddly parts &mdash; binary handling, the headers above,
 per-item execution, and a credential that tests itself &mdash; are configured rather than rebuilt.
-<code>n8n-nodes-pdfmint</code> is a thin client over the same HTTP API, with <strong>zero runtime
+<a href="https://www.npmjs.com/package/n8n-nodes-pdfmint" rel="noopener"><code>n8n-nodes-pdfmint</code></a> is a thin client over the same HTTP API, with <strong>zero runtime
 dependencies</strong>, built and tested against n8n 2.35 on Node.js 20 and 22, and marked
 <code>usableAsTool</code> so an AI Agent node can call it directly.</p>
 
 <p>It is <strong>verified by n8n</strong>: the package is in n8n's community-node registry with
 <code>isPublished: true</code>, which is the list n8n Cloud installs from. You can confirm that
 without an account &mdash; the entry is in the response of
-<code>https://api.n8n.io/api/community-nodes</code>. npm recorded
-<strong>1,002 installs in the week to 29 August 2026</strong> (npm’s own
-<code>downloads/point/last-week</code> figure, read on 30 August).</p>
+<code>https://api.n8n.io/api/community-nodes</code>. We also publish the package: PDFMint and this node are built and run by the same people, so the node and the API it calls stay in step.</p>
 
 <p class="notice"><strong>One thing to check after installing.</strong> n8n’s registry entry
 currently names version <strong>0.1.0</strong> while npm’s latest is <strong>0.4.3</strong>, and
