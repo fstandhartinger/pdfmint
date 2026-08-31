@@ -1,0 +1,470 @@
+{
+ "name": "Send branded overdue-invoice statements from Xero with PDFMint",
+ "nodes": [
+  {
+   "parameters": {
+    "content": "## Branded overdue-invoice statements from Xero\n\nXero can chase overdue invoices, but the reminder is a plain email and the PDF it attaches is Xero's, not yours. This sends **your** statement instead: one PDF per customer covering every invoice they still owe, in your layout and colours.\n\n**Edit one node \u2014 *Your company details*.** Everything else works as it is.\n\nYou need a Xero credential, a PDFMint credential (free tier: 10 documents) and Gmail.",
+    "width": 700,
+    "height": 300,
+    "color": "6"
+   },
+   "id": "Sticky Note",
+   "name": "Sticky Note",
+   "type": "n8n-nodes-base.stickyNote",
+   "typeVersion": 1,
+   "position": [
+    -560,
+    -320
+   ]
+  },
+  {
+   "parameters": {
+    "content": "### 1 \u00b7 When it runs\nEvery weekday at 09:00. Chasing on a Sunday annoys people and changes nothing.",
+    "width": 320,
+    "height": 200
+   },
+   "id": "Sticky Note1",
+   "name": "Sticky Note1",
+   "type": "n8n-nodes-base.stickyNote",
+   "typeVersion": 1,
+   "position": [
+    -560,
+    40
+   ]
+  },
+  {
+   "parameters": {
+    "content": "### 2 \u00b7 What it asks Xero for\nAll **ACCREC** invoices still `AUTHORISED` \u2014 issued and awaiting payment. Paid ones drop out on their own because `AmountDue` becomes 0.",
+    "width": 320,
+    "height": 200
+   },
+   "id": "Sticky Note2",
+   "name": "Sticky Note2",
+   "type": "n8n-nodes-base.stickyNote",
+   "typeVersion": 1,
+   "position": [
+    -200,
+    40
+   ]
+  },
+  {
+   "parameters": {
+    "content": "### 3 \u00b7 The one node you edit\nYour name, address, accent colour and the footer line. The accent colour is used for the rule under your name, so the statement looks like you.",
+    "width": 320,
+    "height": 240
+   },
+   "id": "Sticky Note3",
+   "name": "Sticky Note3",
+   "type": "n8n-nodes-base.stickyNote",
+   "typeVersion": 1,
+   "position": [
+    160,
+    40
+   ]
+  },
+  {
+   "parameters": {
+    "content": "### 4 \u00b7 Grouping, not spamming\nKeeps only invoices genuinely past their due date, then groups them **per customer**. Someone with four late invoices gets one statement listing four lines \u2014 not four emails. Also computes days overdue and marks anything past 30 days.",
+    "width": 340,
+    "height": 260
+   },
+   "id": "Sticky Note4",
+   "name": "Sticky Note4",
+   "type": "n8n-nodes-base.stickyNote",
+   "typeVersion": 1,
+   "position": [
+    520,
+    40
+   ]
+  },
+  {
+   "parameters": {
+    "content": "### 5 \u00b7 Stop if the ledger is clean\nNo overdue invoices means no render and no email. Without this the workflow would send empty statements and burn PDFMint credits.",
+    "width": 320,
+    "height": 200
+   },
+   "id": "Sticky Note5",
+   "name": "Sticky Note5",
+   "type": "n8n-nodes-base.stickyNote",
+   "typeVersion": 1,
+   "position": [
+    880,
+    40
+   ]
+  },
+  {
+   "parameters": {
+    "content": "### 6 \u00b7 The PDF\nPDFMint renders the HTML the previous node built. The file is named after the customer, so it is recognisable in an inbox and in your sent folder.",
+    "width": 320,
+    "height": 220
+   },
+   "id": "Sticky Note6",
+   "name": "Sticky Note6",
+   "type": "n8n-nodes-base.stickyNote",
+   "typeVersion": 1,
+   "position": [
+    1240,
+    40
+   ]
+  },
+  {
+   "parameters": {
+    "content": "### 7 \u00b7 Delivery\nGoes to the email Xero holds for that contact, with the statement attached. Change this node if you would rather post it to Slack or drop it in Drive.",
+    "width": 340,
+    "height": 220
+   },
+   "id": "Sticky Note7",
+   "name": "Sticky Note7",
+   "type": "n8n-nodes-base.stickyNote",
+   "typeVersion": 1,
+   "position": [
+    1600,
+    40
+   ]
+  },
+  {
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "field": "cronExpression",
+       "expression": "0 9 * * 1-5"
+      }
+     ]
+    }
+   },
+   "id": "Every weekday morning",
+   "name": "Every weekday morning",
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.2,
+   "position": [
+    -480,
+    -40
+   ]
+  },
+  {
+   "parameters": {
+    "resource": "invoice",
+    "operation": "getAll",
+    "returnAll": true,
+    "organizationId": "YOUR_XERO_TENANT_ID",
+    "options": {
+     "where": "Status==\"AUTHORISED\" AND Type==\"ACCREC\""
+    }
+   },
+   "id": "Get unpaid invoices from Xero",
+   "name": "Get unpaid invoices from Xero",
+   "type": "n8n-nodes-base.xero",
+   "typeVersion": 1,
+   "position": [
+    240,
+    -40
+   ],
+   "credentials": {
+    "xeroOAuth2Api": {
+     "name": "Xero account"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "assignments": {
+     "assignments": [
+      {
+       "id": "a1",
+       "name": "companyName",
+       "value": "Halden Studio",
+       "type": "string"
+      },
+      {
+       "id": "a2",
+       "name": "companyAddress",
+       "value": "12 Meridian Way, Dublin 2, Ireland",
+       "type": "string"
+      },
+      {
+       "id": "a3",
+       "name": "accentColour",
+       "value": "#0b6b57",
+       "type": "string"
+      },
+      {
+       "id": "a4",
+       "name": "footerNote",
+       "value": "Payment details are on the original invoice. Already paid? Reply and we will clear it.",
+       "type": "string"
+      }
+     ]
+    },
+    "options": {}
+   },
+   "id": "Your company details",
+   "name": "Your company details",
+   "type": "n8n-nodes-base.set",
+   "typeVersion": 3.4,
+   "position": [
+    -120,
+    -40
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "// ==== exakt der Code, der in den n8n Code-Node kommt ====\nconst today = new Date($now ? $now.toISO().slice(0,10) : new Date().toISOString().slice(0,10));\nconst brand = $('Your company details').first().json;\n\nconst money = (n, cur) => new Intl.NumberFormat('en-IE',\n  { style: 'currency', currency: cur || 'EUR' }).format(Number(n) || 0);\n\n// Xero liefert ACCREC-Rechnungen aller Faelligkeiten. Nur wirklich ueberfaellige\n// und noch offene interessieren - AmountDue faellt auf 0, sobald bezahlt wurde.\n// $input.all() ist die dokumentierte API des Code-Nodes. `items` ist Altlast\n// und lieferte hier undefined-Eintraege - der Lauf brach mit\n// \"Cannot read properties of undefined (reading 'AmountDue')\" ab.\nconst overdue = $input.all()\n  .map(i => i.json)\n  .filter(Boolean)\n  .filter(inv => Number(inv.AmountDue) > 0 && inv.DueDateString\n                 && new Date(inv.DueDateString.slice(0,10)) < today);\n\n// Ein Kunde bekommt EINE Mahnung ueber alle seine offenen Rechnungen, nicht eine\n// Mail pro Rechnung. Das ist der Unterschied zwischen einer Erinnerung und Spam.\nconst byContact = new Map();\nfor (const inv of overdue) {\n  const id = inv.Contact?.ContactID || inv.Contact?.Name;\n  if (!byContact.has(id)) byContact.set(id, {\n    name: inv.Contact?.Name || 'Customer',\n    email: inv.Contact?.EmailAddress || '',\n    currency: inv.CurrencyCode || 'EUR',\n    invoices: [], total: 0, oldestDays: 0,\n  });\n  const c = byContact.get(id);\n  const days = Math.floor((today - new Date(inv.DueDateString.slice(0,10))) / 86400000);\n  c.invoices.push({\n    number: inv.InvoiceNumber, issued: inv.DateString?.slice(0,10),\n    due: inv.DueDateString.slice(0,10), days,\n    amount: Number(inv.AmountDue),\n    amountText: money(inv.AmountDue, inv.CurrencyCode),\n  });\n  c.total += Number(inv.AmountDue);\n  c.oldestDays = Math.max(c.oldestDays, days);\n}\n\nreturn [...byContact.values()].map(c => {\n  const rows = c.invoices.sort((a,b) => b.days - a.days).map(i => `\n      <tr><td>${i.number}</td><td>${i.issued}</td><td>${i.due}</td>\n          <td class=\"r ${i.days > 30 ? 'bad' : ''}\">${i.days} days</td>\n          <td class=\"r\">${i.amountText}</td></tr>`).join('');\n  const html = `<!doctype html><html><head><meta charset=\"utf-8\"><style>\n  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;margin:44px}\n  h1{font-size:24px;margin:0 0 2px}.muted{color:#666;font-size:13px}\n  .bar{height:4px;background:${brand.accentColour};margin:14px 0 22px;border-radius:2px}\n  table{width:100%;border-collapse:collapse;margin-top:18px;font-size:14px}\n  th{text-align:left;border-bottom:2px solid #222;padding:7px 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04em}\n  td{border-bottom:1px solid #e8e8e8;padding:7px 6px}\n  .r{text-align:right}.bad{color:#b3261e;font-weight:600}\n  .tot{margin-top:20px;font-size:19px;font-weight:700;text-align:right}\n  footer{margin-top:34px;font-size:12px;color:#666;border-top:1px solid #e8e8e8;padding-top:12px}\n  </style></head><body>\n  <h1>${brand.companyName}</h1><div class=\"muted\">${brand.companyAddress}</div>\n  <div class=\"bar\"></div>\n  <h2 style=\"font-size:17px;margin:0 0 2px\">Statement of overdue invoices</h2>\n  <div class=\"muted\">${c.name} &middot; prepared ${today.toISOString().slice(0,10)}</div>\n  <table><thead><tr><th>Invoice</th><th>Issued</th><th>Due</th>\n    <th class=\"r\">Overdue</th><th class=\"r\">Amount</th></tr></thead>\n    <tbody>${rows}</tbody></table>\n  <div class=\"tot\">Total outstanding: ${money(c.total, c.currency)}</div>\n  <footer>${brand.footerNote}</footer></body></html>`;\n  return { json: {\n    customer: c.name, email: c.email, invoiceCount: c.invoices.length,\n    totalOutstanding: Number(c.total.toFixed(2)), oldestDays: c.oldestDays,\n    subject: `${brand.companyName}: ${c.invoices.length} overdue invoice${c.invoices.length>1?'s':''}, ${money(c.total,c.currency)}`,\n    html,\n  }};\n});\n"
+   },
+   "id": "Group overdue invoices per customer",
+   "name": "Group overdue invoices per customer",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    600,
+    -40
+   ]
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "c1",
+       "leftValue": "={{ $json.invoiceCount }}",
+       "rightValue": 0,
+       "operator": {
+        "type": "number",
+        "operation": "gt"
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "looseTypeValidation": true,
+    "options": {}
+   },
+   "id": "Anything actually overdue?",
+   "name": "Anything actually overdue?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    960,
+    -40
+   ]
+  },
+  {
+   "parameters": {
+    "resource": "document",
+    "operation": "pdf",
+    "source": "html",
+    "html": "={{ $json.html }}",
+    "fileName": "=statement-{{ $json.customer.replace(/[^A-Za-z0-9]+/g,'-').toLowerCase() }}.pdf",
+    "options": {}
+   },
+   "id": "Render the statement as PDF",
+   "name": "Render the statement as PDF",
+   "type": "n8n-nodes-pdfmint.pdfMint",
+   "typeVersion": 1,
+   "position": [
+    1320,
+    -140
+   ],
+   "credentials": {
+    "pdfMintApi": {
+     "name": "PDFMint account"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "sendTo": "={{ $('Group overdue invoices per customer').item.json.email }}",
+    "subject": "={{ $('Group overdue invoices per customer').item.json.subject }}",
+    "message": "=Hello,\n\nA statement of the invoices still outstanding with us is attached.\n\nIf any of them have already been paid, just reply and we will clear them.\n\nThank you,\n{{ $('Your company details').first().json.companyName }}",
+    "options": {
+     "attachmentsUi": {
+      "attachmentsBinary": [
+       {
+        "property": "data"
+       }
+      ]
+     }
+    }
+   },
+   "id": "Email the statement",
+   "name": "Email the statement",
+   "type": "n8n-nodes-base.gmail",
+   "typeVersion": 2.1,
+   "position": [
+    1680,
+    -140
+   ],
+   "credentials": {
+    "gmailOAuth2": {
+     "name": "Gmail account"
+    }
+   }
+  }
+ ],
+ "connections": {
+  "Every weekday morning": {
+   "main": [
+    [
+     {
+      "node": "Your company details",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Your company details": {
+   "main": [
+    [
+     {
+      "node": "Get unpaid invoices from Xero",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Get unpaid invoices from Xero": {
+   "main": [
+    [
+     {
+      "node": "Group overdue invoices per customer",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Group overdue invoices per customer": {
+   "main": [
+    [
+     {
+      "node": "Anything actually overdue?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Anything actually overdue?": {
+   "main": [
+    [
+     {
+      "node": "Render the statement as PDF",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    []
+   ]
+  },
+  "Render the statement as PDF": {
+   "main": [
+    [
+     {
+      "node": "Email the statement",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1"
+ },
+ "pinData": {
+  "Get unpaid invoices from Xero": [
+   {
+    "InvoiceID": "a1f0c3d2-1111-4a1b-9c11-0f1e2d3c4b5a",
+    "InvoiceNumber": "INV-0142",
+    "Type": "ACCREC",
+    "Status": "AUTHORISED",
+    "Contact": {
+     "ContactID": "c-001",
+     "Name": "Bramble & Fox Ltd",
+     "EmailAddress": "ap@bramblefox.example"
+    },
+    "DateString": "2026-07-15T00:00:00",
+    "DueDateString": "2026-08-14T00:00:00",
+    "CurrencyCode": "EUR",
+    "LineItems": [
+     {
+      "Description": "Website retainer, July",
+      "Quantity": 1,
+      "UnitAmount": 1800,
+      "LineAmount": 1800
+     },
+     {
+      "Description": "Extra design hours",
+      "Quantity": 6,
+      "UnitAmount": 95,
+      "LineAmount": 570
+     }
+    ],
+    "SubTotal": 2370,
+    "TotalTax": 450.3,
+    "Total": 2820.3,
+    "AmountDue": 2820.3
+   },
+   {
+    "InvoiceID": "b2e1d4c3-2222-4b2c-8d22-1a2b3c4d5e6f",
+    "InvoiceNumber": "INV-0147",
+    "Type": "ACCREC",
+    "Status": "AUTHORISED",
+    "Contact": {
+     "ContactID": "c-001",
+     "Name": "Bramble & Fox Ltd",
+     "EmailAddress": "ap@bramblefox.example"
+    },
+    "DateString": "2026-07-28T00:00:00",
+    "DueDateString": "2026-08-27T00:00:00",
+    "CurrencyCode": "EUR",
+    "LineItems": [
+     {
+      "Description": "Hosting, August",
+      "Quantity": 1,
+      "UnitAmount": 240,
+      "LineAmount": 240
+     }
+    ],
+    "SubTotal": 240,
+    "TotalTax": 45.6,
+    "Total": 285.6,
+    "AmountDue": 285.6
+   },
+   {
+    "InvoiceID": "c3d2e5f4-3333-4c3d-7e33-2b3c4d5e6f70",
+    "InvoiceNumber": "INV-0151",
+    "Type": "ACCREC",
+    "Status": "AUTHORISED",
+    "Contact": {
+     "ContactID": "c-002",
+     "Name": "Nordlicht GmbH",
+     "EmailAddress": "buchhaltung@nordlicht.example"
+    },
+    "DateString": "2026-08-20T00:00:00",
+    "DueDateString": "2026-09-19T00:00:00",
+    "CurrencyCode": "EUR",
+    "LineItems": [
+     {
+      "Description": "Consulting day",
+      "Quantity": 2,
+      "UnitAmount": 1200,
+      "LineAmount": 2400
+     }
+    ],
+    "SubTotal": 2400,
+    "TotalTax": 456,
+    "Total": 2856,
+    "AmountDue": 2856
+   }
+  ]
+ }
+}
