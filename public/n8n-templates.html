@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ready-made n8n workflows for PDFMint</title>
+<meta name="description" content="Import-ready n8n workflows that render PDFs with PDFMint: an overdue-invoice statement built on Xero, plus five workflows published in the n8n template gallery. Every file is a real workflow that was run, not a mock-up.">
+<link rel="canonical" href="https://pdf.mintapis.com/n8n-templates">
+<meta name="robots" content="index, follow">
+<meta property="og:url" content="https://pdf.mintapis.com/n8n-templates">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="PDFMint">
+<meta property="og:title" content="Ready-made n8n workflows for PDFMint">
+<meta property="og:description" content="Import-ready n8n workflows that render PDFs with PDFMint, each one run before it was published.">
+<meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/docs.css">
+</head>
+<body class="docs">
+
+<header class="docs-top">
+  <a class="logo" href="/">PDF<span>Mint</span></a>
+  <nav>
+    <a href="/docs">API reference</a>
+    <a href="/n8n-html-to-pdf">HTML to PDF in n8n</a>
+    <a href="/status">Status</a>
+    <a href="/dashboard">Dashboard</a>
+    <a class="cta" href="/signup">Get an API key</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="toc">
+    <button class="toc-toggle" id="tocToggle" aria-expanded="false" aria-controls="tocBody">On this page</button>
+    <div class="toc-body" id="tocBody">
+      <h2>Workflows</h2>
+      <ul>
+        <li><a href="#gallery">In the n8n gallery</a></li>
+        <li><a href="#xero">Xero overdue-invoice statement</a></li>
+      </ul>
+      <h2>Then</h2>
+      <ul>
+        <li><a href="#honest">What we claim and what we do not</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main>
+    <p class="eyebrow">n8n</p>
+    <h1>Ready-made n8n workflows for PDFMint</h1>
+    <p class="lead">Install <code>n8n-nodes-pdfmint</code>, paste your API key once, then import any workflow below and run it against your own data. Every workflow here was executed in a real n8n instance before it was published &mdash; the honest limits of each one are stated on this page.</p>
+
+    <section id="gallery">
+      <h2>In the n8n gallery <a class="anchor" href="#gallery">#</a></h2>
+      <p>Five workflows are published in n8n's official template gallery, which means n8n's own review accepted them:</p>
+      <ul>
+        <li><a href="https://n8n.io/workflows/18734-generate-pdf-invoices-from-webhook-requests-with-pdfmint/" rel="noopener">Generate PDF invoices from webhook requests with PDFMint</a> &mdash; webhook in, invoice out, with validation that refuses an empty payload before a credit is spent.</li>
+        <li><a href="https://n8n.io/workflows/18793-send-branded-pdf-receipts-for-stripe-payments-with-pdfmint-gmail-and-drive/" rel="noopener">Send branded PDF receipts for Stripe payments with PDFMint, Gmail and Drive</a> &mdash; a Stripe payment triggers a receipt that is rendered, filed and mailed.</li>
+        <li><a href="https://n8n.io/workflows/18787-generate-regional-sales-reports-from-crm-exports-with-docmint-and-excel/" rel="noopener">Generate regional sales reports from CRM exports with DocMint and Excel</a> &mdash; our sibling product DocMint fills your own Excel template, totals computed once, per-region roll-up included.</li>
+        <li><a href="https://n8n.io/workflows/18865-archive-weekly-web-page-snapshots-into-a-single-pdf-with-pdfmint/" rel="noopener">Archive weekly web page snapshots into a single PDF with PDFMint</a> &mdash; renders each page, merges survivors, and says honestly how many made it.</li>
+        <li><a href="https://n8n.io/workflows/18866-turn-form-submissions-into-branded-pdf-reports-with-pdfmint/" rel="noopener">Turn form submissions into branded PDF reports with PDFMint</a> &mdash; form payload in, branded report out, word count computed rather than guessed.</li>
+      </ul>
+    </section>
+
+    <section id="xero">
+      <h2>Xero overdue-invoice statement <a class="anchor" href="#xero">#</a></h2>
+      <p><a href="/templates/xero-overdue-statements.json" download>Download the workflow JSON</a> and paste it straight onto an n8n canvas (Ctrl+V). This one is not in the gallery yet &mdash; it is queued behind n8n's one-template-in-review limit &mdash; so it lives here first.</p>
+      <p><strong>What it does.</strong> Every weekday morning it asks Xero for <code>ACCREC</code> invoices that are still <code>AUTHORISED</code>, keeps only the ones genuinely past their due date, and groups them per customer &mdash; so someone with four late invoices gets one statement with four lines instead of four separate chasers. It computes days overdue, marks anything past 30 days, stops without spending a render credit when the ledger is clean, renders the statement with PDFMint, and mails it to the address Xero holds for that contact.</p>
+      <p><strong>Provenance.</strong> Built and run in a real n8n instance on 31 August 2026. That run caught two real defects &mdash; a Set node that replaced the item data so downstream nodes found nothing, and an <code>items</code> reference from an earlier draft that produced undefined entries &mdash; both fixed before this file was published. After the fixes, the saved grouping code against the recorded invoice data produces exactly one customer with two invoices totalling 3,105.90, and the render step produces the statement PDF (proof: <code>proof-xero-statement.pdf</code> in the public repository). It has not been exercised end-to-end against a live Xero account with real mail delivery; the Xero and Gmail nodes use their standard OAuth2 credentials and you connect your own on import.</p>
+      <p><strong>You edit one node</strong> &mdash; <em>Your company details</em> &mdash; with your name, address, accent colour and footer. The file contains no credentials, keys or account ids.</p>
+    </section>
+
+    <section id="honest">
+      <h2>What we claim and what we do not <a class="anchor" href="#honest">#</a></h2>
+      <ul>
+        <li>Every gallery link above points at a workflow n8n published; the view counters there are n8n's, not ours.</li>
+        <li>The Xero statement was run once with the fixes described above; it is offered as a starting point, not as a certified integration.</li>
+        <li>We build PDFMint and the PDFMint n8n node; anything we publish says so.</li>
+      </ul>
+      <p>Need the API instead? The <a href="/docs">API reference</a> and <a href="/n8n-html-to-pdf">the three ways to turn HTML into a PDF in n8n</a> cover the rest. The free plan is 10 documents a month, no card.</p>
+    </section>
+  </main>
+</div>
+</body>
+</html>
