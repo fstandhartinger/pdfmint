@@ -37,6 +37,7 @@
       <h2>Workflows</h2>
       <ul>
         <li><a href="#gallery">In the n8n gallery</a></li>
+        <li><a href="#invoice-fixed">Invoice webhook workflow — fixed error handling</a></li>
         <li><a href="#xero">Xero overdue-invoice statement</a></li>
       </ul>
       <h2>Then</h2>
@@ -63,6 +64,14 @@
       </ul>
     </section>
 
+    <section id="invoice-fixed">
+      <h2>Invoice webhook workflow — fixed error handling <a class="anchor" href="#invoice-fixed">#</a></h2>
+      <p><a href="/templates/pdf-invoices-from-webhook-fixed.json" download>Download the workflow JSON</a> (same workflow as <a href="https://n8n.io/workflows/18734-generate-pdf-invoices-from-webhook-requests-with-pdfmint/" rel="noopener">gallery #18734</a>, with one fix applied). We are the authors of the PDFMint node and of this template.</p>
+      <p><strong>The fix.</strong> A community reviewer pointed out that in the gallery version a failed PDF render is answered with HTTP <strong>422</strong> — the status code that n8n's HTTP node treats as a permanent request problem, so a retry of the same payload is refused as "Unprocessable Entity" instead of being retried like a server failure. In this version the render failure returns <strong>500</strong> with the same JSON error body, so retries behave correctly; a genuinely invalid payload still returns <strong>422</strong>. Both paths were verified in a real n8n 2.36.9 instance on 1 September 2026: valid payload → invoice PDF; empty payload → 422 with <code>status_code: 422</code>; simulated render failure → 500 with <code>status_code: 500</code>.</p>
+      <p><strong>Why it is here and not in the gallery.</strong> n8n reviews one template submission at a time; the gallery copy is still the pre-fix version and our corrected submission is queued behind another template already in review. Until that clears, this file is the corrected one. If you have already imported #18734, re-import this file or apply the same two changes: add a <code>status_code</code> field (<code>error ? 500 : 422</code>) to <em>Explain what went wrong</em> and set <em>Return the error as JSON</em> to respond with <code>responseCode = {{$json.status_code}}</code>.</p>
+      <p>The file contains no credentials, keys or account ids — only a named credential reference you connect on import.</p>
+    </section>
+
     <section id="xero">
       <h2>Xero overdue-invoice statement <a class="anchor" href="#xero">#</a></h2>
       <p><a href="/templates/xero-overdue-statements.json" download>Download the workflow JSON</a> and paste it straight onto an n8n canvas (Ctrl+V). This one is not in the gallery yet &mdash; it is queued behind n8n's one-template-in-review limit &mdash; so it lives here first.</p>
@@ -76,6 +85,7 @@
       <ul>
         <li>Every gallery link above points at a workflow n8n published; the view counters there are n8n's, not ours.</li>
         <li>The Xero statement was run once with the fixes described above; it is offered as a starting point, not as a certified integration.</li>
+        <li>The fixed invoice workflow's two error paths (422 and 500) were measured in real n8n before this file was published; the PDF-render path is the same one n8n's gallery review accepted.</li>
         <li>We build PDFMint and the PDFMint n8n node; anything we publish says so.</li>
       </ul>
       <p>Need the API instead? The <a href="/docs">API reference</a> and <a href="/n8n-html-to-pdf">the three ways to turn HTML into a PDF in n8n</a> cover the rest. The free plan is 10 documents a month, no card.</p>
