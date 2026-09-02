@@ -2200,26 +2200,23 @@ yourself without an account: the entry is in the response of
 <code>n8n-nodes-pdfmint</code>. Verified nodes can also be found straight from the node panel when
 you search for &ldquo;PDFMint&rdquo;.</p>
 
-<p class="notice"><strong>Check the version you got, and set the base URL.</strong> n8n’s
-registry entry currently names version <strong>0.1.0</strong>, while npm’s latest is
-<strong>0.4.3</strong> — both checkable without an account, in
-<code>https://api.n8n.io/api/community-nodes</code> and
-<code>https://registry.npmjs.org/n8n-nodes-pdfmint</code>. n8n has approved a newer version and
-says it ships in one of their next releases; until it does, an install from the registry can hand
-you 0.1.0. Two things follow, and neither costs you anything to fix:</p>
+<p class="notice"><strong>n8n Cloud currently serves 0.4.4; npm has 0.4.5.</strong> Both are
+checkable without an account: n8n's community-node registry names <strong>0.4.4</strong>, while
+npm's <code>latest</code> tag names <strong>0.4.5</strong>. The node code is identical between
+those releases; 0.4.5 updates the package documentation with the five published workflow
+templates. Both versions use <code>https://pdf.mintapis.com</code> by default and include the
+error-output fix described below. The historical 0.1.0 caveat no longer applies to a fresh Cloud
+install.</p>
 <ul>
-<li><strong>Its credential defaults to <code>https://pdfmint-b9tt.onrender.com</code></strong>,
-not to the host every example on this page uses. That address still answers and runs against the
-same accounts and the same credit balance — an API key issued here works there, verified on
-2026-08-30 — so nothing breaks. But set the credential’s base URL to
-<code>https://pdf.mintapis.com</code> anyway, so what you see in n8n matches what you read here.</li>
-<li><strong>0.1.0 predates a real bug fix.</strong> On error it pushed the failed item onto the
+<li><strong>If an older existing installation still shows 0.1.0, update it.</strong> That version's
+credential defaulted to <code>https://pdfmint-b9tt.onrender.com</code> and predates a real bug fix.
+On error it pushed the failed item onto the
 normal output, so with <em>Continue (using error output)</em> the error branch stayed empty and the
-next node died with <em>&ldquo;No binary data exists on the first item!&rdquo;</em>. If you rely on
-the error output, install from npm instead of the registry.</li>
+next node died with <em>&ldquo;No binary data exists on the first item!&rdquo;</em>. A fresh Cloud
+install on 0.4.4 does not have either problem.</li>
 </ul>
-<p>Settings &rarr; Community Nodes shows the installed version, so you can tell in one look which
-of the two you have.</p>
+<p>Settings &rarr; Community Nodes shows the installed version. Use that value rather than
+assuming that an old workflow updated itself.</p>
 
 <p><strong>On self-hosted n8n:</strong> the same Settings &rarr; Community Nodes &rarr; Install
 path, or from the CLI:</p>
