@@ -39,6 +39,7 @@
         <li><a href="#gallery">In the n8n gallery</a></li>
         <li><a href="#invoice-fixed">Invoice webhook workflow — fixed error handling</a></li>
         <li><a href="#xero">Xero overdue-invoice statement</a></li>
+        <li><a href="#invoiceninja">Invoice Ninja AR ageing report</a></li>
       </ul>
       <h2>Then</h2>
       <ul>
@@ -81,6 +82,15 @@
       <p><strong>What it does.</strong> Every weekday morning it asks Xero for <code>ACCREC</code> invoices that are still <code>AUTHORISED</code>, keeps only the ones genuinely past their due date, and groups them per customer &mdash; so someone with four late invoices gets one statement with four lines instead of four separate chasers. It computes days overdue, marks anything past 30 days, stops without spending a render credit when the ledger is clean, renders the statement with PDFMint, and mails it to the address Xero holds for that contact.</p>
       <p><strong>Provenance.</strong> Built and run in a real n8n instance on 31 August 2026. That run caught two real defects &mdash; a Set node that replaced the item data so downstream nodes found nothing, and an <code>items</code> reference from an earlier draft that produced undefined entries &mdash; both fixed before this file was published. After the fixes, the saved grouping code against the recorded invoice data produces exactly one customer with two invoices totalling 3,105.90, and the render step produces the statement PDF (proof: <code>proof-xero-statement.pdf</code> in the public repository). It has not been exercised end-to-end against a live Xero account with real mail delivery; the Xero and Gmail nodes use their standard OAuth2 credentials and you connect your own on import.</p>
       <p><strong>You edit one node</strong> &mdash; <em>Your company details</em> &mdash; with your name, address, accent colour and footer. The file contains no credentials, keys or account ids.</p>
+    </section>
+
+    <section id="invoiceninja">
+      <h2>Invoice Ninja AR ageing report <a class="anchor" href="#invoiceninja">#</a></h2>
+      <p><a href="/templates/invoiceninja-ageing-reports.json" download>Download the workflow JSON</a> &mdash; submitted to the n8n gallery as template #19112 and pending their review; this file is ours and available now. We are the authors of the PDFMint node and of this template.</p>
+      <p><strong>What it does.</strong> Every Monday morning it pulls active invoices from Invoice Ninja, keeps only the ones with an outstanding balance, computes days past due per client, buckets them into not-yet-due / 1&ndash;30 / 31&ndash;60 / 61&ndash;90 / 90+ days, and stops without spending a render credit when nobody owes anything. Otherwise it renders a landscape accounts-receivable ageing report as a branded PDF with PDFMint and mails it via Gmail.</p>
+      <p><strong>Provenance.</strong> Built and run in a real n8n 2.37.7 instance on 3 September 2026, with <code>n8n-nodes-pdfmint</code> installed from the public npm registry. The run produced a one-page landscape PDF (proof: <code>proof-invoiceninja-ageing.pdf</code> in the public repository). It has not been exercised end-to-end against a live Invoice Ninja account or with real mail delivery; the Invoice Ninja and Gmail nodes use their standard credentials and you connect your own on import.</p>
+      <p><strong>Try it without Invoice Ninja.</strong> The Invoice Ninja node ships with pinned sample data &mdash; six invoices across three clients, one paid, one not yet due. Import and run: the paid invoice drops out, the 90+ day client is flagged, and the totals match the summary cards.</p>
+      <p>The file contains no credentials, keys or account ids &mdash; only named credential references you connect on import.</p>
     </section>
 
     <section id="honest">

@@ -1,0 +1,500 @@
+{
+  "name": "Send weekly accounts-receivable ageing reports with Invoice Ninja, PDFMint and Gmail",
+  "nodes": [
+    {
+      "id": "Sticky Note",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -520
+      ],
+      "parameters": {
+        "content": "## Weekly accounts-receivable ageing report from Invoice Ninja\n\nOne landscape PDF that shows who owes you what and how late it is, mailed to yourself every Monday. Add Invoice Ninja, PDFMint and Gmail credentials, then edit **Your company details**.\n\nPDFMint is a community node: install `n8n-nodes-pdfmint` from Settings \u2192 Community nodes first.",
+        "height": 180,
+        "width": 700,
+        "color": "6"
+      }
+    },
+    {
+      "id": "Sticky Note1",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -80
+      ],
+      "parameters": {
+        "content": "### 1 \u00b7 Schedule\nRuns every Monday at 08:00, before the week's chasing starts.",
+        "height": 360,
+        "width": 320
+      }
+    },
+    {
+      "id": "Sticky Note2",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -80
+      ],
+      "parameters": {
+        "content": "### 2 \u00b7 Branding\nSet your company name, address, accent colour, currency and the address the report goes to. This is the only node you edit.",
+        "height": 360,
+        "width": 320
+      }
+    },
+    {
+      "id": "Sticky Note3",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        -80
+      ],
+      "parameters": {
+        "content": "### 3 \u00b7 Invoice Ninja\nFetches every active invoice with the client record included, so the report can name clients rather than ids.",
+        "height": 360,
+        "width": 320
+      }
+    },
+    {
+      "id": "Sticky Note4",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        520,
+        -80
+      ],
+      "parameters": {
+        "content": "### 4 \u00b7 Ageing\nKeeps invoices with a balance still owed and buckets each one by days past its due date: not yet due, 1-30, 31-60, 61-90, 90+.",
+        "height": 360,
+        "width": 320
+      }
+    },
+    {
+      "id": "Sticky Note5",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        880,
+        -80
+      ],
+      "parameters": {
+        "content": "### 5 \u00b7 Guard\nStops cleanly when nothing is outstanding, so no empty report is mailed and no PDF credit is spent.",
+        "height": 360,
+        "width": 320
+      }
+    },
+    {
+      "id": "Sticky Note6",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1240,
+        -80
+      ],
+      "parameters": {
+        "content": "### 6 \u00b7 PDF\nRenders the branded ageing table with PDFMint and names the file after the report date.",
+        "height": 360,
+        "width": 320
+      }
+    },
+    {
+      "id": "Sticky Note7",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        -80
+      ],
+      "parameters": {
+        "content": "### 7 \u00b7 Delivery\nEmails the PDF to the address you set in step 2. Swap this node for Slack or Drive if you prefer.",
+        "height": 360,
+        "width": 320
+      }
+    },
+    {
+      "id": "Every Monday morning",
+      "name": "Every Monday morning",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -480,
+        100
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "Your company details",
+      "name": "Your company details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -120,
+        100
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "companyName",
+              "value": "Halden Studio",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "companyAddress",
+              "value": "12 Meridian Way, Dublin 2, Ireland",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "accentColour",
+              "value": "#0b6b57",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "currency",
+              "value": "EUR",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "reportRecipient",
+              "value": "finance@your-company.example",
+              "type": "string"
+            },
+            {
+              "id": "a6",
+              "name": "footerNote",
+              "value": "Balances are as at the run date. Questions about a line? Reply to this email.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "Get open invoices from Invoice Ninja",
+      "name": "Get open invoices from Invoice Ninja",
+      "type": "n8n-nodes-base.invoiceNinja",
+      "typeVersion": 2,
+      "position": [
+        240,
+        100
+      ],
+      "credentials": {
+        "invoiceNinjaApi": {
+          "name": "Invoice Ninja account"
+        }
+      },
+      "parameters": {
+        "resource": "invoice",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {
+          "include": "client",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "id": "Build the ageing report",
+      "name": "Build the ageing report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// One accounts-receivable ageing report for the whole ledger: every client who\n// still owes money, split by how late each invoice is.\nconst brand = $('Your company details').first().json;\nconst today = new Date(new Date().toISOString().slice(0, 10));\nconst DAY = 24 * 60 * 60 * 1000;\n\nconst money = (n) => new Intl.NumberFormat('en-IE', {\n  style: 'currency',\n  currency: brand.currency || 'EUR',\n}).format(Number(n) || 0);\n\n// The order an accountant reads them in.\nconst BUCKETS = ['Not yet due', '1-30 days', '31-60 days', '61-90 days', '90+ days'];\nconst bucketFor = (dueDate) => {\n  const days = Math.floor((today - new Date(String(dueDate).slice(0, 10))) / DAY);\n  if (days <= 0) return BUCKETS[0];\n  if (days <= 30) return BUCKETS[1];\n  if (days <= 60) return BUCKETS[2];\n  if (days <= 90) return BUCKETS[3];\n  return BUCKETS[4];\n};\n\n// $input.all() is the documented Code node API. `items` is legacy and hands you\n// undefined entries when the node above returned nothing, which crashes the run\n// on the first property access.\nconst open = $input.all()\n  .map((i) => i.json)\n  .filter(Boolean)\n  // Invoice Ninja keeps paid invoices in the same list. What is still owed is\n  // `balance`, never `amount` - a part-paid invoice carries both.\n  .filter((inv) => Number(inv.balance) > 0 && inv.due_date);\n\nconst byClient = new Map();\nfor (const inv of open) {\n  // `include: client` fills inv.client. Without it there is still an id to group by.\n  const name = inv.client?.display_name || inv.client?.name || `Client ${inv.client_id}`;\n  if (!byClient.has(name)) {\n    byClient.set(name, {\n      name,\n      total: 0,\n      oldestDays: 0,\n      buckets: Object.fromEntries(BUCKETS.map((b) => [b, 0])),\n    });\n  }\n  const row = byClient.get(name);\n  const owed = Number(inv.balance);\n  const late = Math.max(0, Math.floor((today - new Date(String(inv.due_date).slice(0, 10))) / DAY));\n  row.total += owed;\n  row.oldestDays = Math.max(row.oldestDays, late);\n  row.buckets[bucketFor(inv.due_date)] += owed;\n}\n\nconst clients = [...byClient.values()].sort((a, b) => b.total - a.total);\nconst columnTotal = (b) => clients.reduce((sum, c) => sum + c.buckets[b], 0);\nconst grandTotal = clients.reduce((sum, c) => sum + c.total, 0);\nconst overdueTotal = grandTotal - columnTotal(BUCKETS[0]);\nconst asOf = today.toISOString().slice(0, 10);\nconst accent = brand.accentColour || '#0b6b57';\n\nconst esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));\nconst cell = (v) => (v ? money(v) : '<span class=\"zero\">-</span>');\n\nconst rows = clients.map((c) => `\n      <tr>\n        <td class=\"name\">${esc(c.name)}${c.oldestDays > 90 ? ' <span class=\"flag\">90+ days</span>' : ''}</td>\n        ${BUCKETS.map((b) => `<td class=\"num\">${cell(c.buckets[b])}</td>`).join('')}\n        <td class=\"num total\">${money(c.total)}</td>\n      </tr>`).join('');\n\nconst html = `<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>Accounts receivable ${asOf}</title>\n<style>\n  @page { size: A4 landscape; margin: 16mm 14mm; }\n  body { font: 12px/1.5 -apple-system, \"Segoe UI\", Helvetica, Arial, sans-serif; color: #1c1c1c; }\n  header { border-bottom: 3px solid ${accent}; padding-bottom: 10px; margin-bottom: 18px; }\n  h1 { font-size: 20px; margin: 0 0 2px; color: ${accent}; }\n  .sub { color: #555; }\n  .cards { display: flex; gap: 10px; margin-bottom: 18px; }\n  .card { flex: 1; border: 1px solid #e3e3e3; border-radius: 6px; padding: 10px 12px; }\n  .card .k { color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }\n  .card .v { font-size: 18px; font-weight: 600; margin-top: 2px; }\n  table { width: 100%; border-collapse: collapse; }\n  th, td { padding: 7px 8px; border-bottom: 1px solid #ececec; }\n  th { text-align: right; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #666; }\n  th:first-child, td.name { text-align: left; }\n  td.num { text-align: right; font-variant-numeric: tabular-nums; }\n  td.total, tfoot td { font-weight: 600; }\n  tfoot td { border-top: 2px solid ${accent}; border-bottom: none; }\n  .zero { color: #bbb; }\n  .flag { background: #fdecea; color: #a4291c; border-radius: 3px; padding: 1px 5px; font-size: 10px; }\n  footer { margin-top: 20px; color: #666; font-size: 11px; }\n</style></head>\n<body>\n  <header>\n    <h1>Accounts receivable &mdash; ${esc(brand.companyName || 'Your company')}</h1>\n    <div class=\"sub\">Ageing as at ${asOf} &middot; ${esc(brand.companyAddress || '')}</div>\n  </header>\n  <div class=\"cards\">\n    <div class=\"card\"><div class=\"k\">Outstanding</div><div class=\"v\">${money(grandTotal)}</div></div>\n    <div class=\"card\"><div class=\"k\">Overdue</div><div class=\"v\">${money(overdueTotal)}</div></div>\n    <div class=\"card\"><div class=\"k\">Over 90 days</div><div class=\"v\">${money(columnTotal(BUCKETS[4]))}</div></div>\n    <div class=\"card\"><div class=\"k\">Clients</div><div class=\"v\">${clients.length}</div></div>\n  </div>\n  <table>\n    <thead><tr><th>Client</th>${BUCKETS.map((b) => `<th>${b}</th>`).join('')}<th>Total</th></tr></thead>\n    <tbody>${rows}\n    </tbody>\n    <tfoot><tr><td>Total</td>${BUCKETS.map((b) => `<td class=\"num\">${money(columnTotal(b))}</td>`).join('')}<td class=\"num\">${money(grandTotal)}</td></tr></tfoot>\n  </table>\n  <footer>${esc(brand.footerNote || '')}</footer>\n</body></html>`;\n\nreturn [{\n  json: {\n    html,\n    asOf,\n    clientCount: clients.length,\n    invoiceCount: open.length,\n    grandTotal,\n    grandTotalFormatted: money(grandTotal),\n    overdueTotalFormatted: money(overdueTotal),\n  },\n}];\n"
+      }
+    },
+    {
+      "id": "Anything outstanding?",
+      "name": "Anything outstanding?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.clientCount }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "Render the ageing report as PDF",
+      "name": "Render the ageing report as PDF",
+      "type": "n8n-nodes-pdfmint.pdfMint",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        100
+      ],
+      "credentials": {
+        "pdfMintApi": {
+          "name": "PDFMint account"
+        }
+      },
+      "parameters": {
+        "resource": "document",
+        "operation": "pdf",
+        "source": "html",
+        "html": "={{ $json.html }}",
+        "fileName": "=accounts-receivable-{{ $json.asOf }}.pdf",
+        "options": {}
+      }
+    },
+    {
+      "id": "Email the report",
+      "name": "Email the report",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1680,
+        100
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account"
+        }
+      },
+      "parameters": {
+        "sendTo": "={{ $('Your company details').first().json.reportRecipient }}",
+        "subject": "=Accounts receivable as at {{ $('Build the ageing report').first().json.asOf }} \u2014 {{ $('Build the ageing report').first().json.grandTotalFormatted }} outstanding",
+        "message": "=Attached is this week's accounts-receivable ageing report.\n\nOutstanding: {{ $('Build the ageing report').first().json.grandTotalFormatted }}\nOf which overdue: {{ $('Build the ageing report').first().json.overdueTotalFormatted }}\nClients with a balance: {{ $('Build the ageing report').first().json.clientCount }}",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "data"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Monday morning": {
+      "main": [
+        [
+          {
+            "node": "Your company details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Your company details": {
+      "main": [
+        [
+          {
+            "node": "Get open invoices from Invoice Ninja",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get open invoices from Invoice Ninja": {
+      "main": [
+        [
+          {
+            "node": "Build the ageing report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build the ageing report": {
+      "main": [
+        [
+          {
+            "node": "Anything outstanding?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anything outstanding?": {
+      "main": [
+        [
+          {
+            "node": "Render the ageing report as PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Render the ageing report as PDF": {
+      "main": [
+        [
+          {
+            "node": "Email the report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {
+    "Get open invoices from Invoice Ninja": [
+      {
+        "json": {
+          "id": "Wpmbk5ezJn",
+          "number": "INV-1041",
+          "date": "2026-04-11",
+          "due_date": "2026-05-11",
+          "amount": 1840,
+          "balance": 1840,
+          "status_id": "3",
+          "client_id": "Opnel5aKBz",
+          "client": {
+            "id": "Opnel5aKBz",
+            "display_name": "Brackwell & Co",
+            "email": "ap@brackwell.example"
+          }
+        }
+      },
+      {
+        "json": {
+          "id": "Wpmbk5ezJo",
+          "number": "INV-1052",
+          "date": "2026-06-02",
+          "due_date": "2026-07-02",
+          "amount": 960,
+          "balance": 620.5,
+          "status_id": "3",
+          "client_id": "Opnel5aKBz",
+          "client": {
+            "id": "Opnel5aKBz",
+            "display_name": "Brackwell & Co",
+            "email": "ap@brackwell.example"
+          }
+        }
+      },
+      {
+        "json": {
+          "id": "Wpmbk5ezJp",
+          "number": "INV-1063",
+          "date": "2026-07-02",
+          "due_date": "2026-08-01",
+          "amount": 2450,
+          "balance": 2450,
+          "status_id": "3",
+          "client_id": "Volejrkl9m",
+          "client": {
+            "id": "Volejrkl9m",
+            "display_name": "Meridian Foods",
+            "email": "finance@meridianfoods.example"
+          }
+        }
+      },
+      {
+        "json": {
+          "id": "Wpmbk5ezJq",
+          "number": "INV-1071",
+          "date": "2026-07-21",
+          "due_date": "2026-08-20",
+          "amount": 315.75,
+          "balance": 315.75,
+          "status_id": "3",
+          "client_id": "Volejrkl9m",
+          "client": {
+            "id": "Volejrkl9m",
+            "display_name": "Meridian Foods",
+            "email": "finance@meridianfoods.example"
+          }
+        }
+      },
+      {
+        "json": {
+          "id": "Wpmbk5ezJr",
+          "number": "INV-1080",
+          "date": "2026-08-21",
+          "due_date": "2026-09-20",
+          "amount": 1120,
+          "balance": 1120,
+          "status_id": "3",
+          "client_id": "Kmnbk9wqRt",
+          "client": {
+            "id": "Kmnbk9wqRt",
+            "display_name": "Talbot Interiors",
+            "email": "accounts@talbot-interiors.example"
+          }
+        }
+      },
+      {
+        "json": {
+          "id": "Wpmbk5ezJs",
+          "number": "INV-1044",
+          "date": "2026-05-10",
+          "due_date": "2026-06-10",
+          "amount": 740,
+          "balance": 0,
+          "status_id": "4",
+          "client_id": "Kmnbk9wqRt",
+          "client": {
+            "id": "Kmnbk9wqRt",
+            "display_name": "Talbot Interiors",
+            "email": "accounts@talbot-interiors.example"
+          }
+        }
+      }
+    ]
+  }
+}
