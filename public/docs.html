@@ -2200,20 +2200,18 @@ yourself without an account: the entry is in the response of
 <code>n8n-nodes-pdfmint</code>. Verified nodes can also be found straight from the node panel when
 you search for &ldquo;PDFMint&rdquo;.</p>
 
-<p class="notice"><strong>n8n Cloud currently serves 0.4.4; npm has 0.4.5.</strong> Both are
-checkable without an account: n8n's community-node registry names <strong>0.4.4</strong>, while
-npm's <code>latest</code> tag names <strong>0.4.5</strong>. The node code is identical between
-those releases; 0.4.5 updates the package documentation with the five published workflow
-templates. Both versions use <code>https://pdf.mintapis.com</code> by default and include the
-error-output fix described below. The historical 0.1.0 caveat no longer applies to a fresh Cloud
-install.</p>
+<p class="notice"><strong>n8n Cloud and npm both serve 0.4.5.</strong> Both are checkable without
+an account: n8n's community-node registry and npm's <code>latest</code> tag name
+<strong>0.4.5</strong>. This release uses <code>https://pdf.mintapis.com</code> by default,
+includes the error-output fix described below, and lists the published workflow templates in its
+package documentation. The historical 0.1.0 caveat no longer applies to a fresh Cloud install.</p>
 <ul>
 <li><strong>If an older existing installation still shows 0.1.0, update it.</strong> That version's
 credential defaulted to <code>https://pdfmint-b9tt.onrender.com</code> and predates a real bug fix.
 On error it pushed the failed item onto the
 normal output, so with <em>Continue (using error output)</em> the error branch stayed empty and the
 next node died with <em>&ldquo;No binary data exists on the first item!&rdquo;</em>. A fresh Cloud
-install on 0.4.4 does not have either problem.</li>
+install on 0.4.5 does not have either problem.</li>
 </ul>
 <p>Settings &rarr; Community Nodes shows the installed version. Use that value rather than
 assuming that an old workflow updated itself.</p>
