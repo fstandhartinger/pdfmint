@@ -120,12 +120,11 @@ dependencies</strong>, built and tested against n8n 2.35 on Node.js 20 and 22, a
 without an account &mdash; the entry is in the response of
 <code>https://api.n8n.io/api/community-nodes</code>. We also publish the package: PDFMint and this node are built and run by the same people, so the node and the API it calls stay in step.</p>
 
-<p class="notice"><strong>One thing to check after installing.</strong> n8n Cloud currently serves
-<strong>0.4.4</strong>; npm's <code>latest</code> tag is <strong>0.4.5</strong>. The node code is
-identical between them — 0.4.5 only updates the package documentation with the five published
-workflow templates. Both default to <code>https://pdf.mintapis.com</code> and include the
-error-output fix. If an older workflow still shows 0.1.0, update it rather than assuming it
-updated itself. The registry and npm evidence is linked on the
+<p class="notice"><strong>One thing to check after installing.</strong> n8n Cloud and npm both
+serve <strong>0.4.5</strong>. It defaults to <code>https://pdf.mintapis.com</code>, includes the
+error-output fix, and lists the published workflow templates in its package documentation. If an
+older workflow still shows 0.1.0, update it rather than assuming it updated itself. The registry
+and npm evidence is linked on the
 <a href="https://pdf.mintapis.com/docs#n8n-install">docs page</a>.</p>
 
 <div class="tw">
@@ -259,9 +258,8 @@ page: <a href="/html-to-pdf-api">the comparison page</a>.</p>
 <h2>What we cannot claim <a class="anchor" href="#honest">#</a></h2>
 <p>PDFMint has paying customers, but no customer logo, testimonial or case study that we have
 permission to publish. The 1,002 weekly figure is npm downloads &mdash; machines running
-<code>npm install</code>, including CI and scanners &mdash; not users. n8n Cloud currently serves
-<code>0.4.4</code>; npm's <code>latest</code> tag is <code>0.4.5</code>, whose node code is
-identical and whose package documentation lists the five published workflow templates. PDFMint
+<code>npm install</code>, including CI and scanners &mdash; not users. n8n Cloud and npm both serve
+<code>0.4.5</code>; its package documentation lists the published workflow templates. PDFMint
 runs as a single service in one region with no SLA; its
 <a href="/status">status page</a> is generated from its own request log and its uptime figure resets
 on every deploy, which it says on the page.</p>
