@@ -3,7 +3,7 @@
 const express = require('express');
 const Stripe = require('stripe');
 const { config, PLANS, planPriceId } = require('./config');
-const { query } = require('./db');
+const { query, tx } = require('./db');
 const { ApiError } = require('./errors');
 
 const stripe = config.stripe.secretKey ? new Stripe(config.stripe.secretKey, { apiVersion: '2025-01-27.acacia' }) : null;
@@ -33,21 +33,21 @@ async function isUsableCustomer(customerId) {
   }
 }
 
-async function createCustomerFor(account) {
+async function createCustomerFor(account, run = query) {
   const customer = await stripe.customers.create({
     email: account.email,
     metadata: { account_id: String(account.id) },
   });
-  await query(`UPDATE accounts SET stripe_customer_id = $2 WHERE id = $1`, [account.id, customer.id]);
+  await run(`UPDATE accounts SET stripe_customer_id = $2 WHERE id = $1`, [account.id, customer.id]);
   return customer.id;
 }
 
-async function ensureCustomer(account) {
+async function ensureCustomer(account, run = query) {
   if (await isUsableCustomer(account.stripe_customer_id)) return account.stripe_customer_id;
   if (account.stripe_customer_id) {
     console.warn(`[stripe] account ${account.id} pointed at unusable customer ${account.stripe_customer_id}; creating a new one`);
   }
-  return createCustomerFor(account);
+  return createCustomerFor(account, run);
 }
 
 async function createCheckoutSession(account, planId) {
@@ -58,7 +58,51 @@ async function createCheckoutSession(account, planId) {
       hint: `Available plans: ${Object.keys(PLANS).filter((p) => planPriceId(p)).join(', ')}.`,
     });
   }
-  const customerId = await ensureCustomer(account);
+  // Serialize clicks across all instances, and re-read the authoritative row.
+  return tx(async client => {
+    const run = client.query.bind(client);
+    const { rows } = await run('SELECT * FROM accounts WHERE id = $1 FOR UPDATE', [account.id]);
+    account = rows[0];
+    if (!account) throw new ApiError(404, 'account_not_found', 'Account not found.');
+    const customerId = await ensureCustomer(account, run);
+    const listed = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 100 });
+    if (listed.has_more) throw new ApiError(409, 'billing_review_required', 'Please manage subscriptions through the billing portal.');
+    const current = listed.data.filter(sub =>
+      !['canceled', 'incomplete_expired'].includes(sub.status)
+      && sub.items.data.some(item => planForPriceId(item.price.id)));
+    if (current.length > 1) throw new ApiError(409, 'multiple_subscriptions', 'Multiple subscriptions exist. Contact support before changing your plan.');
+    if (current.length) {
+      const sub = current[0];
+      const item = sub.items.data.find(item => planForPriceId(item.price.id));
+      if (!['active', 'trialing'].includes(sub.status) || sub.pending_update) {
+        return stripe.billingPortal.sessions.create({ customer: customerId, return_url: `${config.publicUrl}/dashboard` });
+      }
+      if (item.price.id === priceId) {
+        await applySubscription(sub, run);
+        return { url: `${config.publicUrl}/dashboard?checkout=updated` };
+      }
+      const updated = await stripe.subscriptions.update(sub.id, {
+        items: [{ id: item.id, price: priceId, quantity: item.quantity || 1 }],
+        proration_behavior: 'always_invoice',
+        payment_behavior: 'pending_if_incomplete',
+        expand: ['latest_invoice'],
+      }, { idempotencyKey: `pdfmint-upgrade-${sub.id}-${item.price.id}-${priceId}-${Math.floor(Date.now() / 1800000)}` });
+      // Pending updates keep the old price until the prorated invoice is paid.
+      await applySubscription(updated, run);
+      if (updated.pending_update) {
+        const invoiceUrl = updated.latest_invoice?.hosted_invoice_url;
+        return { url: invoiceUrl || `${config.publicUrl}/dashboard?checkout=pending` };
+      }
+      return { url: `${config.publicUrl}/dashboard?checkout=updated` };
+    }
+    // Reuse the open session so double clicks cannot create two subscriptions.
+    const open = await stripe.checkout.sessions.list({ customer: customerId, status: 'open', limit: 100 });
+    if (open.has_more) throw new ApiError(409, 'billing_review_required', 'Please contact support before starting another checkout.');
+    for (const session of open.data) {
+      if (session.mode !== 'subscription' || session.metadata?.account_id !== String(account.id)) continue;
+      if (session.metadata.plan === planId) return session;
+      await stripe.checkout.sessions.expire(session.id);
+    }
   return stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
@@ -77,6 +121,7 @@ async function createCheckoutSession(account, planId) {
     client_reference_id: String(account.id),
     subscription_data: { metadata: { account_id: String(account.id), plan: planId } },
     metadata: { account_id: String(account.id), plan: planId },
+  }, { idempotencyKey: `pdfmint-checkout-${account.id}-${planId}-${Math.floor(Date.now() / 1800000)}` });
   });
 }
 
@@ -109,7 +154,7 @@ function planForPriceId(priceId) {
   return null;
 }
 
-async function applySubscription(subscription) {
+async function applySubscription(subscription, run = query) {
   const accountId = subscription.metadata?.account_id;
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id;
   const priceId = subscription.items?.data?.[0]?.price?.id;
@@ -128,11 +173,11 @@ async function applySubscription(subscription) {
 
   let target = null;
   if (accountId) {
-    const { rows } = await query(`SELECT * FROM accounts WHERE id = $1`, [accountId]);
+    const { rows } = await run(`SELECT * FROM accounts WHERE id = $1`, [accountId]);
     target = rows[0] || null;
   }
   if (!target && customerId) {
-    const { rows } = await query(`SELECT * FROM accounts WHERE stripe_customer_id = $1`, [customerId]);
+    const { rows } = await run(`SELECT * FROM accounts WHERE stripe_customer_id = $1`, [customerId]);
     target = rows[0] || null;
   }
   if (!target) {
@@ -150,7 +195,7 @@ async function applySubscription(subscription) {
   }
 
   const newPlan = active ? plan : PLANS.free;
-  await query(
+  await run(
     `UPDATE accounts SET plan = $2, credits_limit = $3, stripe_subscription_id = $4, stripe_customer_id = COALESCE(stripe_customer_id, $5)
      WHERE id = $1`,
     [target.id, newPlan.id, newPlan.credits, active ? subscription.id : null, customerId || null],
@@ -159,7 +204,9 @@ async function applySubscription(subscription) {
 }
 
 async function handleEvent(event) {
-  const { rowCount } = await query(`INSERT INTO stripe_events (id) VALUES ($1) ON CONFLICT DO NOTHING`, [event.id]);
+  return tx(async client => {
+  const run = client.query.bind(client);
+  const { rowCount } = await run(`INSERT INTO stripe_events (id) VALUES ($1) ON CONFLICT DO NOTHING`, [event.id]);
   if (!rowCount) return { duplicate: true };
 
   switch (event.type) {
@@ -170,14 +217,14 @@ async function handleEvent(event) {
         if (!sub.metadata?.account_id && session.client_reference_id) {
           sub.metadata = { ...(sub.metadata || {}), account_id: session.client_reference_id };
         }
-        await applySubscription(sub);
+        await applySubscription(sub, run);
       }
       break;
     }
     case 'customer.subscription.created':
     case 'customer.subscription.updated':
     case 'customer.subscription.deleted':
-      await applySubscription(event.data.object);
+      await applySubscription(event.data.object, run);
       break;
     case 'invoice.paid': {
       // A renewal starts a new period — but only if the current one has actually
@@ -188,7 +235,7 @@ async function handleEvent(event) {
       const invoice = event.data.object;
       const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
       if (customerId) {
-        await query(
+        await run(
           `UPDATE accounts
               SET credits_used = 0,
                   period_start = date_trunc('month', now() AT TIME ZONE 'UTC')
@@ -203,6 +250,7 @@ async function handleEvent(event) {
       break;
   }
   return { handled: event.type };
+  });
 }
 
 // Stripe needs the raw body to verify the signature, so this route is mounted
