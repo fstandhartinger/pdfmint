@@ -4,6 +4,7 @@ const express = require('express');
 const crypto = require('node:crypto');
 const path = require('node:path');
 
+const recovery = require('./recovery');
 const { config } = require('./config');
 const { ApiError } = require('./errors');
 const { query } = require('./db');
@@ -87,6 +88,9 @@ app.get('/f/:token', async (req, res, next) => {
 });
 
 app.use('/', status.router);
+const recoveryRouter = express.Router();
+recovery.install(recoveryRouter, { product: 'PDFMint', shell: web.shell });
+app.use('/', recoveryRouter);
 app.use('/v1', api.router);
 app.use('/', web.router);
 app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h', extensions: ['html'] }));
@@ -191,6 +195,8 @@ process.on('unhandledRejection', (reason) => {
 
 async function main() {
   await migrate();
+  // Recovery migrations (password reset columns) run after the main schema.
+  for (const sql of recovery.migration) { await query(sql).catch(() => {}); }
   startReaper();
   jobs.startJobReaper();
   // A customer id stored here can stop existing in Stripe. Clear the dead ones at
