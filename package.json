@@ -4,7 +4,9 @@
   "private": true,
   "description": "PDFMint - HTML/Markdown/URL to PDF API",
   "main": "src/server.js",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
@@ -15,6 +17,7 @@
     "bcryptjs": "^3.0.2",
     "express": "^4.21.2",
     "marked": "^15.0.7",
+    "nodemailer": "^10.0.0",
     "pdf-lib": "^1.17.1",
     "pg": "^8.13.1",
     "playwright": "^1.50.1",

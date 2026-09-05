@@ -139,6 +139,7 @@ const STATEMENTS = [
   `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client TEXT`,
 
   `CREATE INDEX IF NOT EXISTS usage_events_client_time_idx ON usage_events(client, created_at DESC)`,
+  ...require('./recovery').migration,
 ];
 
 async function migrate() {
