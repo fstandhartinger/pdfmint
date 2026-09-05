@@ -105,6 +105,18 @@ function pickSource(body) {
   return given[0];
 }
 
+function requireSourceString(body, source) {
+  if (typeof body[source] !== 'string') {
+    throw bad('invalid_option', `"${source}" must be a string — got ${Array.isArray(body[source]) ? 'an array' : typeof body[source]}.`, {
+      hint: source === 'html'
+        ? 'Send HTML markup as a JSON string, for example {"html":"<h1>Hello</h1>"}.'
+        : `Send "${source}" as a JSON string.`,
+      docs: '/docs#input',
+    });
+  }
+  return body[source];
+}
+
 /**
  * An API that refuses two content fields but silently ignores a typo'd option is
  * inconsistent, and the typo is the case that actually costs someone an hour.
@@ -772,7 +784,7 @@ async function preparePdf(account, rawBody, ctx = {}) {
   };
 
   if (source === 'html') {
-    html = String(body.html);
+    html = requireSourceString(body, source);
     if (data) {
       html = collect(fillTemplate(html, data)).html;
       dataApplied = true;
@@ -782,7 +794,7 @@ async function preparePdf(account, rawBody, ctx = {}) {
       scan = 'scanned';
     }
   } else if (source === 'markdown') {
-    let md = String(body.markdown);
+    let md = requireSourceString(body, source);
     if (data) {
       md = collect(fillTemplate(md, data)).html;
       dataApplied = true;
@@ -797,9 +809,10 @@ async function preparePdf(account, rawBody, ctx = {}) {
       googleFonts: body.googleFonts,
     });
   } else if (source === 'url') {
-    url = (await assertPublicUrl(String(body.url), 'url')).toString();
+    url = (await assertPublicUrl(requireSourceString(body, source), 'url')).toString();
   } else if (source === 'template') {
-    const { rows } = await query(`SELECT * FROM templates WHERE account_id = $1 AND name = $2`, [account.id, String(body.template)]);
+    const templateName = requireSourceString(body, source);
+    const { rows } = await query(`SELECT * FROM templates WHERE account_id = $1 AND name = $2`, [account.id, templateName]);
     if (!rows.length) {
       const { rows: all } = await query(`SELECT name FROM templates WHERE account_id = $1 ORDER BY name LIMIT 10`, [account.id]);
       throw bad('template_not_found', `You have no template called "${body.template}".`, {
@@ -1140,9 +1153,9 @@ router.post('/image', withAuth, asyncRoute(async (req, res) => {
   // contracts on adjacent endpoints.
   const data = body.data ? parseData(body.data) : null;
   let html = null; let url = null; let sourceText = null;
-  if (source === 'html') sourceText = String(body.html);
-  else if (source === 'markdown') sourceText = String(body.markdown);
-  else url = (await assertPublicUrl(String(body.url), 'url')).toString();
+  if (source === 'html') sourceText = requireSourceString(body, source);
+  else if (source === 'markdown') sourceText = requireSourceString(body, source);
+  else url = (await assertPublicUrl(requireSourceString(body, source), 'url')).toString();
 
   let dataApplied = false;
   let scan = 'none';
