@@ -301,6 +301,21 @@ describe('refusals', () => {
     assert.equal(json.error.code, 'ambiguous_content');
   });
 
+  test('content sources must be strings instead of being coerced into documents', async () => {
+    for (const path of ['/v1/pdf', '/v1/image']) {
+      for (const body of [{ html: {} }, { markdown: ['# not markup'] }, { url: { href: 'https://example.com' } }]) {
+        const { res, json } = await req(path, { method: 'POST', key, body });
+        assert.equal(res.status, 400, `${path} ${JSON.stringify(body)}`);
+        assert.equal(json.error.code, 'invalid_option');
+        assert.match(json.error.message, /must be a string/);
+      }
+    }
+
+    const template = await req('/v1/pdf', { method: 'POST', key, body: { template: { name: 'invoice' } } });
+    assert.equal(template.res.status, 400);
+    assert.equal(template.json.error.code, 'invalid_option');
+  });
+
   test('every error carries a code, a message and a request id', async () => {
     const cases = [
       [{}, 'missing_content'],
