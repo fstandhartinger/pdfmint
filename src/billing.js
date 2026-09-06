@@ -6,7 +6,16 @@ const { config, PLANS, planPriceId } = require('./config');
 const { query, tx } = require('./db');
 const { ApiError } = require('./errors');
 
-const stripe = config.stripe.secretKey ? new Stripe(config.stripe.secretKey, { apiVersion: '2025-01-27.acacia' }) : null;
+const stripe = config.stripe.secretKey ? new Stripe(config.stripe.secretKey, {
+  apiVersion: '2025-01-27.acacia',
+  // Bounded on purpose. The checkout path makes several sequential Stripe
+  // calls while it holds a database connection and a row lock, and the pool
+  // is small. With the library's defaults (80 s, two retries) one Stripe
+  // slowdown would hold every connection long enough to take the whole
+  // service down, not just billing.
+  timeout: 10000,
+  maxNetworkRetries: 1,
+}) : null;
 
 // The name a buyer sees at the top of the Stripe Checkout page.
 const BRAND_NAME = 'PDFMint';
@@ -61,17 +70,33 @@ async function createCheckoutSession(account, planId) {
       hint: `Available plans: ${Object.keys(PLANS).filter((p) => planPriceId(p)).join(', ')}.`,
     });
   }
+  // The Stripe customer is created and committed in its OWN short transaction.
+  // Inside the long one below, any later failure rolled the stored id back while
+  // the Stripe object survived — so every failed checkout during a Stripe incident
+  // minted another orphaned customer carrying the buyer's email address, and
+  // nothing ever reclaimed them. The row lock is held across it, so two
+  // simultaneous clicks still cannot produce two customers.
+  const customerId = await tx(async (client) => {
+    const run = client.query.bind(client);
+    const { rows } = await run('SELECT * FROM accounts WHERE id = $1 FOR UPDATE', [account.id]);
+    if (!rows[0]) throw new ApiError(404, 'account_not_found', 'Account not found.');
+    return ensureCustomer(rows[0], run);
+  });
   // Serialize clicks across all instances, and re-read the authoritative row.
   return tx(async client => {
     const run = client.query.bind(client);
     const { rows } = await run('SELECT * FROM accounts WHERE id = $1 FOR UPDATE', [account.id]);
     account = rows[0];
     if (!account) throw new ApiError(404, 'account_not_found', 'Account not found.');
-    const customerId = await ensureCustomer(account, run);
     const listed = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 100 });
     if (listed.has_more) throw new ApiError(409, 'billing_review_required', 'Please manage subscriptions through the billing portal.');
     const current = listed.data.filter(sub =>
-      !['canceled', 'incomplete_expired'].includes(sub.status)
+      // `incomplete` means the very first payment has not cleared. Stripe
+      // leaves it that way for about a day before expiring it, and it never
+      // granted anything — treating it as "current" sent a buyer whose 3-D
+      // Secure failed to a billing portal with nothing to manage, for 24
+      // hours, instead of letting them simply pay again.
+      !['canceled', 'incomplete', 'incomplete_expired'].includes(sub.status)
       && sub.items.data.some(item => planForPriceId(item.price.id)));
     if (current.length > 1) throw new ApiError(409, 'multiple_subscriptions', 'Multiple subscriptions exist. Contact support before changing your plan.');
     if (current.length) {
@@ -135,7 +160,7 @@ async function createCheckoutSession(account, planId) {
     customer_update: { name: 'auto', address: 'auto' },
     client_reference_id: String(account.id),
     subscription_data: { metadata: { account_id: String(account.id), plan: planId } },
-    metadata: { account_id: String(account.id), plan: planId },
+    metadata: { account_id: String(account.id), plan: planId, service: 'pdfmint' },
   }, { idempotencyKey: `pdfmint-checkout-${account.id}-${planId}-${Math.floor(Date.now() / 1800000)}` });
   });
 }
@@ -188,11 +213,11 @@ async function applySubscription(subscription, run = query) {
 
   let target = null;
   if (accountId) {
-    const { rows } = await run(`SELECT * FROM accounts WHERE id = $1`, [accountId]);
+    const { rows } = await run(`SELECT * FROM accounts WHERE id = $1 FOR UPDATE`, [accountId]);
     target = rows[0] || null;
   }
   if (!target && customerId) {
-    const { rows } = await run(`SELECT * FROM accounts WHERE stripe_customer_id = $1`, [customerId]);
+    const { rows } = await run(`SELECT * FROM accounts WHERE stripe_customer_id = $1 FOR UPDATE`, [customerId]);
     target = rows[0] || null;
   }
   if (!target) {
@@ -296,7 +321,7 @@ router.post('/webhook', asyncRoute(async (req, res) => {
     event = stripe.webhooks.constructEvent(req.body, req.get('stripe-signature'), config.stripe.webhookSecret);
   } catch (e) {
     console.warn('[stripe] signature verification failed:', e.message);
-    return res.status(400).json({ error: { code: 'invalid_signature', message: e.message } });
+    return res.status(400).json({ error: { code: 'invalid_signature' } });
   }
   const out = await handleEvent(event);
   res.json({ received: true, ...out });
@@ -334,7 +359,7 @@ async function verifyCheckoutReturn(account, sessionId) {
 
   let session;
   try {
-    session = await stripe.checkout.sessions.retrieve(sessionId);
+    session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['line_items'] });
   } catch (e) {
     console.warn(`[stripe] could not verify checkout return ${sessionId}: ${e.message}`);
     return state('unverified', { reason: 'lookup_failed' });
@@ -345,6 +370,15 @@ async function verifyCheckoutReturn(account, sessionId) {
   if (String(claimed || '') !== String(account.id)) return state('foreign', { reason: 'account_mismatch' });
   if (account.stripe_customer_id && sessionCustomer && sessionCustomer !== account.stripe_customer_id) {
     return state('foreign', { reason: 'customer_mismatch' });
+  }
+  // All three products live on ONE Stripe account and all three number their
+  // accounts from 1, so a matching account id is not proof either: a sibling
+  // product's genuinely paid session would otherwise be accepted here and tell
+  // someone who has paid US nothing that their payment is being activated. The
+  // line item has to be a price we sell.
+  const lineItems = session.line_items?.data || [];
+  if (!lineItems.length || !lineItems.some((item) => planForPriceId(item.price?.id))) {
+    return state('foreign', { reason: 'not_our_price' });
   }
   if (session.status === 'expired') return state('expired');
   if (!['paid', 'no_payment_required'].includes(session.payment_status)) {

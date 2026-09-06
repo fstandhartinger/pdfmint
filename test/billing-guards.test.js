@@ -38,7 +38,7 @@ function load(opts = {}) {
   }]));
   const priceOf = (id) => (id === 'free' ? null : `price_test_${id}`);
 
-  const calls = { checkoutCreate: [], subUpdate: [], portal: [], expire: [] };
+  const calls = { checkoutCreate: [], subUpdate: [], portal: [], expire: [], sessionRetrieve: null };
   const dbUpdates = [];
   const seenEvents = new Set();
   let failDb = false;
@@ -59,7 +59,10 @@ function load(opts = {}) {
       create: async (args) => ({ id: `cus_new_${++seq}`, ...args }),
     },
     subscriptions: {
-      list: async () => ({ data: subscriptions, has_more: false }),
+      list: async () => {
+        if (opts.failAfterCustomer) throw new Error('injected Stripe outage after customer creation');
+        return { data: subscriptions, has_more: false };
+      },
       retrieve: async (id) => subscriptions.find((s) => s.id === id) || {
         id, customer: account.stripe_customer_id || 'cus_guards', status: 'active',
         metadata: {}, items: { data: [{ id: 'si_x', price: { id: priceOf('pro') } }] },
@@ -85,7 +88,8 @@ function load(opts = {}) {
         },
         list: async () => ({ data: opts.openSessions || [], has_more: false }),
         expire: async (id) => { calls.expire.push(id); return { id, status: 'expired' }; },
-        retrieve: async (id) => {
+        retrieve: async (id, options) => {
+          calls.sessionRetrieve = options && options.expand;
           const found = sessions.find((x) => x.id === id);
           if (!found) {
             const e = new Error('No such checkout session');
@@ -260,6 +264,32 @@ describe('C2 — an existing subscription is changed, never duplicated', () => {
   });
 });
 
+describe('C2 — a half-finished checkout leaves nothing broken behind', () => {
+  test('an incomplete first payment still lets the buyer pay again', async () => {
+    // Stripe keeps a failed first payment as `incomplete` for about a day. It
+    // granted nothing, so parking the buyer in a billing portal for 24 hours
+    // instead of a payment page was a revenue bug, not a safety measure.
+    const h = load({ account: paying({ plan: 'free', stripe_subscription_id: null }) });
+    const sub = existingSub(h);
+    sub.id = 'sub_incomplete';
+    sub.status = 'incomplete';
+    h.addSubscription(sub);
+    await h.api.createCheckoutSession(h.account, 'pro');
+    assert.equal(h.calls.checkoutCreate.length, 1, 'the buyer must get a payment page');
+    assert.equal(h.calls.portal.length, 0);
+  });
+
+  test('a checkout that fails afterwards keeps the Stripe customer it created', async () => {
+    // The customer is a real, permanent Stripe object holding the buyer's email.
+    // Rolling its id back while the object survives mints a fresh orphan on every
+    // retry, and nothing ever reclaims them.
+    const h = load({ account: { stripe_customer_id: null }, failAfterCustomer: true });
+    await assert.rejects(() => h.api.createCheckoutSession(h.account, 'pro'));
+    assert.match(String(h.account.stripe_customer_id), /^cus_/,
+      'the id must be committed even though the checkout failed');
+  });
+});
+
 describe('C2 — one Stripe account serves several products', () => {
   test("a sibling product's cancellation cannot downgrade this account", async () => {
     const h = load({ account: paying({ stripe_subscription_id: 'sub_mine' }) });
@@ -375,9 +405,11 @@ describe('C2 — a webhook that fails is retried for real', () => {
 });
 
 describe('C3 — a query parameter is not a receipt', () => {
+  const priceOf = load().priceOf;
   const session = (over = {}) => ({
     id: 'cs_real', object: 'checkout.session', status: 'complete', payment_status: 'paid',
     client_reference_id: '71', customer: 'cus_guards', subscription: 'sub_paid',
+    line_items: { data: [{ price: { id: priceOf('pro') } }] },
     metadata: { account_id: '71', plan: 'pro' }, ...over,
   });
 
@@ -427,6 +459,18 @@ describe('C3 — a query parameter is not a receipt', () => {
   test("another account's session is refused", async () => {
     const h = load({ account: { stripe_customer_id: 'cus_guards' } });
     h.addSession(session({ client_reference_id: '999', customer: 'cus_someone_else', metadata: { account_id: '999' } }));
+    const out = await h.api.verifyCheckoutReturn(h.account, 'cs_real');
+    assert.equal(out.state, 'foreign');
+  });
+
+  test("a SIBLING PRODUCT's paid session claims nothing here", async () => {
+    // One Stripe account sells all three products and all three number their
+    // accounts from 1, so a matching account id is not proof of anything.
+    const h = load({ account: { stripe_customer_id: null } });
+    h.addSession(session({
+      customer: 'cus_of_the_other_product',
+      line_items: { data: [{ price: { id: 'price_of_a_sibling_product' } }] },
+    }));
     const out = await h.api.verifyCheckoutReturn(h.account, 'cs_real');
     assert.equal(out.state, 'foreign');
   });
