@@ -2200,11 +2200,12 @@ yourself without an account: the entry is in the response of
 <code>n8n-nodes-pdfmint</code>. Verified nodes can also be found straight from the node panel when
 you search for &ldquo;PDFMint&rdquo;.</p>
 
-<p class="notice"><strong>n8n Cloud and npm both serve 0.4.5.</strong> Both are checkable without
-an account: n8n's community-node registry and npm's <code>latest</code> tag name
-<strong>0.4.5</strong>. This release uses <code>https://pdf.mintapis.com</code> by default,
-includes the error-output fix described below, and lists the published workflow templates in its
-package documentation. The historical 0.1.0 caveat no longer applies to a fresh Cloud install.</p>
+<p class="notice"><strong>n8n Cloud serves 0.4.5; npm serves 0.4.6.</strong> Both are checkable
+without an account: n8n's community-node registry exposes the Cloud version and npm's
+<code>latest</code> tag exposes the self-hosted version. The node code is unchanged between these
+releases; 0.4.6 adds the account-free demo and current workflow links to the package documentation.
+Both use <code>https://pdf.mintapis.com</code> by default and include the error-output fix described
+below. The historical 0.1.0 caveat no longer applies to a fresh Cloud install.</p>
 <ul>
 <li><strong>If an older existing installation still shows 0.1.0, update it.</strong> That version's
 credential defaulted to <code>https://pdfmint-b9tt.onrender.com</code> and predates a real bug fix.
