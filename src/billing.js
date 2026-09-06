@@ -7,6 +7,9 @@ const { query, tx } = require('./db');
 const { ApiError } = require('./errors');
 
 const stripe = config.stripe.secretKey ? new Stripe(config.stripe.secretKey, { apiVersion: '2025-01-27.acacia' }) : null;
+
+// The name a buyer sees at the top of the Stripe Checkout page.
+const BRAND_NAME = 'PDFMint';
 const enabled = () => Boolean(stripe);
 
 const router = express.Router();
@@ -87,12 +90,16 @@ async function createCheckoutSession(account, planId) {
         payment_behavior: 'pending_if_incomplete',
         expand: ['latest_invoice'],
       }, { idempotencyKey: `pdfmint-upgrade-${sub.id}-${item.price.id}-${priceId}-${Math.floor(Date.now() / 1800000)}` });
-      // Pending updates keep the old price until the prorated invoice is paid.
-      await applySubscription(updated, run);
+      // A pending update is an UNPAID upgrade: Stripe keeps the old price until
+      // the prorated invoice clears. Writing the new plan here would hand out the
+      // larger quota before the money moved, so the entitlement is left alone and
+      // the customer is sent to the invoice. `invoice.paid` / `subscription.updated`
+      // applies it once it is real.
       if (updated.pending_update) {
         const invoiceUrl = updated.latest_invoice?.hosted_invoice_url;
         return { url: invoiceUrl || `${config.publicUrl}/dashboard?checkout=pending` };
       }
+      await applySubscription(updated, run);
       return { url: `${config.publicUrl}/dashboard?checkout=updated` };
     }
     // Reuse the open session so double clicks cannot create two subscriptions.
@@ -107,8 +114,16 @@ async function createCheckoutSession(account, planId) {
     mode: 'subscription',
     customer: customerId,
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${config.publicUrl}/dashboard?checkout=success`,
+    // The session id comes back so the dashboard can VERIFY the payment with
+    // Stripe instead of believing `?checkout=success`. See verifyCheckoutReturn.
+    success_url: `${config.publicUrl}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${config.publicUrl}/dashboard?checkout=cancelled`,
+    // One Stripe account sells several products, so its business name is the
+    // portfolio's ("Amazing AI Apps") and a PDFMint buyer had no idea who was
+    // charging them. branding_settings overrides the name on THIS session only;
+    // the legal entity, receipts, statement descriptor and support details are
+    // account-level and deliberately untouched.
+    branding_settings: { display_name: BRAND_NAME },
     allow_promotion_codes: true,
     // An EU business needs its VAT ID on the invoice or its accountant will not
     // accept the receipt. Optional on purpose: Stripe shows an "Add VAT ID" link
@@ -185,6 +200,17 @@ async function applySubscription(subscription, run = query) {
     return;
   }
 
+  // `metadata.account_id` is a number we put there ourselves, and the sibling
+  // products on this Stripe account number their accounts from 1 as well. So the
+  // id alone is not proof of ownership: the subscription must also sit on the
+  // Stripe customer this account is bound to. An account that has never paid has
+  // no customer yet, and there the price check above is what carries the weight.
+  if (customerId && target.stripe_customer_id && target.stripe_customer_id !== customerId) {
+    console.warn(`[stripe] ignoring subscription ${subscription.id}: customer ${customerId}`
+      + ` is not account ${target.id}'s customer`);
+    return { ignored: 'foreign_customer' };
+  }
+
   // A cancellation only speaks for the subscription it names. When an account has
   // since moved to a different subscription, an older one ending must not revoke
   // the current one.
@@ -212,6 +238,14 @@ async function handleEvent(event) {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object;
+      // A completed session is not a paid session. Asynchronous methods finish
+      // later, and some finish as a failure; fulfilling here would hand out the
+      // quota for a payment that never arrives. `invoice.paid` and
+      // `customer.subscription.updated` deliver the real thing.
+      if (!['paid', 'no_payment_required'].includes(session.payment_status)) {
+        console.warn(`[stripe] session ${session.id} completed but payment_status=${session.payment_status}; not fulfilling`);
+        break;
+      }
       if (session.subscription) {
         const sub = await stripe.subscriptions.retrieve(String(session.subscription));
         if (!sub.metadata?.account_id && session.client_reference_id) {
@@ -269,6 +303,63 @@ router.post('/webhook', asyncRoute(async (req, res) => {
 }));
 
 /**
+ * C3 — what a return from Checkout is actually allowed to claim.
+ *
+ * `?checkout=success` is a query parameter. Anyone can type it, a bookmark keeps
+ * it, and a shared link carries it. It is not evidence of anything. Neither is
+ * "this account is on a paid plan": that only says some earlier payment worked,
+ * not that the checkout the customer just came back from was paid.
+ *
+ * So the page asks Stripe. It resolves the session id that Stripe itself put in
+ * the URL, checks the session belongs to this account, checks Stripe considers it
+ * paid, and checks our own fulfilment has landed. "Payment received" is returned
+ * for exactly one state; everything else gets neutral, honest text.
+ */
+const CHECKOUT_RETURN = {
+  paid: { ok: true, message: 'Payment received. Your new quota is live — it is shown below.' },
+  activating: { ok: false, message: 'Payment confirmed. We are activating your plan now — this usually takes a few seconds. Reload this page to see it.' },
+  pending: { ok: false, message: 'This checkout is not confirmed yet. Nothing has been charged or activated; your plan below is unchanged.' },
+  expired: { ok: false, message: 'That checkout link has expired. Nothing was charged. Choose a plan below to start again.' },
+  foreign: { ok: false, message: 'We could not match that checkout to this account. Your plan below is unchanged.' },
+  unverified: { ok: false, message: 'We could not confirm a payment for this link. Your plan below is unchanged — if you have just paid, reload in a moment.' },
+};
+
+async function verifyCheckoutReturn(account, sessionId) {
+  const state = (name, extra = {}) => ({ state: name, ...CHECKOUT_RETURN[name], ...extra });
+  // No session id (an old bookmark, a hand-typed URL, a forged link) proves nothing.
+  if (!sessionId || typeof sessionId !== 'string' || !/^cs_[A-Za-z0-9_]+$/.test(sessionId)) {
+    return state('unverified', { reason: 'no_session_id' });
+  }
+  if (!enabled()) return state('unverified', { reason: 'billing_disabled' });
+
+  let session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch (e) {
+    console.warn(`[stripe] could not verify checkout return ${sessionId}: ${e.message}`);
+    return state('unverified', { reason: 'lookup_failed' });
+  }
+
+  const claimed = session.client_reference_id || session.metadata?.account_id;
+  const sessionCustomer = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+  if (String(claimed || '') !== String(account.id)) return state('foreign', { reason: 'account_mismatch' });
+  if (account.stripe_customer_id && sessionCustomer && sessionCustomer !== account.stripe_customer_id) {
+    return state('foreign', { reason: 'customer_mismatch' });
+  }
+  if (session.status === 'expired') return state('expired');
+  if (!['paid', 'no_payment_required'].includes(session.payment_status)) {
+    return state('pending', { reason: `payment_status=${session.payment_status}` });
+  }
+
+  // Stripe says paid. That still does not mean OUR side has applied it — the
+  // webhook may not have landed. Claiming a live quota before the row moved is
+  // the same lie in a different place.
+  const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
+  const fulfilled = account.plan !== 'free' && (!subId || account.stripe_subscription_id === subId);
+  return fulfilled ? state('paid') : state('activating');
+}
+
+/**
  * Finds every account whose stored customer id no longer resolves and clears it,
  * so the next checkout creates a fresh one instead of failing. Runs at boot.
  */
@@ -292,5 +383,6 @@ async function healStaleCustomers() {
 
 module.exports = {
   router, stripe, enabled, createCheckoutSession, createPortalSession, applySubscription,
-  handleEvent, ensureCustomer, isUsableCustomer, healStaleCustomers,
+  handleEvent, ensureCustomer, isUsableCustomer, healStaleCustomers, verifyCheckoutReturn,
+  BRAND_NAME,
 };
