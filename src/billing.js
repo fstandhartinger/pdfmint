@@ -106,7 +106,9 @@ async function createCheckoutSession(account, planId) {
         return stripe.billingPortal.sessions.create({ customer: customerId, return_url: `${config.publicUrl}/dashboard` });
       }
       if (item.price.id === priceId) {
-        await applySubscription(sub, run);
+        // `sub` came straight from subscriptions.list a moment ago, under the row
+        // lock: it is already what Stripe holds, so do not pay for a second call.
+        await applySubscription(sub, run, { refresh: false });
         return { url: `${config.publicUrl}/dashboard?checkout=updated` };
       }
       const updated = await stripe.subscriptions.update(sub.id, {
@@ -124,7 +126,8 @@ async function createCheckoutSession(account, planId) {
         const invoiceUrl = updated.latest_invoice?.hosted_invoice_url;
         return { url: invoiceUrl || `${config.publicUrl}/dashboard?checkout=pending` };
       }
-      await applySubscription(updated, run);
+      // `updated` is Stripe's own response to the update we just made.
+      await applySubscription(updated, run, { refresh: false });
       return { url: `${config.publicUrl}/dashboard?checkout=updated` };
     }
     // Reuse the open session so double clicks cannot create two subscriptions.
@@ -194,20 +197,26 @@ function planForPriceId(priceId) {
   return null;
 }
 
-async function applySubscription(subscription, run = query) {
+/**
+ * `refresh` decides whether the subscription's status is re-read from Stripe
+ * before it is acted on. Callers that were handed an authoritative object by
+ * Stripe a moment ago — the checkout path — pass `false`; webhook bodies, which
+ * are snapshots, do not. See the block below.
+ */
+async function applySubscription(subscription, run = query, { refresh = true } = {}) {
   const accountId = subscription.metadata?.account_id;
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id;
-  const priceId = subscription.items?.data?.[0]?.price?.id;
-  const plan = planForPriceId(priceId);
-  const active = ['active', 'trialing', 'past_due'].includes(subscription.status);
 
   // One Stripe account serves more than one product, and every endpoint on it
   // receives every event. A subscription whose price is not one of ours belongs
   // to a sibling product; acting on it once downgraded a live, paying PDFMint
   // customer because a DocMint subscription tagged with the same account_id was
-  // cancelled. Anything we cannot price is not ours to act on.
-  if (!plan) {
-    console.warn(`[stripe] ignoring subscription ${subscription.id}: price ${priceId} is not a PDFMint plan`);
+  // cancelled. Anything we cannot price is not ours to act on. Checked on the
+  // event body first, before we lock one of our rows or spend a Stripe call on
+  // something that was never ours.
+  if (!planForPriceId(subscription.items?.data?.[0]?.price?.id)) {
+    console.warn(`[stripe] ignoring subscription ${subscription.id}:`
+      + ` price ${subscription.items?.data?.[0]?.price?.id} is not a PDFMint plan`);
     return { ignored: 'foreign_price' };
   }
 
@@ -236,11 +245,66 @@ async function applySubscription(subscription, run = query) {
     return { ignored: 'foreign_customer' };
   }
 
+  /**
+   * The event body is a SNAPSHOT of the moment Stripe emitted it, and Stripe
+   * emits a purchase's four events at once and delivers them concurrently, in no
+   * guaranteed order. `customer.subscription.created` is emitted the instant the
+   * subscription exists — which for a card payment is BEFORE the card is charged
+   * — so its body says `status: "incomplete"` every single time. Acted on as
+   * written and processed last, it set a paying customer back to `free` and
+   * cleared the subscription id. Reproduced against this exact deployed image on
+   * 2026-09-06 with genuine Stripe events; the live webhook endpoint is enabled
+   * for `customer.subscription.created`, so it is reachable in production.
+   * Evidence: ops/proofs/remaining-readiness/pdfmint-event-order/.
+   *
+   * So the status and the price are read from Stripe as they are NOW, after the
+   * account row is locked. That is what makes the outcome independent of delivery
+   * order: Stripe gives the same answer to all four events, their snapshots do not.
+   *
+   * A failure here falls back to the snapshot. Asking Stripe is better
+   * information, not a new way to fail — the snapshot is what this did in every
+   * case before, so the fallback is no worse than before, and it is loud in the log.
+   */
+  let current = subscription;
+  if (refresh && stripe && subscription.id) {
+    try {
+      // Bounded tightly, and on this call alone: it happens while an account row
+      // is locked inside the transaction, and the pool is PG_POOL_MAX (5 by
+      // default). A Stripe incident must cost one webhook five seconds, not hold
+      // a lock and a connection long enough to stall rendering as well. The
+      // catch below is the whole point — five seconds and then the event body.
+      const found = await stripe.subscriptions.retrieve(String(subscription.id), {},
+        { timeout: 5000, maxNetworkRetries: 0 });
+      if (found && found.id) {
+        // Metadata is ours, and may exist only on the body we were handed: the
+        // checkout path stamps account_id onto it from client_reference_id.
+        current = { ...found, metadata: { ...(subscription.metadata || {}), ...(found.metadata || {}) } };
+        if (found.status !== subscription.status) {
+          console.log(`[stripe] subscription ${subscription.id} refreshed:`
+            + ` the event said ${subscription.status}, Stripe says ${found.status}`);
+        }
+      }
+    } catch (e) {
+      console.warn(`[stripe] could not re-read subscription ${subscription.id} (${e.message});`
+        + ' falling back to the event body, which may be out of date');
+    }
+  }
+
+  const priceId = current.items?.data?.[0]?.price?.id;
+  const plan = planForPriceId(priceId);
+  const active = ['active', 'trialing', 'past_due'].includes(current.status);
+  // The price is checked again on what Stripe holds now, because an upgrade or a
+  // migration can move a subscription onto a price we do not sell.
+  if (!plan) {
+    console.warn(`[stripe] ignoring subscription ${current.id}: price ${priceId} is not a PDFMint plan`);
+    return { ignored: 'foreign_price' };
+  }
+
   // A cancellation only speaks for the subscription it names. When an account has
   // since moved to a different subscription, an older one ending must not revoke
   // the current one.
   if (!active && target.stripe_subscription_id && target.stripe_subscription_id !== subscription.id) {
-    console.warn(`[stripe] ignoring ${subscription.status} of stale subscription ${subscription.id};`
+    console.warn(`[stripe] ignoring ${current.status} of stale subscription ${subscription.id};`
       + ` account ${target.id} is on ${target.stripe_subscription_id}`);
     return { ignored: 'stale_subscription' };
   }
@@ -251,7 +315,7 @@ async function applySubscription(subscription, run = query) {
      WHERE id = $1`,
     [target.id, newPlan.id, newPlan.credits, active ? subscription.id : null, customerId || null],
   );
-  console.log(`[stripe] account ${target.id} -> plan ${newPlan.id} (${newPlan.credits} credits), sub ${subscription.id} ${subscription.status}`);
+  console.log(`[stripe] account ${target.id} -> plan ${newPlan.id} (${newPlan.credits} credits), sub ${subscription.id} ${current.status}`);
 }
 
 async function handleEvent(event) {
@@ -276,7 +340,8 @@ async function handleEvent(event) {
         if (!sub.metadata?.account_id && session.client_reference_id) {
           sub.metadata = { ...(sub.metadata || {}), account_id: session.client_reference_id };
         }
-        await applySubscription(sub, run);
+        // Retrieved from Stripe on the line above, so it is already current.
+        await applySubscription(sub, run, { refresh: false });
       }
       break;
     }

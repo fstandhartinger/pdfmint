@@ -63,9 +63,17 @@ function load(opts = {}) {
         if (opts.failAfterCustomer) throw new Error('injected Stripe outage after customer creation');
         return { data: subscriptions, has_more: false };
       },
-      retrieve: async (id) => subscriptions.find((s) => s.id === id) || {
-        id, customer: account.stripe_customer_id || 'cus_guards', status: 'active',
-        metadata: {}, items: { data: [{ id: 'si_x', price: { id: priceOf('pro') } }] },
+      retrieve: async (id) => {
+        // Stripe is asked about subscriptions in two places now, so this has to
+        // behave like Stripe: an id it does not hold is a 404, not a helpful
+        // stand-in. A lenient stub here would let a test pass because the mock
+        // invented an active subscription.
+        if (opts.failRetrieve) throw new Error('injected Stripe outage on subscriptions.retrieve');
+        const found = subscriptions.find((s) => s.id === id);
+        if (found) return JSON.parse(JSON.stringify(found));
+        const e = new Error('No such subscription: ' + id);
+        e.code = 'resource_missing'; e.statusCode = 404;
+        throw e;
       },
       update: async (id, args, options) => {
         calls.subUpdate.push({ id, args, options });
@@ -495,5 +503,145 @@ describe(`C4 — the Checkout page says ${BRAND}, not the portfolio's name`, () 
     await h.api.createCheckoutSession(h.account, 'pro');
     const args = h.calls.checkoutCreate[0].args;
     assert.match(args.success_url, /\{CHECKOUT_SESSION_ID\}/);
+  });
+});
+
+/**
+ * C5 — whether a customer keeps what they paid for cannot depend on delivery order.
+ *
+ * Found in MailMint on 2026-09-06 by paying and watching (mailmint-REPORT.md F3,
+ * c5-out-of-order-evidence.txt), and asked of PDFMint here because PDFMint's live
+ * webhook endpoint is enabled for `customer.subscription.created` — MailMint's is not.
+ *
+ * Stripe emits a purchase's four events at once and delivers them concurrently, in
+ * no guaranteed order. Every body is a SNAPSHOT of the moment it was emitted, and
+ * `customer.subscription.created` is emitted the instant the subscription exists,
+ * which for a card payment is BEFORE the card is charged. Its body therefore reads
+ * `status: "incomplete"` every single time. Acted on as written and processed last,
+ * it applies the free plan and clears the subscription id on an account Stripe holds
+ * an active, paid subscription for.
+ */
+describe('C5 — a paid plan must not depend on which webhook lands last', () => {
+  const CUS = 'cus_guards';
+  const SUB = 'sub_ordering';
+
+  // What Stripe holds once the card has cleared. This is the truth every one of
+  // the four events below is a stale or partial view of.
+  const authoritative = (h, status = 'active', plan = 'starter') => ({
+    id: SUB, customer: CUS, status,
+    metadata: { account_id: '71', plan },
+    items: { data: [{ id: 'si_ordering', price: { id: h.priceOf(plan) }, quantity: 1 }] },
+  });
+
+  // The four real bodies, with the statuses Stripe really puts in them.
+  const bodies = (h) => ({
+    'checkout.session.completed': {
+      id: 'evt_cs', type: 'checkout.session.completed',
+      data: { object: {
+        id: 'cs_ordering', payment_status: 'paid', status: 'complete', subscription: SUB,
+        client_reference_id: '71', customer: CUS, metadata: { account_id: '71', plan: 'starter' },
+      } },
+    },
+    'invoice.paid': {
+      id: 'evt_inv', type: 'invoice.paid',
+      data: { object: { id: 'in_ordering', customer: CUS, subscription: SUB, paid: true } },
+    },
+    'customer.subscription.updated': {
+      id: 'evt_upd', type: 'customer.subscription.updated',
+      data: { object: { ...authoritative(h), status: 'active' } },
+    },
+    // The one that does the damage: emitted before the charge, so `incomplete`.
+    'customer.subscription.created': {
+      id: 'evt_new', type: 'customer.subscription.created',
+      data: { object: { ...authoritative(h), status: 'incomplete' } },
+    },
+  });
+
+  const fresh = () => {
+    const h = load({ account: { stripe_customer_id: CUS } });
+    h.addSubscription(authoritative(h));
+    return h;
+  };
+
+  test('the order observed in production: `created` lands last and must not undo the purchase', async () => {
+    const h = fresh();
+    const e = bodies(h);
+    for (const type of ['invoice.paid', 'checkout.session.completed',
+                        'customer.subscription.updated', 'customer.subscription.created']) {
+      await h.fireEvent(e[type]);
+    }
+    assert.equal(h.account.plan, 'starter', 'the customer paid; the last webhook must not take it away');
+    assert.equal(h.account.stripe_subscription_id, SUB, 'and the subscription id must still be there to manage');
+    assert.equal(Number(h.quota()), h.PLANS.starter.credits);
+  });
+
+  test('every one of the 24 delivery orders ends in the plan that was paid for', async () => {
+    const types = ['checkout.session.completed', 'invoice.paid',
+                   'customer.subscription.updated', 'customer.subscription.created'];
+    const perms = (xs) => (xs.length <= 1 ? [xs]
+      : xs.flatMap((x, i) => perms([...xs.slice(0, i), ...xs.slice(i + 1)]).map((r) => [x, ...r])));
+    const orders = perms(types);
+    assert.equal(orders.length, 24);
+    const broken = [];
+    for (const order of orders) {
+      const h = fresh();
+      const e = bodies(h);
+      for (const type of order) await h.fireEvent(e[type]);
+      if (h.account.plan !== 'starter' || h.account.stripe_subscription_id !== SUB) {
+        broken.push(`${order.join(' -> ')} ended on ${h.account.plan}/${h.account.stripe_subscription_id}`);
+      }
+    }
+    assert.deepEqual(broken, [], `delivery order decided the outcome:\n${broken.join('\n')}`);
+  });
+
+  test('a cancellation Stripe agrees with still downgrades, as it must', async () => {
+    const h = load({ account: paying({ stripe_customer_id: CUS, stripe_subscription_id: SUB }) });
+    h.addSubscription(authoritative(h, 'canceled'));
+    await h.fireEvent({
+      id: 'evt_cancel', type: 'customer.subscription.deleted',
+      data: { object: { ...authoritative(h, 'canceled') } },
+    });
+    assert.equal(h.account.plan, 'free', 'asking Stripe must not have made cancellation impossible');
+    assert.equal(h.account.stripe_subscription_id, null);
+  });
+
+  test('a stale ACTIVE body does not resurrect a subscription Stripe has cancelled', async () => {
+    // The mirror of the bug: a late `updated` whose body still says active, for a
+    // subscription that has since been cancelled, must not hand the plan back.
+    const h = load({ account: paying({ stripe_customer_id: CUS, stripe_subscription_id: SUB }) });
+    h.addSubscription(authoritative(h, 'canceled'));
+    await h.fireEvent({
+      id: 'evt_stale_active', type: 'customer.subscription.updated',
+      data: { object: { ...authoritative(h, 'active') } },
+    });
+    assert.equal(h.account.plan, 'free');
+  });
+
+  test('a Stripe outage falls back to the event body rather than losing the plan', async () => {
+    // Asking Stripe is better information, not a new dependency to fail on. When
+    // the call fails this must do exactly what it did before: believe the body.
+    const h = load({ account: { stripe_customer_id: CUS }, failRetrieve: true });
+    h.addSubscription(authoritative(h));
+    await h.fireEvent({
+      id: 'evt_outage', type: 'customer.subscription.updated',
+      data: { object: { ...authoritative(h), status: 'active' } },
+    });
+    assert.equal(h.account.plan, 'starter', 'an outage must not silently strip a paying customer');
+    assert.equal(h.account.stripe_subscription_id, SUB);
+  });
+
+  test("a foreign product's subscription is refused before Stripe is called at all", async () => {
+    // A sibling product's event must not cost us a Stripe call or a row lock.
+    const h = load({ account: paying({ stripe_customer_id: CUS, stripe_subscription_id: 'sub_mine' }), failRetrieve: true });
+    await h.fireEvent({
+      id: 'evt_foreign_no_call', type: 'customer.subscription.created',
+      data: { object: {
+        id: 'sub_of_a_sibling', status: 'incomplete', customer: 'cus_someone_else',
+        metadata: { account_id: '71', plan: 'pro' },
+        items: { data: [{ price: { id: 'price_of_a_sibling_product' } }] },
+      } },
+    });
+    assert.equal(h.account.plan, 'starter');
+    assert.equal(h.dbUpdates.length, 0, 'nothing may be written for another product');
   });
 });
