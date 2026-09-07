@@ -929,3 +929,68 @@ describe('D — a plan switch must never hand back a dead session or a phantom p
     assert.equal(h.calls.checkoutCreate.length, 0, 'and never opens a second subscription');
   });
 });
+
+/**
+ * E — what the return-from-Checkout page may say when it cannot read the session.
+ *
+ * Raised by the cross-product handoff (pdfmint-cross-product-handoff.md, "Also
+ * worth a look"). Two orderings inside `verifyCheckoutReturn` were wrong for the
+ * same reason: "I could not read the price" was being reported as "this checkout
+ * belongs to someone else", and expiry was decided after the price rather than
+ * before it.
+ */
+describe('E — an unreadable session is unverified, not somebody else\'s', () => {
+  const priceOf = load().priceOf;
+  const session = (over = {}) => ({
+    id: 'cs_real', object: 'checkout.session', status: 'complete', payment_status: 'paid',
+    client_reference_id: '71', customer: 'cus_guards', subscription: 'sub_paid',
+    line_items: { data: [{ price: { id: priceOf('pro') } }] },
+    metadata: { account_id: '71', plan: 'pro' }, ...over,
+  });
+  const mine = (over = {}) => ({ plan: 'free', stripe_customer_id: 'cus_guards', ...over });
+
+  test('an expired session reads as expired even when its line items are gone', async () => {
+    // Stripe does return line items for an expired session today — measured by the
+    // sibling run — so this is about not depending on that. Expiry is a fact about
+    // the session; whether we can price it is a separate question.
+    const h = load({ account: mine() });
+    h.addSession(session({ status: 'expired', payment_status: 'unpaid', line_items: { data: [] } }));
+    const out = await h.api.verifyCheckoutReturn(h.account, 'cs_real');
+    assert.equal(out.state, 'expired');
+    assert.match(out.message, /expired/i);
+    assert.doesNotMatch(out.message, /could not match/i, 'expiry is not an ownership problem');
+  });
+
+  test('a session we cannot price is unverified, never claimed as another account\'s', async () => {
+    const h = load({ account: mine() });
+    h.addSession(session({ line_items: { data: [] } }));
+    const out = await h.api.verifyCheckoutReturn(h.account, 'cs_real');
+    assert.equal(out.state, 'unverified', '"no price to read" is not "not yours"');
+    assert.equal(out.ok, false);
+    assert.doesNotMatch(out.message, /payment received/i);
+  });
+
+  test("a sibling product's paid session is still refused as foreign", async () => {
+    // The distinction that matters: a price we CAN read and do not sell is
+    // somebody else's; a price we cannot read at all is simply unknown.
+    const h = load({ account: mine({ stripe_customer_id: null }) });
+    h.addSession(session({
+      customer: 'cus_of_the_other_product',
+      line_items: { data: [{ price: { id: 'price_of_a_sibling_product' } }] },
+    }));
+    const out = await h.api.verifyCheckoutReturn(h.account, 'cs_real');
+    assert.equal(out.state, 'foreign');
+  });
+
+  test('none of these ever read as paid', async () => {
+    for (const over of [{ line_items: { data: [] } },
+                        { status: 'expired', line_items: { data: [] } },
+                        { line_items: { data: [{ price: { id: 'price_of_a_sibling_product' } }] } }]) {
+      const h = load({ account: mine() });
+      h.addSession(session(over));
+      const out = await h.api.verifyCheckoutReturn(h.account, 'cs_real');
+      assert.notEqual(out.state, 'paid');
+      assert.equal(out.ok, false);
+    }
+  });
+});

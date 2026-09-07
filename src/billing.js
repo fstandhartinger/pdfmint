@@ -115,8 +115,15 @@ async function createCheckoutSession(account, planId) {
   // Inside the long one below, any later failure rolled the stored id back while
   // the Stripe object survived — so every failed checkout during a Stripe incident
   // minted another orphaned customer carrying the buyer's email address, and
-  // nothing ever reclaimed them. The row lock is held across it, so two
-  // simultaneous clicks still cannot produce two customers.
+  // nothing ever reclaimed them.
+  //
+  // These are two transactions, so the lock taken here is released before the one
+  // below starts — an earlier version of this comment claimed the lock was "held
+  // across it", and that was simply false. What keeps two simultaneous clicks to
+  // one customer is that BOTH transactions take the row lock and re-read the row
+  // under it: the second click blocks here and then reads the customer id the
+  // first one committed. Measured 2026-09-07 against the deployed build: four
+  // simultaneous clicks produced one customer and one checkout session.
   const customerId = await tx(async (client) => {
     const run = client.query.bind(client);
     const { rows } = await run('SELECT * FROM accounts WHERE id = $1 FOR UPDATE', [account.id]);
@@ -547,16 +554,28 @@ async function verifyCheckoutReturn(account, sessionId) {
   if (account.stripe_customer_id && sessionCustomer && sessionCustomer !== account.stripe_customer_id) {
     return state('foreign', { reason: 'customer_mismatch' });
   }
+  // Expiry is a fact about the session and is answered before anything is priced.
+  // Stripe does still return `line_items` for an expired session — measured — but
+  // an ordering that only works because of that is an ordering waiting to break,
+  // and "that link has expired, nothing was charged" is the honest answer either
+  // way.
+  if (session.status === 'expired') return state('expired');
   // All three products live on ONE Stripe account and all three number their
   // accounts from 1, so a matching account id is not proof either: a sibling
   // product's genuinely paid session would otherwise be accepted here and tell
   // someone who has paid US nothing that their payment is being activated. The
   // line item has to be a price we sell.
+  //
+  // A price we can read and do not sell is somebody else's. NO price at all is a
+  // different thing — we simply could not read the session — and saying "we could
+  // not match that checkout to this account" about it accuses the buyer of
+  // arriving with someone else's link. Neither answer grants anything; only one
+  // of them is true.
   const lineItems = session.line_items?.data || [];
-  if (!lineItems.length || !lineItems.some((item) => planForPriceId(item.price?.id))) {
+  if (!lineItems.length) return state('unverified', { reason: 'no_line_items' });
+  if (!lineItems.some((item) => planForPriceId(item.price?.id))) {
     return state('foreign', { reason: 'not_our_price' });
   }
-  if (session.status === 'expired') return state('expired');
   if (!['paid', 'no_payment_required'].includes(session.payment_status)) {
     return state('pending', { reason: `payment_status=${session.payment_status}` });
   }
