@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ready-made n8n workflows for PDFMint</title>
-<meta name="description" content="Nine reviewed n8n workflows for PDFMint, DocMint and MailMint, including Xero and Invoice Ninja ageing reports. Every workflow was run in a real n8n before publishing.">
+<meta name="description" content="Ten reviewed n8n workflows for PDFMint, DocMint and MailMint, including Markdown-to-PDF, Xero and Invoice Ninja reports. Every workflow was run in a real n8n before publishing.">
 <link rel="canonical" href="https://pdf.mintapis.com/n8n-templates">
 <meta name="robots" content="index, follow">
 <meta property="og:url" content="https://pdf.mintapis.com/n8n-templates">
@@ -56,7 +56,7 @@
 
     <section id="gallery">
       <h2>In the n8n gallery <a class="anchor" href="#gallery">#</a></h2>
-      <p>Nine workflows are published in n8n's official template gallery, which means n8n's own review accepted them:</p>
+      <p>Ten workflows are published in n8n's official template gallery, which means n8n's own review accepted them:</p>
       <ul>
         <li><a href="https://n8n.io/workflows/18734-generate-pdf-invoices-from-webhook-data-with-pdfmint/" rel="noopener">Generate PDF invoices from webhook data with PDFMint</a> &mdash; webhook in, invoice out, with validation that refuses an empty payload before a credit is spent.</li>
         <li><a href="https://n8n.io/workflows/18793-send-branded-pdf-receipts-for-stripe-payments-with-pdfmint-gmail-and-drive/" rel="noopener">Send branded PDF receipts for Stripe payments with PDFMint, Gmail and Drive</a> &mdash; a Stripe payment triggers a receipt that is rendered, filed and mailed.</li>
@@ -67,14 +67,15 @@
         <li><a href="https://n8n.io/workflows/19112-send-weekly-ar-ageing-reports-with-invoice-ninja-pdfmint-and-gmail/" rel="noopener">Send weekly AR ageing reports with Invoice Ninja, PDFMint and Gmail</a> &mdash; the Invoice Ninja workflow below, accepted into the gallery on 3 September.</li>
         <li><a href="https://n8n.io/workflows/18867-screen-and-triage-invoice-emails-for-approval-with-mailmint/" rel="noopener">Screen and triage invoice emails for approval with MailMint</a> &mdash; our sibling product MailMint reads the invoice mail and drafts the approval, so nobody approves from a guess.</li>
         <li><a href="https://n8n.io/workflows/18943-file-supplier-invoice-emails-into-google-sheets-using-mailmint/" rel="noopener">File supplier invoice emails into Google Sheets using MailMint</a> &mdash; MailMint extracts the invoice fields and files them in a sheet, ready for a DocMint or PDFMint render.</li>
+        <li><a href="https://n8n.io/workflows/19277-convert-markdown-into-branded-pdfs-with-a-table-of-contents-using-pdfmint/" rel="noopener">Convert Markdown into branded PDFs with a table of contents using PDFMint</a> &mdash; webhook in, branded PDF out, with generated contents, validation and an optional draft watermark.</li>
       </ul>
     </section>
 
     <section id="markdown">
       <h2>Markdown to branded PDF with a table of contents <a class="anchor" href="#markdown">#</a></h2>
-      <p><a href="/templates/markdown-to-branded-pdf.json" download>Download the workflow JSON</a>. We are the authors of the PDFMint node and of this template.</p>
+      <p><a href="https://n8n.io/workflows/19277-convert-markdown-into-branded-pdfs-with-a-table-of-contents-using-pdfmint/" rel="noopener">Open gallery #19277</a>, or <a href="/templates/markdown-to-branded-pdf.json" download>download the same workflow JSON</a> for inspection before importing. We are the authors of the PDFMint node and of this template.</p>
       <p><strong>What it does.</strong> Send Markdown to a webhook and receive a branded A4 PDF with numbered headings, a generated table of contents, header, page numbers and PDF metadata. A configuration node controls the brand colour, author and optional <code>DRAFT</code> watermark. Validation rejects a missing title or empty Markdown before a render credit is spent.</p>
-      <p><strong>Provenance.</strong> Built and run in a real n8n 2.37.7 instance on 6 September 2026 with <code>n8n-nodes-pdfmint@0.4.5</code> installed from public npm. The happy path produced a two-page, 108,024-byte PDF from 290 words and eight sections; a fenced shell-code comment was correctly excluded from the heading list. The watermark path, both validation paths and a simulated service failure were also run. The workflow is in n8n's human review as gallery submission 19277, so this download is available before the gallery page is public.</p>
+      <p><strong>Provenance.</strong> Built and run in a real n8n 2.37.7 instance on 6 September 2026 with <code>n8n-nodes-pdfmint@0.4.5</code> installed from public npm. The happy path produced a two-page, 108,024-byte PDF from 290 words and eight sections; a fenced shell-code comment was correctly excluded from the heading list. The watermark path, both validation paths and a simulated service failure were also run. n8n published gallery submission 19277 on 7 September 2026; the local download remains as an inspectable copy.</p>
       <p>The file contains pinned sample input for a one-click test, but no credentials, keys, account ids or personal data. Connect your own PDFMint credential after import.</p>
     </section>
 
@@ -107,7 +108,7 @@
       <h2>What we claim and what we do not <a class="anchor" href="#honest">#</a></h2>
       <ul>
         <li>Every gallery link above points at a workflow n8n published; the view counters there are n8n's, not ours.</li>
-        <li>The Markdown workflow and its error paths were run in n8n before this download was published; n8n's separate human review of gallery submission 19277 is still pending.</li>
+        <li>The Markdown workflow and its error paths were run in n8n before the local copy was published; n8n then accepted gallery submission 19277 on 7 September 2026.</li>
         <li>The Xero statement was run once with the fixes described above; it is offered as a starting point, not as a certified integration.</li>
         <li>The fixed invoice workflow's two error paths (422 and 500) were measured in real n8n before this file was published; the PDF-render path is the same one n8n's gallery review accepted.</li>
         <li>We build PDFMint and the PDFMint n8n node; anything we publish says so.</li>
