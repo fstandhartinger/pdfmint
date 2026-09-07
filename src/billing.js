@@ -62,6 +62,47 @@ async function ensureCustomer(account, run = query) {
   return createCustomerFor(account, run);
 }
 
+// A payment in one of these states may still succeed. Voiding its invoice is how
+// money gets taken for nothing, so an attempt in flight is never touched.
+// `requires_action` and `requires_payment_method` are deliberately NOT here: those
+// are the abandoned 3-D Secure step and the declined card, which is exactly what
+// the abandoned-attempt sweep exists to clear.
+const SETTLING = ['processing', 'requires_capture', 'succeeded'];
+
+/**
+ * What is still payable about an `incomplete` subscription's first invoice.
+ *
+ * Where the payment intent lives depends on the API version: on the version this
+ * client pins (`2025-01-27.acacia`) it is `invoice.payment_intent`; on the
+ * account's newer default it has moved under `payments.data[].payment.payment_intent`.
+ * Both expansions are accepted by both versions, so both are asked for and
+ * whichever answers is used — otherwise a future default-version bump would
+ * silently switch this guard off.
+ *
+ * Unreadable is reported as `null`, which the caller treats as "do not touch".
+ */
+async function abandonedInvoice(sub) {
+  const id = typeof sub.latest_invoice === 'string' ? sub.latest_invoice : sub.latest_invoice?.id;
+  if (!id) return null;
+  try {
+    const invoice = await stripe.invoices.retrieve(id, {
+      expand: ['payment_intent', 'payments.data.payment.payment_intent'],
+    });
+    const intents = [
+      invoice.payment_intent,
+      ...(invoice.payments?.data || []).map((entry) => entry.payment?.payment_intent),
+    ].filter((intent) => intent && typeof intent === 'object');
+    return {
+      url: invoice.hosted_invoice_url || null,
+      status: invoice.status,
+      inFlight: intents.some((intent) => SETTLING.includes(intent.status)),
+    };
+  } catch (e) {
+    console.warn(`[stripe] could not read invoice ${id} of abandoned attempt ${sub.id}: ${e.message}`);
+    return null;
+  }
+}
+
 async function createCheckoutSession(account, planId) {
   if (!enabled()) throw new ApiError(503, 'billing_unavailable', 'Billing is not configured on this deployment.');
   const priceId = planPriceId(planId);
@@ -99,6 +140,55 @@ async function createCheckoutSession(account, planId) {
       !['canceled', 'incomplete', 'incomplete_expired'].includes(sub.status)
       && sub.items.data.some(item => planForPriceId(item.price.id)));
     if (current.length > 1) throw new ApiError(409, 'multiple_subscriptions', 'Multiple subscriptions exist. Contact support before changing your plan.');
+
+    /**
+     * An `incomplete` subscription grants nothing, but its first invoice stays
+     * PAYABLE for about a day — so ignoring it and opening a second checkout
+     * beside it is how one buyer ends up paying for two. Measured in DocMint on
+     * 2026-09-06 in test mode against the same code: an abandoned $9 attempt, a
+     * completed $29 checkout, then the abandoned invoice paid afterwards = two
+     * active subscriptions, $38 a month, and the account left on the CHEAPER
+     * plan's quota because the later webhook won.
+     *
+     * The buyer must still be able to pay. What they must not be able to do is
+     * pay twice for one intention. So: finish the attempt they made, or make it
+     * unpayable — never leave it payable next to a new one.
+     */
+    const abandoned = listed.data.filter((sub) => sub.status === 'incomplete'
+      && sub.items.data.some((item) => planForPriceId(item.price.id)));
+    let finish = null;     // the attempt to hand the buyer back to
+    let blocked = false;   // ...or one we may not judge, which also forbids a second
+    for (const sub of abandoned) {
+      const item = sub.items.data.find((entry) => planForPriceId(entry.price.id));
+      // eslint-disable-next-line no-await-in-loop
+      const attempt = await abandonedInvoice(sub);
+      if (attempt && attempt.status !== 'open') continue;   // nothing payable is left
+      // Same plan and nothing live to upgrade: finishing the payment they started
+      // is the retry they actually want, and it cannot produce a second
+      // subscription. An unreadable or still-settling attempt goes the same way,
+      // because the one thing worse than a confusing page is a double charge.
+      const samePlan = Boolean(item && item.price.id === priceId && !current.length);
+      if (samePlan || !attempt || attempt.inFlight) {
+        // Remembered, not returned: every OTHER abandoned attempt still has to be
+        // made unpayable before this call ends, or it sits there for a day.
+        blocked = true;
+        if (!finish && attempt && attempt.url) finish = attempt;
+        continue;
+      }
+      // They changed their mind. Cancelling an incomplete subscription voids its
+      // open invoice, and Stripe then refuses a late payment outright — measured:
+      // "Voided invoices cannot be paid."
+      // eslint-disable-next-line no-await-in-loop
+      await stripe.subscriptions.cancel(sub.id);
+      console.log(`[stripe] account ${account.id}: cancelled abandoned attempt ${sub.id}`
+        + ` (${item && item.price.id}) so its invoice cannot be paid beside a new one`);
+    }
+    if (blocked) {
+      return finish
+        ? { url: finish.url }
+        : stripe.billingPortal.sessions.create({ customer: customerId, return_url: `${config.publicUrl}/dashboard` });
+    }
+
     if (current.length) {
       const sub = current[0];
       const item = sub.items.data.find(item => planForPriceId(item.price.id));
@@ -116,7 +206,17 @@ async function createCheckoutSession(account, planId) {
         proration_behavior: 'always_invoice',
         payment_behavior: 'pending_if_incomplete',
         expand: ['latest_invoice'],
-      }, { idempotencyKey: `pdfmint-upgrade-${sub.id}-${item.price.id}-${priceId}-${Math.floor(Date.now() / 1800000)}` });
+      });
+      // No idempotency key here, and that is the fix rather than an omission.
+      // The key was `…-{sub}-{from}-{to}-{30-minute bucket}`, so Starter -> Pro ->
+      // Starter -> Pro inside one window sent the FIRST key again and Stripe
+      // replayed its stored response: the subscription stayed on Starter while we
+      // read Pro out of the replay and granted the Pro quota. The customer would
+      // have paid $9 for 50,000 documents. What actually collapses a double click
+      // is the account row lock plus the re-read of Stripe above — the second
+      // click sees Pro and takes the "already on this plan" branch. The Stripe
+      // client still generates its own key per request, so an SDK network retry
+      // cannot duplicate anything.
       // A pending update is an UNPAID upgrade: Stripe keeps the old price until
       // the prorated invoice clears. Writing the new plan here would hand out the
       // larger quota before the money moved, so the entitlement is left alone and
@@ -138,6 +238,17 @@ async function createCheckoutSession(account, planId) {
       if (session.metadata.plan === planId) return session;
       await stripe.checkout.sessions.expire(session.id);
     }
+  // No idempotency key on this call either, for the same reason and with a worse
+  // symptom. The key spanned a 30-minute window, and choosing a different plan
+  // EXPIRES the session created for the first one — so Starter, then Pro, then
+  // Starter again replayed the dead Starter session and Stripe's page told the
+  // buyer "You're all done here. You've either completed your payment or this
+  // checkout session has timed out." They could not pay, and nothing said why.
+  // The replayed body is no help in spotting it: it still reads `status: "open"`
+  // while a fresh retrieve of the same id says `expired`. Keying the retry on the
+  // dead session's id only moves the problem, because that key is replayable too.
+  // What stops two sessions is the row lock plus the reuse of the OPEN session
+  // listed immediately above.
   return stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
@@ -164,7 +275,7 @@ async function createCheckoutSession(account, planId) {
     client_reference_id: String(account.id),
     subscription_data: { metadata: { account_id: String(account.id), plan: planId } },
     metadata: { account_id: String(account.id), plan: planId, service: 'pdfmint' },
-  }, { idempotencyKey: `pdfmint-checkout-${account.id}-${planId}-${Math.floor(Date.now() / 1800000)}` });
+  });
   });
 }
 

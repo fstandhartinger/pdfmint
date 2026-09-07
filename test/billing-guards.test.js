@@ -38,7 +38,20 @@ function load(opts = {}) {
   }]));
   const priceOf = (id) => (id === 'free' ? null : `price_test_${id}`);
 
-  const calls = { checkoutCreate: [], subUpdate: [], portal: [], expire: [], sessionRetrieve: null };
+  const calls = { checkoutCreate: [], subUpdate: [], portal: [], expire: [], cancel: [], sessionRetrieve: null };
+  // Stripe stores the response body against an idempotency key for 24 hours and
+  // REPLAYS it verbatim on the next request carrying the same key. That replay is
+  // the whole of finding D, so the mock has to do it too; a mock that quietly
+  // performs the operation again cannot see the bug.
+  const idempotent = new Map();
+  const replay = async (options, produce) => {
+    const key = options && options.idempotencyKey;
+    if (key && idempotent.has(key)) return JSON.parse(JSON.stringify(idempotent.get(key)));
+    const made = await produce();
+    if (key) idempotent.set(key, JSON.parse(JSON.stringify(made)));
+    return made;
+  };
+  let invoices = JSON.parse(JSON.stringify(opts.invoices || []));
   const dbUpdates = [];
   const seenEvents = new Set();
   let failDb = false;
@@ -77,25 +90,53 @@ function load(opts = {}) {
       },
       update: async (id, args, options) => {
         calls.subUpdate.push({ id, args, options });
-        const before = subscriptions.find((x) => x.id === id);
-        const after = {
-          ...before,
-          items: { data: [{ ...before.items.data[0], price: { id: args.items[0].price } }] },
-          latest_invoice: { hosted_invoice_url: 'https://invoice.invalid/i1' },
-        };
-        if (opts.pendingUpdate) after.pending_update = { expires_at: 1 };
-        subscriptions = subscriptions.map((x) => (x.id === id ? after : x));
-        return after;
+        return replay(options, async () => {
+          const before = subscriptions.find((x) => x.id === id);
+          const after = {
+            ...before,
+            items: { data: [{ ...before.items.data[0], price: { id: args.items[0].price } }] },
+            latest_invoice: { hosted_invoice_url: 'https://invoice.invalid/i1' },
+          };
+          if (opts.pendingUpdate) after.pending_update = { expires_at: 1 };
+          subscriptions = subscriptions.map((x) => (x.id === id ? after : x));
+          return after;
+        });
+      },
+      // Cancelling an incomplete subscription voids its open invoice, and Stripe
+      // then refuses a late payment outright.
+      cancel: async (id) => {
+        calls.cancel.push(id);
+        const sub = subscriptions.find((x) => x.id === id);
+        if (sub) sub.status = sub.status === 'incomplete' ? 'incomplete_expired' : 'canceled';
+        const invId = sub && (typeof sub.latest_invoice === 'string' ? sub.latest_invoice : sub.latest_invoice?.id);
+        const inv = invoices.find((x) => x.id === invId);
+        if (inv) inv.status = 'void';
+        return sub || { id, status: 'canceled' };
       },
     },
     checkout: {
       sessions: {
         create: async (args, options) => {
           calls.checkoutCreate.push({ args, options });
-          return { id: `cs_${++seq}`, url: `https://checkout.invalid/cs_${seq}`, ...args };
+          return replay(options, async () => {
+            const made = { id: `cs_${++seq}`, status: 'open', url: `https://checkout.invalid/cs_${seq}`, ...args };
+            sessions.push(made);
+            return made;
+          });
         },
-        list: async () => ({ data: opts.openSessions || [], has_more: false }),
-        expire: async (id) => { calls.expire.push(id); return { id, status: 'expired' }; },
+        // A real list reflects what expire() did; a static one cannot show that a
+        // replayed session is dead.
+        list: async (params = {}) => {
+          const all = [...(opts.openSessions || []), ...sessions];
+          const data = params.status ? all.filter((x) => (x.status || 'open') === params.status) : all;
+          return { data, has_more: false };
+        },
+        expire: async (id) => {
+          calls.expire.push(id);
+          const found = sessions.find((x) => x.id === id) || (opts.openSessions || []).find((x) => x.id === id);
+          if (found) found.status = 'expired';
+          return found || { id, status: 'expired' };
+        },
         retrieve: async (id, options) => {
           calls.sessionRetrieve = options && options.expand;
           const found = sessions.find((x) => x.id === id);
@@ -106,6 +147,18 @@ function load(opts = {}) {
           }
           return found;
         },
+      },
+    },
+    invoices: {
+      retrieve: async (id) => {
+        if (opts.invoiceUnreadable) throw new Error('injected: invoice unreadable');
+        const found = invoices.find((x) => x.id === id);
+        if (!found) {
+          const e = new Error('No such invoice: ' + id);
+          e.code = 'resource_missing'; e.statusCode = 404;
+          throw e;
+        }
+        return JSON.parse(JSON.stringify(found));
       },
     },
     billingPortal: { sessions: { create: async (args) => { calls.portal.push(args); return { url: 'https://portal.invalid' }; } } },
@@ -218,6 +271,10 @@ function load(opts = {}) {
     quota: () => (account.quota_month !== undefined && api.BRAND_NAME === 'MailMint' ? account.quota_month : account.credits_limit),
     addSubscription: (s) => subscriptions.push(s),
     addSession: (s) => sessions.push(s),
+    addInvoice: (i) => invoices.push(i),
+    subscriptionsNow: () => JSON.parse(JSON.stringify(subscriptions)),
+    sessionsNow: () => JSON.parse(JSON.stringify(sessions)),
+    invoicesNow: () => JSON.parse(JSON.stringify(invoices)),
   };
 }
 
@@ -239,14 +296,19 @@ describe('C2 — an existing subscription is changed, never duplicated', () => {
     assert.ok(h.calls.subUpdate.length >= 1, 'the existing subscription must be updated');
   });
 
-  test('duplicate clicks carry one idempotency key, so Stripe collapses them', async () => {
+  test('duplicate clicks are collapsed by the row lock, not by an idempotency key', async () => {
+    // This test used to require a window-spanning idempotency key on the update.
+    // Finding D showed that key is not what collapses a double click — the
+    // account row lock and the re-read of Stripe inside it are — and that the key
+    // actively harms: Starter -> Pro -> Starter -> Pro replayed the first
+    // response and granted a plan the customer was not on. See the D suite.
     const h = load({ account: paying() });
     h.addSubscription(existingSub(h));
     await h.api.createCheckoutSession(h.account, 'pro');
     await h.api.createCheckoutSession(h.account, 'pro');
-    const keys = h.calls.subUpdate.map((u) => u.options && u.options.idempotencyKey);
-    assert.ok(keys.every(Boolean), 'every update must carry an idempotency key');
-    assert.equal(new Set(keys).size, 1, 'the same click twice must reuse one key');
+    assert.equal(h.calls.subUpdate.length, 1, 'the second click finds Pro already in place');
+    assert.equal(h.calls.checkoutCreate.length, 0, 'and never opens a second subscription');
+    assert.ok(h.calls.subUpdate.every((u) => !(u.options && u.options.idempotencyKey)));
   });
 
   test('the upgrade is prorated, and a pending payment grants no quota yet', async () => {
@@ -277,14 +339,28 @@ describe('C2 — a half-finished checkout leaves nothing broken behind', () => {
     // Stripe keeps a failed first payment as `incomplete` for about a day. It
     // granted nothing, so parking the buyer in a billing portal for 24 hours
     // instead of a payment page was a revenue bug, not a safety measure.
+    //
+    // Finding B added one condition: the buyer gets a payment page, but the
+    // abandoned attempt must be made unpayable first, or the two sit there
+    // side by side and both can be paid. The attempt here is for Starter and the
+    // buyer is now asking for Pro, so it is cancelled rather than resumed. The
+    // original object had no `latest_invoice` at all, which an `incomplete`
+    // subscription in Stripe never does; it now has one.
     const h = load({ account: paying({ plan: 'free', stripe_subscription_id: null }) });
     const sub = existingSub(h);
     sub.id = 'sub_incomplete';
     sub.status = 'incomplete';
+    sub.latest_invoice = 'in_incomplete';
     h.addSubscription(sub);
+    h.addInvoice({
+      id: 'in_incomplete', status: 'open', hosted_invoice_url: 'https://invoice.invalid/in_incomplete',
+      payment_intent: { id: 'pi_i', status: 'requires_payment_method' },
+    });
     await h.api.createCheckoutSession(h.account, 'pro');
     assert.equal(h.calls.checkoutCreate.length, 1, 'the buyer must get a payment page');
-    assert.equal(h.calls.portal.length, 0);
+    assert.equal(h.calls.portal.length, 0, 'a dead end for 24 hours is still not acceptable');
+    assert.deepEqual(h.calls.cancel, ['sub_incomplete'], 'and the old attempt must not stay payable beside it');
+    assert.equal(h.invoicesNow()[0].status, 'void');
   });
 
   test('a checkout that fails afterwards keeps the Stripe customer it created', async () => {
@@ -643,5 +719,213 @@ describe('C5 — a paid plan must not depend on which webhook lands last', () =>
     });
     assert.equal(h.account.plan, 'starter');
     assert.equal(h.dbUpdates.length, 0, 'nothing may be written for another product');
+  });
+});
+
+/**
+ * B — an abandoned first attempt must never become a second subscription.
+ *
+ * Found in DocMint on 2026-09-06 (docmint-billing-followup-REPORT.md §2) and asked
+ * of PDFMint here because the two checkout paths are the same code.
+ *
+ * An `incomplete` subscription is a first payment that has not cleared. It grants
+ * nothing, but its invoice stays PAYABLE for about a day. Filtering it out of
+ * "current" and opening a second checkout next to it is how one buyer ends up
+ * paying for two plans at once — and, because the later webhook wins, ends up on
+ * the cheaper one's quota.
+ */
+describe('B — an abandoned first attempt must never become a second subscription', () => {
+  const CUS = 'cus_guards';
+  const attempt = (h, plan = 'starter', over = {}) => ({
+    id: 'sub_attempt', customer: CUS, status: 'incomplete',
+    latest_invoice: 'in_attempt',
+    metadata: { account_id: '71', plan },
+    items: { data: [{ id: 'si_attempt', price: { id: h.priceOf(plan) }, quantity: 1 }] },
+    ...over,
+  });
+  const openInvoice = (over = {}) => ({
+    id: 'in_attempt', status: 'open', hosted_invoice_url: 'https://invoice.invalid/in_attempt',
+    payment_intent: { id: 'pi_attempt', status: 'requires_payment_method' }, ...over,
+  });
+  const withAttempt = (plan = 'starter', invoice = openInvoice(), loadOpts = {}) => {
+    const h = load({ account: { stripe_customer_id: CUS }, ...loadOpts });
+    h.addSubscription(attempt(h, plan));
+    if (invoice) h.addInvoice(invoice);
+    return h;
+  };
+  const statusOf = (h, id) => (h.subscriptionsNow().find((s) => s.id === id) || {}).status;
+
+  test('asking again for the plan they started hands back THAT invoice, not a second checkout', async () => {
+    const h = withAttempt('starter');
+    const out = await h.api.createCheckoutSession(h.account, 'starter');
+    assert.equal(h.calls.checkoutCreate.length, 0, 'a second payable thing must not be created');
+    assert.equal(out.url, 'https://invoice.invalid/in_attempt', 'the buyer finishes the payment they started');
+    assert.equal(statusOf(h, 'sub_attempt'), 'incomplete', 'and the attempt they are paying must survive');
+  });
+
+  test('changing their mind voids the abandoned attempt before opening the new one', async () => {
+    const h = withAttempt('starter');
+    await h.api.createCheckoutSession(h.account, 'pro');
+    assert.deepEqual(h.calls.cancel, ['sub_attempt'], 'the abandoned attempt must be cancelled');
+    assert.equal(h.invoicesNow()[0].status, 'void', 'which is what makes its invoice unpayable');
+    assert.equal(h.calls.checkoutCreate.length, 1, 'and only then may a new checkout open');
+  });
+
+  test('a payment still settling is never voided, and no second checkout opens beside it', async () => {
+    // The buyer may be on the 3-D Secure step in another tab. Voiding an invoice
+    // whose charge is completing is how money is taken for nothing.
+    for (const status of ['processing', 'requires_capture', 'succeeded']) {
+      const h = withAttempt('starter', openInvoice({ payment_intent: { id: 'pi_x', status } }));
+      await h.api.createCheckoutSession(h.account, 'pro');
+      assert.deepEqual(h.calls.cancel, [], `a ${status} payment must not be cancelled`);
+      assert.equal(h.calls.checkoutCreate.length, 0, `nor may a second payable thing open beside a ${status} payment`);
+    }
+  });
+
+  test('an abandoned 3-D Secure step and a declined card ARE cleared', async () => {
+    for (const status of ['requires_action', 'requires_payment_method']) {
+      const h = withAttempt('starter', openInvoice({ payment_intent: { id: 'pi_x', status } }));
+      await h.api.createCheckoutSession(h.account, 'pro');
+      assert.deepEqual(h.calls.cancel, ['sub_attempt'], `${status} is abandoned, not settling`);
+    }
+  });
+
+  test('the newer API shape, where the intent hides under payments.data', async () => {
+    // Where the payment intent lives depends on the API version. Both expansions
+    // are requested; whichever answers is used, so a default-version bump cannot
+    // silently switch this guard off.
+    const h = withAttempt('starter', openInvoice({
+      payment_intent: undefined,
+      payments: { data: [{ payment: { payment_intent: { id: 'pi_x', status: 'processing' } } }] },
+    }));
+    await h.api.createCheckoutSession(h.account, 'pro');
+    assert.deepEqual(h.calls.cancel, [], 'a settling payment must be seen on the newer shape too');
+    assert.equal(h.calls.checkoutCreate.length, 0);
+  });
+
+  test('an attempt we cannot read is not voided on a guess, and blocks a second one', async () => {
+    const h = withAttempt('starter', openInvoice(), { invoiceUnreadable: true });
+    const out = await h.api.createCheckoutSession(h.account, 'pro');
+    assert.deepEqual(h.calls.cancel, [], 'nothing is voided on a guess');
+    assert.equal(h.calls.checkoutCreate.length, 0, 'and no second payable thing is created');
+    assert.equal(h.calls.portal.length, 1, 'the buyer goes somewhere a human can sort it out');
+    assert.match(out.url, /portal/);
+  });
+
+  test('an attempt with nothing payable left is simply ignored', async () => {
+    for (const status of ['paid', 'void']) {
+      const h = withAttempt('starter', openInvoice({ status }));
+      await h.api.createCheckoutSession(h.account, 'pro');
+      assert.deepEqual(h.calls.cancel, [], `an invoice that is ${status} needs no action`);
+      assert.equal(h.calls.checkoutCreate.length, 1, 'and must not block the buyer');
+    }
+  });
+
+  test("a sibling product's incomplete attempt is none of our business", async () => {
+    const h = load({ account: { stripe_customer_id: CUS } });
+    h.addSubscription({
+      id: 'sub_sibling', customer: CUS, status: 'incomplete', latest_invoice: 'in_sibling',
+      metadata: { account_id: '71' },
+      items: { data: [{ id: 'si_s', price: { id: 'price_of_a_sibling_product' }, quantity: 1 }] },
+    });
+    h.addInvoice(openInvoice({ id: 'in_sibling' }));
+    await h.api.createCheckoutSession(h.account, 'starter');
+    assert.deepEqual(h.calls.cancel, [], 'we do not cancel another product\'s subscription');
+    assert.equal(h.calls.checkoutCreate.length, 1);
+  });
+});
+
+/**
+ * D — a plan switch must never hand the buyer a dead link, or a plan they are not on.
+ *
+ * Found in DocMint on 2026-09-06 (docmint-billing-followup-REPORT.md §3). A Stripe
+ * idempotency key that spans a time window REPLAYS the response it stored, and the
+ * object in that response can since have been destroyed: choosing another plan
+ * expires the first checkout session. The replayed body still says `status: "open"`
+ * while the session is in fact expired — so the assertions below check the state of
+ * the object, never the body we were handed.
+ *
+ * PDFMint has a second instance of the same mechanism that DocMint does not: the
+ * upgrade path keys `subscriptions.update` the same way, and there a replay grants
+ * a plan the customer is not actually on at Stripe.
+ */
+describe('D — a plan switch must never hand back a dead session or a phantom plan', () => {
+  const CUS = 'cus_guards';
+  const paying = (over = {}) => ({ plan: 'starter', stripe_customer_id: CUS, stripe_subscription_id: 'sub_live', ...over });
+  const liveSub = (h, plan = 'starter') => ({
+    id: 'sub_live', customer: CUS, status: 'active',
+    metadata: { account_id: '71', plan },
+    items: { data: [{ id: 'si_live', price: { id: h.priceOf(plan) }, quantity: 1 }] },
+  });
+
+  test('starter, pro, starter again: the buyer is handed a session they can still pay', async () => {
+    const h = load({ account: { stripe_customer_id: CUS } });
+    const first = await h.api.createCheckoutSession(h.account, 'starter');
+    await h.api.createCheckoutSession(h.account, 'pro');
+    const again = await h.api.createCheckoutSession(h.account, 'starter');
+    const live = h.sessionsNow().find((x) => x.id === again.id);
+    assert.ok(live, 'the session handed back must exist');
+    assert.equal(live.status, 'open',
+      'the buyer must not land on "You\'re all done here" for a session that was expired in between');
+    assert.notEqual(again.id, first.id, 'the first session was expired when they chose Pro');
+  });
+
+  test('the same is true a second time in a row', async () => {
+    // The previous attempt at this fix passed once and then failed, so the shape
+    // of the reproduction matters: run it twice.
+    for (let i = 0; i < 2; i += 1) {
+      const h = load({ account: { stripe_customer_id: CUS } });
+      await h.api.createCheckoutSession(h.account, 'starter');
+      await h.api.createCheckoutSession(h.account, 'pro');
+      const again = await h.api.createCheckoutSession(h.account, 'starter');
+      assert.equal(h.sessionsNow().find((x) => x.id === again.id).status, 'open', `run ${i + 1}`);
+    }
+  });
+
+  test('checkout creation carries no window-spanning idempotency key', async () => {
+    // What collapses a double click is the account row lock plus the reuse of the
+    // OPEN session listed in the same transaction — both measured. A key that
+    // spans a window adds nothing and can only replay something already dead.
+    const h = load({ account: { stripe_customer_id: CUS } });
+    await h.api.createCheckoutSession(h.account, 'starter');
+    const options = h.calls.checkoutCreate[0].options || {};
+    assert.equal(options.idempotencyKey, undefined);
+  });
+
+  test('a double click still opens exactly one checkout', async () => {
+    const h = load({ account: { stripe_customer_id: CUS } });
+    const a = await h.api.createCheckoutSession(h.account, 'starter');
+    const b = await h.api.createCheckoutSession(h.account, 'starter');
+    assert.equal(h.calls.checkoutCreate.length, 1, 'the second click reuses the first click\'s open session');
+    assert.equal(a.id, b.id);
+  });
+
+  test('starter, pro, starter, pro: the plan we grant is the plan Stripe is on', async () => {
+    const h = load({ account: paying() });
+    h.addSubscription(liveSub(h, 'starter'));
+    await h.api.createCheckoutSession(h.account, 'pro');
+    await h.api.createCheckoutSession(h.account, 'starter');
+    await h.api.createCheckoutSession(h.account, 'pro');
+    const atStripe = h.subscriptionsNow().find((x) => x.id === 'sub_live').items.data[0].price.id;
+    assert.equal(atStripe, h.priceOf('pro'), 'the switch back to Pro must actually happen at Stripe');
+    assert.equal(h.account.plan, 'pro', 'and the quota we grant must match it');
+  });
+
+  test('the upgrade carries no window-spanning idempotency key either', async () => {
+    const h = load({ account: paying() });
+    h.addSubscription(liveSub(h, 'starter'));
+    await h.api.createCheckoutSession(h.account, 'pro');
+    const options = h.calls.subUpdate[0].options || {};
+    assert.equal(options.idempotencyKey, undefined);
+  });
+
+  test('two upgrade clicks still change the subscription exactly once', async () => {
+    const h = load({ account: paying() });
+    h.addSubscription(liveSub(h, 'starter'));
+    await h.api.createCheckoutSession(h.account, 'pro');
+    await h.api.createCheckoutSession(h.account, 'pro');
+    assert.equal(h.calls.subUpdate.length, 1,
+      'the second click re-reads Stripe under the row lock, sees Pro, and changes nothing');
+    assert.equal(h.calls.checkoutCreate.length, 0, 'and never opens a second subscription');
   });
 });
