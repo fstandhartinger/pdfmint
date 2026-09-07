@@ -81,6 +81,11 @@ function load(opts = {}) {
         // behave like Stripe: an id it does not hold is a 404, not a helpful
         // stand-in. A lenient stub here would let a test pass because the mock
         // invented an active subscription.
+        if (opts.failRetrievePermanent) {
+          const e = new Error('No such subscription: ' + id);
+          e.code = 'resource_missing'; e.statusCode = 404;
+          throw e;
+        }
         if (opts.failRetrieve) throw new Error('injected Stripe outage on subscriptions.retrieve');
         const found = subscriptions.find((s) => s.id === id);
         if (found) return JSON.parse(JSON.stringify(found));
@@ -195,12 +200,19 @@ function load(opts = {}) {
   const tx = async (fn) => {
     const markers = new Set(seenEvents);
     const writes = dbUpdates.length;
+    // The account row is mutated in place by runQuery, so a rollback has to undo
+    // that too. Without this, a test asserting "nothing was written" passes
+    // whenever the throw happens to precede the UPDATE — which is passing for the
+    // wrong reason, and would go on passing if the throw moved.
+    const before = JSON.parse(JSON.stringify(account));
     try {
       return await fn({ query: runQuery });
     } catch (e) {
       seenEvents.clear();
       markers.forEach((m) => seenEvents.add(m));
       dbUpdates.length = writes;         // ROLLBACK
+      for (const k of Object.keys(account)) delete account[k];
+      Object.assign(account, before);
       throw e;
     }
   };
@@ -275,6 +287,8 @@ function load(opts = {}) {
     subscriptionsNow: () => JSON.parse(JSON.stringify(subscriptions)),
     sessionsNow: () => JSON.parse(JSON.stringify(sessions)),
     invoicesNow: () => JSON.parse(JSON.stringify(invoices)),
+    setRetrieveFails: (v) => { opts.failRetrieve = v; },
+    setRetrievePermanent: (v) => { opts.failRetrievePermanent = v; },
   };
 }
 
@@ -418,6 +432,14 @@ describe('C2 — one Stripe account serves several products', () => {
 
   test('cancelling the CURRENT subscription still downgrades, as it must', async () => {
     const h = load({ account: paying({ plan: 'pro', stripe_subscription_id: 'sub_mine' }) });
+    // Stripe answers for a cancelled subscription, so the fixture holds one: a stub
+    // that 404s where Stripe would answer is not a faithful stub, and the
+    // authoritative read is what decides this now.
+    h.addSubscription({
+      id: 'sub_mine', status: 'canceled', customer: 'cus_guards',
+      metadata: { account_id: '71', plan: 'pro' },
+      items: { data: [{ price: { id: h.priceOf('pro') } }] },
+    });
     await h.fireEvent({
       id: 'evt_own_cancel', type: 'customer.subscription.deleted',
       data: { object: {
@@ -693,17 +715,77 @@ describe('C5 — a paid plan must not depend on which webhook lands last', () =>
     assert.equal(h.account.plan, 'free');
   });
 
-  test('a Stripe outage falls back to the event body rather than losing the plan', async () => {
-    // Asking Stripe is better information, not a new dependency to fail on. When
-    // the call fails this must do exactly what it did before: believe the body.
+  test('a Stripe outage writes nothing and leaves the delivery retryable', async () => {
+    // This test used to require the opposite — believe the body, because "an outage
+    // must not silently strip a paying customer". Measured on 2026-09-07 against
+    // THIS product's deployed image (547ff2d) with Stripe genuinely unreachable
+    // from the container, believing the body is exactly what stripped them:
+    //
+    //   before starter|5000|sub_1UCuEg…   after free|10|(cleared)
+    //   HTTP 200, and the event id consumed, so the retry would be a duplicate
+    //
+    // A snapshot we could not confirm is not a fact. The customer gets what they
+    // paid for on the redelivery instead.
     const h = load({ account: { stripe_customer_id: CUS }, failRetrieve: true });
     h.addSubscription(authoritative(h));
-    await h.fireEvent({
+    const event = {
       id: 'evt_outage', type: 'customer.subscription.updated',
       data: { object: { ...authoritative(h), status: 'active' } },
-    });
-    assert.equal(h.account.plan, 'starter', 'an outage must not silently strip a paying customer');
+    };
+    await assert.rejects(() => h.fireEvent(event), 'the delivery must fail so Stripe retries it');
+    assert.equal(h.account.plan, 'free', 'nothing is written from an unconfirmed snapshot');
+
+    h.setRetrieveFails(false);
+    const retry = await h.fireEvent(event);
+    assert.ok(!retry.duplicate, 'the event id was not consumed, so the retry still fulfils');
+    assert.equal(h.account.plan, 'starter', 'the paid plan lands, a little later');
+  });
+
+  test('a stale "incomplete" body cannot downgrade a paid account when Stripe is down', async () => {
+    const h = load({ account: paying({ stripe_customer_id: CUS, stripe_subscription_id: SUB }), failRetrieve: true });
+    h.addSubscription(authoritative(h));
+    await assert.rejects(() => h.fireEvent({
+      id: 'evt_outage_created', type: 'customer.subscription.created',
+      data: { object: { ...authoritative(h), status: 'incomplete' } },
+    }));
+    assert.equal(h.account.plan, 'starter');
     assert.equal(h.account.stripe_subscription_id, SUB);
+  });
+
+  test('an outage after a write in the same transaction still leaves nothing behind', async () => {
+    // The rollback is the guarantee, not the ordering of the throw: this fires an
+    // event that applies a plan and then makes the NEXT read fail, so the harness
+    // has to show the account exactly as it was.
+    const h = load({ account: paying({ stripe_customer_id: CUS, stripe_subscription_id: SUB }) });
+    h.addSubscription(authoritative(h));
+    const before = h.account.plan;
+    h.setRetrieveFails(true);
+    await assert.rejects(() => h.fireEvent({
+      id: 'evt_rollback', type: 'customer.subscription.updated',
+      data: { object: { ...authoritative(h), status: 'active' } },
+    }));
+    assert.equal(h.account.plan, before, 'the transaction rolled back, so the row is untouched');
+  });
+
+  test('a failure Stripe will never resolve is answered, but still writes nothing', async () => {
+    // "No such subscription", a key in the wrong mode, a restricted key: retrying
+    // for three days cannot fix any of them, and an endpoint that fails
+    // continuously eventually gets disabled — which would take the deliveries that
+    // DO work down with it. Answered, then: still writes nothing, still does not
+    // consume the event id.
+    const h = load({ account: paying({ stripe_customer_id: CUS, stripe_subscription_id: SUB }), failRetrievePermanent: true });
+    const event = {
+      id: 'evt_perm', type: 'customer.subscription.created',
+      data: { object: { ...authoritative(h), status: 'incomplete' } },
+    };
+    const out = await h.fireEvent(event);
+    assert.equal(out.ignored, 'subscription_unverifiable');
+    assert.equal(h.account.plan, 'starter');
+
+    h.setRetrievePermanent(false);
+    h.addSubscription(authoritative(h));
+    const again = await h.fireEvent(event);
+    assert.ok(!again.duplicate, 'the event id was not consumed, so a redelivery still works');
   });
 
   test("a foreign product's subscription is refused before Stripe is called at all", async () => {

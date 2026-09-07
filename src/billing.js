@@ -321,6 +321,55 @@ function planForPriceId(priceId) {
  * Stripe a moment ago — the checkout path — pass `false`; webhook bodies, which
  * are snapshots, do not. See the block below.
  */
+/**
+ * Asks Stripe what a subscription is now, and turns a failure into something the
+ * caller may not confuse with an answer.
+ *
+ * The old code fell back to the event body here, on the reasoning that asking
+ * Stripe is better information and not a new dependency to fail on. Measured on
+ * 2026-09-07 against this deployed image (547ff2d), with Stripe genuinely
+ * unreachable from the container, that fallback is what stripped a paying
+ * customer: the `created` body says `incomplete` every time, so a paid account
+ * went from `starter / 5000` to `free / 10` with the subscription id cleared —
+ * answered HTTP 200, so nothing was retried, and consumed the event id, so the
+ * retry would have been a duplicate.
+ *
+ * So a snapshot we cannot confirm is never acted on. What differs is the answer:
+ *
+ *   transient — a connection failure, a timeout, a rate limit, a Stripe 5xx, and
+ *     also a key that is wrong or restricted: all of those are fixed by somebody,
+ *     and Stripe redelivers for three days. The delivery fails, the event id rolls
+ *     back with the transaction, and the plan is decided minutes late instead of
+ *     wrongly. A wrong key also shows up in Stripe's own failed-delivery list,
+ *     which answering 200 would hide.
+ *   permanent — "no such subscription", and only that. Redelivering cannot make
+ *     the object exist, and an endpoint that fails continuously eventually gets
+ *     disabled, which would take the deliveries that DO work with it. So it is
+ *     answered — still writing nothing, still not consuming the event id.
+ *
+ * The read is bounded and does NOT retry in-process: it happens while an account
+ * row is locked and the pool is small (PG_POOL_MAX defaults to 5), and Stripe's
+ * own redelivery is the retry. A 429 carrying Retry-After would otherwise hold
+ * that lock for up to a minute.
+ */
+function unverifiable(subscriptionId, e) {
+  const permanent = Boolean(e && (e.code === 'resource_missing' || e.statusCode === 404));
+  console.warn(`[stripe] could not confirm subscription ${subscriptionId} (${e && e.message});`
+    + ` refusing to act on the event body (permanent=${permanent})`);
+  const failure = new ApiError(503, 'subscription_unverifiable',
+    `Could not confirm subscription ${subscriptionId} with Stripe; refusing to act on the event body.`);
+  failure.stripePermanent = permanent;
+  return failure;
+}
+
+async function confirmSubscription(id) {
+  try {
+    return await stripe.subscriptions.retrieve(String(id), {}, { timeout: 5000, maxNetworkRetries: 0 });
+  } catch (e) {
+    throw unverifiable(id, e);
+  }
+}
+
 async function applySubscription(subscription, run = query, { refresh = true } = {}) {
   const accountId = subscription.metadata?.account_id;
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id;
@@ -379,18 +428,16 @@ async function applySubscription(subscription, run = query, { refresh = true } =
    * account row is locked. That is what makes the outcome independent of delivery
    * order: Stripe gives the same answer to all four events, their snapshots do not.
    *
-   * A failure here falls back to the snapshot. Asking Stripe is better
-   * information, not a new way to fail — the snapshot is what this did in every
-   * case before, so the fallback is no worse than before, and it is loud in the log.
+   * A failure here is NOT a licence to use the snapshot — see unverifiable()
+   * above for what happens instead, and for the measurement that changed it.
    */
   let current = subscription;
   if (refresh && stripe && subscription.id) {
     try {
-      // Bounded tightly, and on this call alone: it happens while an account row
-      // is locked inside the transaction, and the pool is PG_POOL_MAX (5 by
-      // default). A Stripe incident must cost one webhook five seconds, not hold
-      // a lock and a connection long enough to stall rendering as well. The
-      // catch below is the whole point — five seconds and then the event body.
+      // Bounded, and deliberately without an in-process retry: this happens while
+      // an account row is locked and the pool is PG_POOL_MAX (5 by default), so a
+      // Stripe incident must cost one webhook five seconds rather than hold a lock
+      // and a connection. The retry is Stripe's redelivery. See unverifiable().
       const found = await stripe.subscriptions.retrieve(String(subscription.id), {},
         { timeout: 5000, maxNetworkRetries: 0 });
       if (found && found.id) {
@@ -403,8 +450,7 @@ async function applySubscription(subscription, run = query, { refresh = true } =
         }
       }
     } catch (e) {
-      console.warn(`[stripe] could not re-read subscription ${subscription.id} (${e.message});`
-        + ' falling back to the event body, which may be out of date');
+      throw unverifiable(subscription.id, e);
     }
   }
 
@@ -437,6 +483,21 @@ async function applySubscription(subscription, run = query, { refresh = true } =
 }
 
 async function handleEvent(event) {
+  try {
+    return await handleEventInTransaction(event);
+  } catch (e) {
+    // Answered rather than retried, so a continuously-failing endpoint is not
+    // disabled and does not take the deliveries that do work with it. Nothing was
+    // written and the event id was not consumed: the transaction rolled back.
+    if (e && e.stripePermanent) {
+      console.error(`[stripe] event ${event.id} (${event.type}) could not be confirmed and never will be; ignoring`);
+      return { ignored: 'subscription_unverifiable' };
+    }
+    throw e;
+  }
+}
+
+async function handleEventInTransaction(event) {
   return tx(async client => {
   const run = client.query.bind(client);
   const { rowCount } = await run(`INSERT INTO stripe_events (id) VALUES ($1) ON CONFLICT DO NOTHING`, [event.id]);
@@ -454,7 +515,7 @@ async function handleEvent(event) {
         break;
       }
       if (session.subscription) {
-        const sub = await stripe.subscriptions.retrieve(String(session.subscription));
+        const sub = await confirmSubscription(String(session.subscription));
         if (!sub.metadata?.account_id && session.client_reference_id) {
           sub.metadata = { ...(sub.metadata || {}), account_id: session.client_reference_id };
         }
