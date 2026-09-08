@@ -519,8 +519,11 @@ async function handleEventInTransaction(event) {
         if (!sub.metadata?.account_id && session.client_reference_id) {
           sub.metadata = { ...(sub.metadata || {}), account_id: session.client_reference_id };
         }
-        // Retrieved from Stripe on the line above, so it is already current.
-        await applySubscription(sub, run, { refresh: false });
+        // The first lookup precedes the account lock. A concurrent paid upgrade
+        // can commit before we acquire it, so re-confirm under the lock rather
+        // than overwrite that upgrade with this earlier snapshot. A failed
+        // confirmation rolls back both the entitlement and event marker.
+        await applySubscription(sub, run);
       }
       break;
     }
