@@ -61,46 +61,74 @@ async function claim() {
   });
 }
 
-async function deliver(job, payload) {
-  if (!job.webhook_url) return;
-  const body = JSON.stringify(payload);
-
-  // Anything that learns a webhook URL could otherwise forge a "succeeded" call.
-  // The signature is HMAC-SHA256 over `timestamp.body` with the account's webhook
-  // secret, so a receiver can verify both the sender and that it is not a replay.
-  const { rows } = await query(`SELECT webhook_secret FROM accounts WHERE id = $1`, [job.account_id]).catch(() => ({ rows: [] }));
-  const secret = rows[0] && rows[0].webhook_secret;
-  const timestamp = Math.floor(Date.now() / 1000);
-  const headers = {
-    'Content-Type': 'application/json',
-    'User-Agent': 'PDFMint-Webhook/1',
-    'X-PDFMint-Timestamp': String(timestamp),
-    'X-PDFMint-Job-Id': job.id,
-    'X-PDFMint-Delivery-Id': `wh_${job.id}`,
-  };
-  if (secret) {
-    headers['X-PDFMint-Signature'] = `sha256=${crypto.createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex')}`;
-  }
-
-  for (let attempt = 1; attempt <= MAX_WEBHOOK_ATTEMPTS; attempt += 1) {
-    try {
-      const res = await fetch(job.webhook_url, {
-        method: 'POST',
-        headers,
-        body,
-        signal: AbortSignal.timeout(15000),
-      });
-      if (res.ok) {
-        await query(`UPDATE jobs SET attempts = $2 WHERE id = $1`, [job.id, attempt]);
-        return;
-      }
-      console.warn(`[jobs] webhook ${job.id} attempt ${attempt} -> HTTP ${res.status}`);
-    } catch (e) {
-      console.warn(`[jobs] webhook ${job.id} attempt ${attempt} failed: ${e.message}`);
+// A lease is longer than the HTTP timeout. An interrupted/ambiguous attempt is
+// replayed with the same delivery ID and body; only recorded outcomes consume
+// the three-attempt budget. Exactly-once HTTP is impossible: receivers dedupe ID.
+async function claimDelivery() {
+  return tx(async (client) => {
+    const { rows } = await client.query(`SELECT * FROM job_webhooks
+      WHERE (status = 'pending' AND next_attempt_at <= now())
+         OR (status = 'delivering' AND lease_until <= now())
+      ORDER BY next_attempt_at LIMIT 1 FOR UPDATE SKIP LOCKED`);
+    if (!rows.length) return null;
+    const delivery = rows[0];
+    const token = crypto.randomBytes(18).toString('hex');
+    let body = delivery.body;
+    if (!body) {
+      const p = delivery.payload;
+      const { file_path: filePath, ...rest } = p.result || {};
+      body = JSON.stringify(p.status === 'succeeded' ? {
+        job_id: p.job_id, status: p.status, ...rest,
+        ...(filePath ? { url: `${(config.publicUrl || '').replace(/\/$/, '')}${filePath}` } : {}),
+      } : { job_id: p.job_id, status: p.status, error: p.error });
     }
-    await query(`UPDATE jobs SET attempts = $2 WHERE id = $1`, [job.id, attempt]);
-    if (attempt < MAX_WEBHOOK_ATTEMPTS) await new Promise((r) => setTimeout(r, attempt * 4000));
-  }
+    await client.query(`UPDATE job_webhooks SET status = 'delivering', body = $2,
+      lease_token = $3, lease_until = now() + interval '18 seconds' WHERE job_id = $1`,
+    [delivery.job_id, body, token]);
+    return { ...delivery, body, lease_token: token };
+  });
+}
+
+async function deliver(delivery) {
+  let ok = false;
+  let error = null;
+  try {
+    const { rows } = await query(`SELECT webhook_secret FROM accounts WHERE id = $1`, [delivery.account_id]);
+    const secret = rows[0] && rows[0].webhook_secret;
+    // A transient DB failure must not downgrade a signed notification to unsigned.
+    if (!secret) throw new Error('Webhook signing secret unavailable');
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const headers = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'PDFMint-Webhook/1',
+      'X-PDFMint-Timestamp': timestamp,
+      'X-PDFMint-Job-Id': delivery.job_id,
+      'X-PDFMint-Delivery-Id': delivery.delivery_id,
+      'X-PDFMint-Signature': `sha256=${crypto.createHmac('sha256', secret).update(`${timestamp}.${delivery.body}`).digest('hex')}`,
+    };
+    const res = await fetch(delivery.webhook_url, {
+      method: 'POST', headers, body: delivery.body, signal: AbortSignal.timeout(15000),
+    });
+    ok = res.ok;
+    error = ok ? null : `HTTP ${res.status}`;
+    // Do not retain an unread response stream/socket between attempts.
+    if (res.body) await res.body.cancel();
+  } catch (e) { error = String(e.message || e).slice(0, 400); }
+  const attempt = delivery.attempts + 1;
+  // Fence a worker that resumes after its lease was reclaimed. The compatibility
+  // attempts field is only a projection; the outbox owns retry/exhaustion state.
+  await tx(async (client) => {
+    const { rowCount } = await client.query(`UPDATE job_webhooks
+      SET status = $3, attempts = $4, last_error = $5,
+          next_attempt_at = now() + ($6 * interval '1 millisecond'),
+          lease_token = NULL, lease_until = NULL,
+          finished_at = CASE WHEN $3 IN ('delivered','exhausted') THEN now() ELSE NULL END
+      WHERE job_id = $1 AND lease_token = $2 AND status = 'delivering'`,
+    [delivery.job_id, delivery.lease_token, ok ? 'delivered' : attempt >= MAX_WEBHOOK_ATTEMPTS ? 'exhausted' : 'pending',
+      attempt, error, attempt * 4000]);
+    if (rowCount) await client.query(`UPDATE jobs SET attempts = GREATEST(attempts, $2) WHERE id = $1`,
+      [delivery.job_id, attempt]);
+  });
 }
 
 /**
@@ -122,15 +150,8 @@ function startWorker(runner) {
         await query(`UPDATE jobs SET status = 'succeeded', result = $2, finished_at = now()
                       WHERE id = $1 AND status = 'running'`,
           [job.id, JSON.stringify(result)]);
-        // The webhook has no request to take a host from, so it uses the configured
-        // public URL. The stored path stays relative for GET /v1/jobs/{id}.
-        const { file_path: filePath, ...rest } = result;
-        await deliver(job, {
-          job_id: job.id,
-          status: 'succeeded',
-          ...rest,
-          ...(filePath ? { url: `${(config.publicUrl || '').replace(/\/$/, '')}${filePath}` } : {}),
-        });
+        // The migration trigger atomically records the notification with this
+        // transition, including transitions made by an old in-flight worker.
       }
     } catch (e) {
       if (job) {
@@ -142,7 +163,6 @@ function startWorker(runner) {
         await query(`UPDATE jobs SET status = 'failed', error = $2, finished_at = now()
                       WHERE id = $1 AND status = 'running'`,
           [job.id, JSON.stringify(error)]).catch(() => {});
-        await deliver(job, { job_id: job.id, status: 'failed', error });
       } else {
         console.warn('[jobs] worker tick failed:', e.message);
       }
@@ -151,6 +171,7 @@ function startWorker(runner) {
     }
   };
   setTimeout(tick, 3000).unref();
+  const stopDelivery = startWebhookWorker();
 
   // Anything left 'running' when the process died is retried ONCE, then failed.
   //
@@ -158,7 +179,12 @@ function startWorker(runner) {
   // the renderer's memory kills the process before any catch block runs, so the
   // job stays 'running', gets requeued on the next boot, and takes the service
   // down again on a timer. One caller's document then becomes everyone's outage.
-  query(`UPDATE jobs
+  const recoverStalled = async () => {
+    const { rows: stale } = await query(`SELECT id FROM jobs
+      WHERE status = 'running' AND started_at < now() - interval '10 minutes'`);
+    // One job's failed refund must not roll back recovery of other accounts.
+    for (const candidate of stale) await tx(async (client) => {
+    const r = await client.query(`UPDATE jobs
             SET status      = CASE WHEN attempts >= 1 THEN 'failed' ELSE 'queued' END,
                 started_at  = NULL,
                 attempts    = attempts + 1,
@@ -169,31 +195,52 @@ function startWorker(runner) {
                     'message', 'The renderer stopped before this job finished, twice. The document is most likely too large to render.',
                     'hint', 'Split the document, or lower the page count, and try again.')
                   ELSE error END
-          WHERE status = 'running' AND started_at < now() - interval '10 minutes'
-          RETURNING id, status`)
-    .then(async (r) => {
-      if (!r.rowCount) return;
+          WHERE id = $1 AND status = 'running' AND started_at < now() - interval '10 minutes'
+          RETURNING id, status`, [candidate.id]);
       const failed = r.rows.filter((j) => j.status === 'failed');
-      // A crash kills the process before the in-flight catch can refund, so the
-      // credit is given back here instead. Without this the caller is billed for
-      // exactly the failure the docs promise is free.
+      // Transition, outbox entry and refund commit together. A killed worker or
+      // database error cannot leave a failed row whose refund was never made.
       for (const j of failed) {
-        await query(
+        await client.query(
           `UPDATE accounts SET credits_used = GREATEST(0, credits_used - 1)
              WHERE id = (SELECT account_id FROM jobs WHERE id = $1)`, [j.id],
-        ).catch(() => {});
+        );
       }
-      console.log(`[jobs] recovered ${r.rowCount} stalled job(s): ${r.rowCount - failed.length} requeued, `
-        + `${failed.length} failed for good and refunded`);
-    })
-    .catch(() => {});
+      return r.rowCount;
+    }).catch((e) => console.warn('[jobs] stalled recovery failed:', e.message));
+  };
+  const recoveryTick = async () => {
+    if (stopped) return;
+    await recoverStalled().catch((e) => console.warn('[jobs] stalled discovery failed:', e.message));
+    setTimeout(recoveryTick, 60000).unref();
+  };
+  recoveryTick();
 
+  return () => { stopped = true; stopDelivery(); };
+}
+
+/** Can remain running against the additive schema during an API binary rollback.
+ * Never claims renders, changes quota, or runs a reaper. */
+function startWebhookWorker() {
+  let stopped = false;
+  const deliveryTick = async () => {
+    if (stopped) return;
+    let delivery;
+    try {
+      delivery = await claimDelivery();
+      if (delivery) await deliver(delivery);
+    } catch (e) { console.warn('[jobs] delivery tick failed:', e.message); }
+    finally { setTimeout(deliveryTick, delivery ? 50 : POLL_MS).unref(); }
+  };
+  setTimeout(deliveryTick, 3000).unref();
   return () => { stopped = true; };
 }
 
 /** Deletes finished jobs after a week so the table stays small. */
 function startJobReaper() {
-  const tick = () => query(`DELETE FROM jobs WHERE finished_at < now() - interval '7 days'`).catch(() => {});
+  const tick = () => query(`DELETE FROM jobs WHERE finished_at < now() - interval '7 days'
+    AND NOT EXISTS (SELECT 1 FROM job_webhooks w WHERE w.job_id = jobs.id
+      AND w.status IN ('pending','delivering'))`).catch(() => {});
   setInterval(tick, 6 * 3600 * 1000).unref();
 }
 
@@ -244,4 +291,4 @@ async function cancel(accountId, id) {
     });
 }
 
-module.exports = { enqueue, get, cancel, startWorker, startJobReaper, MAX_WEBHOOK_ATTEMPTS };
+module.exports = { enqueue, get, cancel, startWorker, startWebhookWorker, startJobReaper, MAX_WEBHOOK_ATTEMPTS };

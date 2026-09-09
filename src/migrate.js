@@ -140,6 +140,7 @@ const STATEMENTS = [
 
   `CREATE INDEX IF NOT EXISTS usage_events_client_time_idx ON usage_events(client, created_at DESC)`,
   ...require('./recovery').migration,
+  ...require('./job-webhook-schema').migration,
 ];
 
 async function migrate() {

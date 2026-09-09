@@ -1252,6 +1252,7 @@ Every callback is signed, so you can tell ours from theirs:</p>
 
 <pre><code>X-PDFMint-Timestamp: 1787500123
 X-PDFMint-Job-Id: job_kx5zzjIJ2fy-vN-U
+X-PDFMint-Delivery-Id: wh_job_kx5zzjIJ2fy-vN-U
 X-PDFMint-Signature: sha256=9f2c…</code></pre>
 
 <p>The signature is <code>HMAC-SHA256(secret, "&lt;timestamp&gt;." + rawBody)</code>, hex-encoded.
@@ -1287,9 +1288,16 @@ app.post('/pdf-ready', express.raw({ type: 'application/json' }), (req, res) =&g
 consequential with the result, add a Code node that repeats the check above using the secret
 from your dashboard.</p>
 
-<p>Delivery is attempted three times with backoff, and each attempt is signed with a fresh
-timestamp. If all three fail the job is still <code>succeeded</code> — poll
-<code>GET /v1/jobs/{id}</code> to collect it.</p>
+<p>Success and failure notifications are stored with the finished job and resume after a
+worker restart. Delivery uses a 15-second timeout and up to three recorded attempts, with
+4-second then 8-second backoff. Each request has a fresh signed timestamp, the same body,
+and a stable <code>X-PDFMint-Delivery-Id</code>. An interrupted attempt whose acknowledgment
+was not saved is replayed, even if your receiver already accepted it: delivery is
+<strong>at least once, not exactly once</strong>. After verifying the signature, deduplicate
+by the body's <code>job_id</code> (or its corresponding delivery ID) before performing side effects.</p>
+<p>Three recorded failures exhaust that notification; restarting does not reset its retry
+budget. Delivery retries never render or charge again. A failed notification does not change
+the render's outcome — poll <code>GET /v1/jobs/{id}</code> to collect the result or error.</p>
 </section>
 
 <!-- ================================================================ DEBUG -->
