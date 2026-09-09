@@ -76,6 +76,7 @@ async function deliver(job, payload) {
     'User-Agent': 'PDFMint-Webhook/1',
     'X-PDFMint-Timestamp': String(timestamp),
     'X-PDFMint-Job-Id': job.id,
+    'X-PDFMint-Delivery-Id': `wh_${job.id}`,
   };
   if (secret) {
     headers['X-PDFMint-Signature'] = `sha256=${crypto.createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex')}`;
