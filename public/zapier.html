@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PDFMint for Zapier &mdash; join the private beta</title>
+<meta name="description" content="Use PDFMint in Zapier to generate PDFs and images, render saved templates, merge PDFs and return files to the next Zap step. The integration is in private beta.">
+<link rel="canonical" href="https://pdf.mintapis.com/zapier">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:url" content="https://pdf.mintapis.com/zapier">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PDFMint">
+<meta property="og:title" content="PDFMint for Zapier &mdash; private beta">
+<meta property="og:description" content="Generate PDFs and images, render templates and merge PDFs inside a Zap. Free PDFMint account; private Zapier beta.">
+<meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/docs.css">
+</head>
+<body class="docs">
+<header class="docs-top">
+  <a class="logo" href="/">PDF<span>Mint</span></a>
+  <nav>
+    <a href="/docs">API reference</a>
+    <a href="/n8n-html-to-pdf">n8n</a>
+    <a href="/status">Status</a>
+    <a href="/login">Sign in</a>
+    <a class="cta" href="/signup">Get an API key</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside class="toc">
+    <button class="toc-toggle" id="tocToggle" aria-expanded="false" aria-controls="tocBody">On this page</button>
+    <div class="toc-body" id="tocBody">
+      <h2>Zapier beta</h2>
+      <ul>
+        <li><a href="#status">What beta means</a></li>
+        <li><a href="#actions">Available actions</a></li>
+        <li><a href="#start">Set it up</a></li>
+        <li><a href="#limits">Honest limits</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="content">
+    <h1>PDFMint for Zapier</h1>
+    <p class="lede">Turn HTML, Markdown, a URL or a saved template into a PDF inside a Zap, then hand the file straight to Gmail, Google Drive, Dropbox or the next step. The PDFMint integration is available as an opt-in private beta while it works toward Zapier&rsquo;s public-directory usage requirement.</p>
+
+    <div class="note" id="status">
+      <p><strong>This is a private beta, not a public Zapier listing.</strong> The integration passes Zapier&rsquo;s current structural and integration checks, but Zapier requires three users with live Zaps before an app can be submitted for public access. It currently has one. Joining is optional and creates no paid subscription; PDFMint&rsquo;s free plan includes 10 documents a month and needs no card.</p>
+    </div>
+
+    <section id="actions">
+      <h2>What the beta can do <a class="anchor" href="#actions">#</a></h2>
+      <ul>
+        <li><strong>Generate PDF</strong> from HTML, Markdown or a URL.</li>
+        <li><strong>Generate PDF from template</strong> by mapping fields from an earlier Zap step.</li>
+        <li><strong>Generate image</strong> as PNG, JPEG or WebP.</li>
+        <li><strong>Merge PDFs</strong> and return one file.</li>
+        <li><strong>Save, find and list templates</strong> without copying template IDs by hand.</li>
+      </ul>
+      <p>Generated files use Zapier&rsquo;s normal file output, so the next step receives a file rather than a base64 string you have to decode.</p>
+    </section>
+
+    <section id="start">
+      <h2>Set it up <a class="anchor" href="#start">#</a></h2>
+      <ol>
+        <li><a href="/signup">Create a free PDFMint account</a> and copy the API key shown once.</li>
+        <li><a href="https://zapier.com/developer/public-invite/245495/509853/82dee3f1793e3c6371627cf78a0c73c8/" rel="nofollow noopener">Accept the PDFMint 1.0.1 beta invitation on Zapier</a>.</li>
+        <li>Create a Zap, choose <strong>PDFMint</strong>, then paste the API key when Zapier asks for a connection.</li>
+        <li>Run Zapier&rsquo;s test step and inspect the returned PDF or image before turning the Zap on.</li>
+      </ol>
+      <p><a class="cta" href="https://zapier.com/developer/public-invite/245495/509853/82dee3f1793e3c6371627cf78a0c73c8/" rel="nofollow noopener">Join the Zapier beta</a></p>
+    </section>
+
+    <section id="limits">
+      <h2>What we cannot claim yet <a class="anchor" href="#limits">#</a></h2>
+      <p>The integration is not searchable in Zapier&rsquo;s public App Directory, has not reached Zapier&rsquo;s three-live-user publishing threshold, and has no Zapier customer case study we have permission to publish. A beta invitation is not an endorsement or approval by Zapier. If a private integration is unsuitable for your production policy, use the documented <a href="/docs">HTTP API</a> or the verified <a href="/n8n-html-to-pdf">n8n node</a> instead.</p>
+    </section>
+  </main>
+</div>
+
+<script src="/docs.js"></script>
+</body>
+</html>
