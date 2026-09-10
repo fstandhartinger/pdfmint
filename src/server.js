@@ -86,6 +86,7 @@ app.get('/f/:token', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+require('./ads-report').install(app);
 app.use('/', status.router);
 app.use('/v1', api.router);
 app.use('/', web.router);

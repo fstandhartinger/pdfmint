@@ -9,6 +9,7 @@ const { query } = require('./db');
 const bcrypt = require('bcryptjs');
 const { createAccount, verifyLogin, createSession, accountForSession, destroySession, issueApiKey,
         stashKeyForSession, takeKeyForSession, revokeApiKey } = require('./auth');
+const ads = require('./ads');
 const billing = require('./billing');
 const { escapeHtml } = require('./markdown');
 
@@ -48,7 +49,10 @@ function shell(title, body, opts = {}) {
 <style>${css}</style></head><body>${body}</body></html>`;
 }
 
-function authForm(kind, error, values = {}) {
+// `adsToken` is only ever a server-minted, HMAC-signed campaign token from
+// src/ads.js (or null). It is why the signup form can carry attribution without
+// letting a visitor invent a campaign — an unknown `?campaign=` is never signed.
+function authForm(kind, error, values = {}, adsToken = null) {
   const isSignup = kind === 'signup';
   return shell(isSignup ? 'Create your PDFMint account' : 'Sign in to PDFMint', `
 <main class="auth">
@@ -58,6 +62,7 @@ function authForm(kind, error, values = {}) {
   ${isSignup ? '<p class="muted">Use an email address you can access. You can reset your password by email.</p>' : ''}
   ${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}
   <form method="post" action="/${kind}">
+    ${isSignup && adsToken ? `<input type="hidden" name="ads" value="${escapeHtml(adsToken)}">` : ''}
     <label>Email<input type="email" name="email" required autocomplete="email" value="${escapeHtml(values.email || '')}"></label>
     <label>Password<input type="password" name="password" required minlength="8" autocomplete="${isSignup ? 'new-password' : 'current-password'}"></label>
     <button type="submit">${isSignup ? 'Create account' : 'Sign in'}</button>
@@ -69,9 +74,46 @@ function authForm(kind, error, values = {}) {
 
 require('./recovery').install(router, { product: 'PDFMint', shell, minLength: 8 });
 
+/**
+ * The landing page the authorised Google Ads measurement test points at. It is
+ * deliberately first-party: server-rendered here, no third-party tag, no
+ * tracking cookie, nothing sent anywhere on view. Attribution begins only when
+ * the visitor follows the "Create a free account" link, and it becomes a
+ * conversion only when an account is actually created — see src/ads.js.
+ *
+ * `?campaign=` picks the campaign; anything outside the allowlist renders the
+ * same page with a plain unattributed signup link, so a misspelled or invented
+ * campaign can never manufacture attribution.
+ *
+ * The shell's default robots meta is noindex/nofollow, which is what a campaign
+ * landing variant should be: the canonical `/` remains the page search indexes.
+ */
+router.get('/ads/pdf', asyncRoute(async (req, res) => {
+  if (await currentAccount(req)) return res.redirect('/dashboard');
+  const requested = typeof req.query.campaign === 'string' ? req.query.campaign : ads.DEFAULT_CAMPAIGN;
+  const campaign = ads.isKnownCampaign(requested) ? requested : null;
+  const signupHref = campaign ? `/signup?campaign=${encodeURIComponent(campaign)}` : '/signup';
+  res.type('html').send(shell('PDFMint — HTML, Markdown or URL to PDF in one POST', `
+<main class="auth">
+  <a class="logo" href="/">PDF<span>Mint</span></a>
+  <h1>Your workflow asks for a PDF. One POST later, you have it.</h1>
+  <p class="sub">POST HTML, Markdown or a URL, get the PDF bytes back in the same response.
+    No template editor, no second request, no headless Chrome of your own to run.</p>
+  <p><a class="cta" href="${signupHref}">Create a free account</a></p>
+  <p class="sub">10 documents a month on the free plan, no card. Your API key is shown
+    the moment your account exists, ready for curl or the n8n community node.</p>
+  <p class="sub">Paid plans start at $9/month for 5,000 documents. Cancel anytime.</p>
+  <p class="alt"><a href="/docs" target="_blank" rel="noopener">Read the API reference</a> · <a href="/" target="_blank" rel="noopener">Why PDFMint</a></p>
+</main>`));
+}));
+
 router.get('/signup', asyncRoute(async (req, res) => {
   if (await currentAccount(req)) return res.redirect('/dashboard');
-  res.type('html').send(authForm('signup', null));
+  // Only an allowlisted campaign is ever signed into the hidden form field; an
+  // unknown or missing one yields the plain form, and the signup then works
+  // exactly as it always has.
+  const token = ads.signToken(typeof req.query.campaign === 'string' ? req.query.campaign : null);
+  res.type('html').send(authForm('signup', null, {}, token));
 }));
 
 router.get('/login', asyncRoute(async (req, res) => {
@@ -126,19 +168,31 @@ async function emailIsDeliverable(email) {
 
 router.post('/signup', asyncRoute(async (req, res) => {
   const { email, password } = req.body || {};
+  // The posted value is only carried back into a re-rendered form when it still
+  // verifies — a forged token never survives a round trip and never attributes.
+  const adsToken = ads.verifyToken(req.body?.ads) ? String(req.body.ads) : null;
   if (!email || !password || String(password).length < 8) {
-    return res.status(400).type('html').send(authForm('signup', 'Enter an email address and a password of at least 8 characters.', { email }));
+    return res.status(400).type('html').send(authForm('signup', 'Enter an email address and a password of at least 8 characters.', { email }, adsToken));
   }
   const normalised = String(email).trim().toLowerCase();
   const deliverable = await emailIsDeliverable(normalised);
   if (!deliverable.ok) {
-    return res.status(400).type('html').send(authForm('signup', deliverable.why, { email }));
+    return res.status(400).type('html').send(authForm('signup', deliverable.why, { email }, adsToken));
   }
   const { rows } = await query(`SELECT id FROM accounts WHERE email = $1`, [normalised]);
   if (rows.length) {
-    return res.status(409).type('html').send(authForm('signup', 'That email already has an account. Sign in instead.', { email }));
+    return res.status(409).type('html').send(authForm('signup', 'That email already has an account. Sign in instead.', { email }, adsToken));
   }
   const { account, apiKey } = await createAccount(email, password);
+  // The exact conversion point: one row, only now. Every path above returned
+  // before a row could exist, and nothing later (dashboard, reloads) writes
+  // one. Attribution must never cost the signup itself, so a failure here is
+  // logged, not raised — the account already exists and the session continues.
+  try {
+    await ads.recordSignupConversion(account, adsToken);
+  } catch (e) {
+    console.warn(`[ads] conversion not recorded for account ${account.id}:`, e.message);
+  }
   const sessionId = await createSession(account.id);
   setSessionCookie(res, sessionId);
   stashKeyForSession(sessionId, apiKey);

@@ -141,6 +141,10 @@ const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS usage_events_client_time_idx ON usage_events(client, created_at DESC)`,
   ...require('./recovery').migration,
   ...require('./job-webhook-schema').migration,
+  // First-party ads attribution: one conversion row per account, created only at
+  // a successful signup. See src/ads.js for why the table stores no email, no IP
+  // and no click id.
+  ...require('./ads').migration,
 ];
 
 async function migrate() {
