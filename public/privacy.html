@@ -55,9 +55,19 @@
 <p>See also the <a href="/legal">imprint</a>.</p>
 
 <h2>2. What is stored, and for how long</h2>
-<p>Everything below is in one PostgreSQL database. There is no analytics product, no advertising
-  network, no tracking pixel and no third-party script on this site other than the Google Fonts
-  stylesheet used for typography.</p>
+<p>Everything below is in one PostgreSQL database. The only analytics on this site is the
+  first-party visitor statistics described below. There is no advertising network, no tracking
+  pixel and no third-party script other than Google Fonts.</p>
+
+<h3 id="visitor-statistics">Visitor statistics</h3>
+<p>The server counts page loads of its own pages as daily totals, per page and per referring
+  website (host name only). What is stored is the date, the page path, the referring host and two
+  counters. Not stored: your IP address, your user agent, a cookie, an identifier, your account or
+  a fingerprint. No profile is built and unique visitors are not counted. Nothing is placed on your
+  device. Browsers that
+  send Global Privacy Control or Do Not Track are not counted. Automated clients are filtered as
+  far as they are recognisable. Totals are deleted after 13 months. Only the operator can see
+  them.</p>
 
 <table>
   <tr><th>Data</th><th>Why</th><th>Kept for</th></tr>
@@ -100,6 +110,11 @@
     <td>Stripe customer and subscription ids</td>
     <td>To connect your account to your subscription.</td>
     <td>Until the account is deleted.</td>
+  </tr>
+  <tr>
+    <td>Visitor statistics (daily totals)</td>
+    <td>Page loads of this site's own pages, counted per page and per referring host. No IP address, no user agent, no identifier is stored — see <a href="#visitor-statistics">Visitor statistics</a> above.</td>
+    <td>Deleted after 13 months.</td>
   </tr>
 </table>
 

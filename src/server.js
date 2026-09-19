@@ -14,6 +14,7 @@ const web = require('./web');
 const status = require('./status');
 const render = require('./render');
 const jobs = require('./jobs');
+const visitCounter = require('./visit-counter');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -42,7 +43,7 @@ app.use((req, res, next) => {
  * wherever they are asked.
  */
 const CANONICAL_HOST = config.publicUrl ? new URL(config.publicUrl).host : '';
-const NEVER_REDIRECT = ['/v1/', '/stripe/', '/f/', '/healthz'];
+const NEVER_REDIRECT = ['/v1/', '/stripe/', '/f/', '/healthz', '/api/operator/'];
 
 app.use((req, res, next) => {
   if (!CANONICAL_HOST) return next();
@@ -53,6 +54,10 @@ app.use((req, res, next) => {
   if (host.startsWith('localhost') || host.startsWith('127.0.0.1')) return next();
   return res.redirect(301, `${config.publicUrl}${req.originalUrl}`);
 });
+
+// First-party visitor statistics: counts the page requests the server delivers anyway.
+// Runs on every request; classification drops everything that is not a full page load.
+app.use(visitCounter.middleware);
 
 // Stripe signature verification needs the untouched body.
 app.use('/stripe', express.raw({ type: 'application/json' }), billing.router);
@@ -87,6 +92,7 @@ app.get('/f/:token', async (req, res, next) => {
 });
 
 require('./ads-report').install(app);
+visitCounter.install(app);
 app.use('/', status.router);
 app.use('/v1', api.router);
 app.use('/', web.router);
