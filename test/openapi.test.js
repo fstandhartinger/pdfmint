@@ -130,11 +130,17 @@ function validate(s, { routes, usedCodes, errorShapeHeaders, authSchemes } = {})
       for (const [k, v] of Object.entries(obj)) {
         if (k === 'x-error-codes' && Array.isArray(v)) {
           for (const e of v) if (e && e.code) documented.add(e.code);
+        } else if (k === 'x-app-level-errors' && Array.isArray(v)) {
+          // Codes documented once at spec level for the app-level handlers
+          // (each entry: { code, status, meaning }) count as documented too.
+          for (const e of v) if (e && e.code) documented.add(e.code);
         } else if (/^[0-9]{3}$/.test(k)) collect(v);
         else collect(v);
       }
     };
-    collect(s.paths);
+    // Walk the whole spec, not just paths: x-error-codes live on the
+    // operations, the app-level codes once in the top-level x-app-level-errors.
+    collect(s);
     const want = new Set(usedCodes);
     for (const c of want) if (!documented.has(c)) problems.push(`error code "${c}" is raised in source but not documented in the spec`);
     for (const c of documented) if (!want.has(c)) problems.push(`error code "${c}" is documented in the spec but never raised in source`);
@@ -168,7 +174,8 @@ function publicV1Routes() {
 
 function usedErrorCodes() {
   const codes = new Set();
-  const files = ['src/api.js', 'src/options.js', 'src/jobs.js', 'src/auth.js', 'src/net.js', 'src/recovery.js'];
+  // src/billing.js is deliberately not scanned: its ApiError codes serve the dashboard/Stripe surface, not the /v1 API reference, and billing is owned by the separate billing work.
+  const files = ['src/api.js', 'src/options.js', 'src/jobs.js', 'src/auth.js', 'src/net.js', 'src/recovery.js', 'src/render.js', 'src/server.js'];
   const patterns = [
     /\bbad\(\s*'([a-z_]+)'/g,
     /new ApiError\(\s*\d+\s*,\s*'([a-z_]+)'/g,
@@ -242,8 +249,11 @@ test('bidirectional error-code inventory', () => {
     if (Array.isArray(obj)) { obj.forEach(walk); return; }
     for (const [k, v] of Object.entries(obj)) walk(v);
     if (Array.isArray(obj['x-error-codes'])) for (const e of obj['x-error-codes']) documented.add(e.code);
+    // Codes documented once in the top-level x-app-level-errors section
+    // (each entry: { code, status, meaning }) count as documented too.
+    if (Array.isArray(obj['x-app-level-errors'])) for (const e of obj['x-app-level-errors']) documented.add(e.code);
   };
-  walk(spec.paths);
+  walk(spec);
   for (const c of used) assert.ok(documented.has(c), `code "${c}" raised in source but not documented`);
   for (const c of documented) assert.ok(used.includes(c), `code "${c}" documented but never raised in source`);
 });
@@ -286,6 +296,9 @@ test('mutation test: the validator bites on a dropped error code', () => {
     if (Array.isArray(obj)) { obj.forEach(strip); return; }
     if (Array.isArray(obj['x-error-codes'])) {
       obj['x-error-codes'] = obj['x-error-codes'].filter((e) => e.code !== victim);
+    }
+    if (Array.isArray(obj['x-app-level-errors'])) {
+      obj['x-app-level-errors'] = obj['x-app-level-errors'].filter((e) => e.code !== victim);
     }
     for (const v of Object.values(obj)) strip(v);
   };

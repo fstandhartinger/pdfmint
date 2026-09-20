@@ -48,8 +48,20 @@ const ERR = {
   job_already_finished: 'The job is already in a final state and cannot be cancelled.',
   account_gone: 'The account that queued this job no longer exists.',
   job_cancelled: 'The job was cancelled before it finished.',
-  render_failed: 'The render inside the job failed.',
-  renderer_crashed: 'The renderer stopped before the job finished, twice; the document is most likely too large.',
+  render_failed: 'The renderer could not produce the document; a failed async job carries this code in its error object.',
+  renderer_crashed: 'The renderer stopped before the document was finished — most likely the page is too large or too complex; on an async job this happens after two attempts.',
+  renderer_busy: 'PDFMint is at capacity: the render queue is full. Retry in a few seconds.',
+  wait_for_timeout: 'The selector passed as "waitFor" did not appear on the page before the timeout elapsed.',
+  url_unreachable: 'The URL could not be loaded: the host did not resolve, refused the connection or has an invalid TLS certificate.',
+  url_http_error: 'The URL was reached but answered with an HTTP error status; details.upstream_status carries it.',
+  render_timeout: 'Rendering exceeded the "timeout" while loading or printing the document.',
+  encryption_unavailable: 'Password protection is not available on this deployment (the qpdf binary is missing).',
+  encryption_failed: 'The PDF was rendered but could not be password-protected.',
+  invalid_pdf: 'One of the merge inputs is not a readable PDF.',
+  unknown_endpoint: 'The path does not exist on this API; the /v1/* 404 fall-through answers this.',
+  request_too_large: 'The request body is over the size limit the server accepts.',
+  invalid_json: 'The request body is not valid JSON.',
+  internal_error: 'Something failed on the server while handling the request.',
   key_not_found: 'No active key on this account starts with the given prefix.',
   last_key: 'That is the only key on the account, so revoking it would lock the account out.',
   demo_limit_reached: 'The keyless demo allows 5 renders an hour from one address.',
@@ -123,9 +135,54 @@ const MERGE_400 = [
   E('unknown_field', ERR.unknown_field),
   E('invalid_option', ERR.invalid_option),
   E('download_failed', ERR.download_failed),
+  E('invalid_pdf', ERR.invalid_pdf),
   E('blank_document', ERR.blank_document),
   E('file_too_large', ERR.file_too_large),
 ];
+
+// Error codes raised inside src/render.js. render.render() serves POST /v1/pdf
+// and POST /v1/image (and the keyless demo, which renders HTML only), so these
+// are reachable there with the real statuses the ApiErrors carry. /v1/merge
+// never renders; its only render.js code is invalid_pdf from mergePdfs().
+const URL_502 = {
+  502: [
+    E('url_unreachable', ERR.url_unreachable),
+    E('url_http_error', ERR.url_http_error),
+  ],
+};
+
+const RENDER_BUSY_503 = {
+  503: [E('renderer_busy', ERR.renderer_busy)],
+};
+
+const RENDER_TIMEOUT_504 = {
+  504: [
+    E('render_timeout', ERR.render_timeout),
+    E('wait_for_timeout', ERR.wait_for_timeout),
+  ],
+};
+
+// The demo accepts neither "waitFor" nor a URL, so only the load/print timeout
+// can fire there.
+const DEMO_TIMEOUT_504 = {
+  504: [E('render_timeout', ERR.render_timeout)],
+};
+
+const PDF_500 = {
+  500: [
+    E('renderer_crashed', ERR.renderer_crashed),
+    E('render_failed', ERR.render_failed),
+    E('encryption_failed', ERR.encryption_failed),
+  ],
+  501: [E('encryption_unavailable', ERR.encryption_unavailable)],
+};
+
+const IMAGE_500 = {
+  500: [
+    E('renderer_crashed', ERR.renderer_crashed),
+    E('render_failed', ERR.render_failed),
+  ],
+};
 
 const errResponse = (status, codes, description) => ({
   description,
@@ -145,6 +202,20 @@ function errors(...groups) {
 }
 
 const AUTH_SECURED = [{ bearerAuth: [] }, { apiKeyAuth: [] }];
+
+/**
+ * App-level errors from src/server.js: the /v1/* 404 fall-through, the
+ * body-size and JSON-parse handlers and the final error handler. They are not
+ * tied to one operation, so they are documented once at spec level (with the
+ * status each handler really answers with) plus a components response, instead
+ * of being listed on every operation.
+ */
+const APP_LEVEL_ERRORS = [
+  { code: 'unknown_endpoint', status: 404, meaning: ERR.unknown_endpoint },
+  { code: 'invalid_json', status: 400, meaning: ERR.invalid_json },
+  { code: 'request_too_large', status: 413, meaning: ERR.request_too_large },
+  { code: 'internal_error', status: 500, meaning: ERR.internal_error },
+];
 
 /* ----------------------------------------------------------- option schema */
 
@@ -295,6 +366,16 @@ const FileJson = {
     duration_ms: { type: 'integer' },
     credits_remaining: { type: 'integer' },
     warnings: { type: 'array', items: { type: 'string' } },
+    debug: {
+      type: 'object',
+      description: 'Only on POST /v1/pdf with "debug": true and output url or base64: what the renderer saw while producing the page.',
+      properties: {
+        renderedHtml: { type: ['string', 'null'], description: 'The HTML of the page after placeholder filling; null if it could not be read back.' },
+        finalUrl: { type: 'string', format: 'uri', description: 'The page URL after redirects; "about:blank" when the source was html or markdown.' },
+        pageErrors: { type: 'array', items: { type: 'string' }, description: 'Up to 5 page errors (uncaught exceptions) the page produced; the same list is sent in the X-PDFMint-Page-Errors header.' },
+      },
+      required: ['renderedHtml', 'finalUrl', 'pageErrors'],
+    },
   },
 };
 
@@ -318,7 +399,7 @@ const Job = {
       type: 'object',
       description: 'Present when the job failed or was cancelled.',
       properties: {
-        code: { type: 'string', enum: ['render_failed', 'renderer_crashed', 'job_cancelled'], description: 'Any render-time code (e.g. html_too_large) can also appear here.' },
+        code: { type: 'string', description: 'The failure code. Any render-time code can land here (e.g. html_too_large, render_timeout, renderer_busy), plus job_cancelled for a cancelled job; src/jobs.js stores e.code || "render_failed".' },
         message: { type: 'string' },
         hint: { type: 'string' },
       },
@@ -342,7 +423,10 @@ const spec = {
       + 'machine-readable OpenAPI 3.1 description of the same endpoints. '
       + 'Authentication uses either `Authorization: Bearer <key>` or `x-api-key: <key>`; keys start with `pm_live_`. '
       + 'Every authenticated endpoint is rate-limited to 120 requests per minute per account with a burst of 30 '
-      + '(headers X-RateLimit-Limit, X-RateLimit-Burst, X-RateLimit-Remaining; a 429 carries Retry-After).',
+      + '(headers X-RateLimit-Limit, X-RateLimit-Burst, X-RateLimit-Remaining; a 429 carries Retry-After). '
+      + 'App-level errors that are not tied to one operation — `unknown_endpoint` (404), `invalid_json` (400), '
+      + '`request_too_large` (413) and `internal_error` (500) — are documented once in the top-level '
+      + '`x-app-level-errors` section; every operation-specific error code is listed on the operation it can hit.',
   },
   servers: [
     { url: 'https://pdf.mintapis.com' },
@@ -397,6 +481,9 @@ const spec = {
           400: errResponse(400, [E('missing_content', ERR.missing_content)], '`missing_content` — send the markup in "html".'),
           413: errResponse(413, [E('demo_payload_too_large', ERR.demo_payload_too_large)], '`demo_payload_too_large` — the demo accepts 16 KB of HTML.'),
           429: errResponse(429, [E('demo_limit_reached', ERR.demo_limit_reached)], '`demo_limit_reached` — 5 renders an hour from one address; Retry-After says when to retry.'),
+          500: errResponse(500, [E('renderer_crashed', ERR.renderer_crashed), E('render_failed', ERR.render_failed)], '`renderer_crashed` or `render_failed` — the renderer stopped while producing the document; nothing was charged.'),
+          503: errResponse(503, [E('renderer_busy', ERR.renderer_busy)], '`renderer_busy` — the render queue is full; retry in a few seconds.'),
+          504: errResponse(504, [E('render_timeout', ERR.render_timeout)], '`render_timeout` — rendering exceeded the fixed demo timeout.'),
         },
       },
     },
@@ -426,7 +513,7 @@ const spec = {
             },
             required: ['job_id', 'status', 'status_url', 'credits_remaining'],
           }),
-          ...errors(ERRORS.AUTH, ERRORS.QUOTA, ERRORS.RATE, { 400: PDF_400 }),
+          ...errors(ERRORS.AUTH, ERRORS.QUOTA, ERRORS.RATE, { 400: PDF_400 }, URL_502, RENDER_BUSY_503, RENDER_TIMEOUT_504, PDF_500),
         },
       },
     },
@@ -446,7 +533,7 @@ const spec = {
               'application/json': { schema: { $ref: '#/components/schemas/FileJson' } },
             },
           },
-          ...errors(ERRORS.AUTH, ERRORS.QUOTA, ERRORS.RATE, { 400: IMAGE_400 }),
+          ...errors(ERRORS.AUTH, ERRORS.QUOTA, ERRORS.RATE, { 400: IMAGE_400 }, URL_502, RENDER_BUSY_503, RENDER_TIMEOUT_504, IMAGE_500),
         },
       },
     },
@@ -689,7 +776,7 @@ const spec = {
       post: {
         tags: ['recovery'],
         summary: 'Request a password-reset link',
-        description: 'Always answers the same whether or not the account exists. Rate-limited to 20 attempts per hour per address.',
+        description: 'Always answers the same whether or not the account exists. Rate-limited to 20 attempts per hour per client IP address.',
         security: [],
         requestBody: json({ type: 'object', required: ['email'], properties: { email: { type: 'string', format: 'email' } } }),
         responses: {
@@ -715,6 +802,7 @@ const spec = {
       },
     },
   },
+  'x-app-level-errors': APP_LEVEL_ERRORS,
   components: {
     securitySchemes: {
       bearerAuth: {
@@ -727,6 +815,12 @@ const spec = {
         in: 'header',
         name: 'x-api-key',
         description: 'x-api-key: pm_live_...',
+      },
+    },
+    responses: {
+      AppLevelError: {
+        description: 'The JSON error body the app-level handlers in the server answer with, on any request: the /v1/* 404 fall-through (`unknown_endpoint`), an oversized request body (`request_too_large`, 413), a body that is not valid JSON (`invalid_json`, 400) or an unhandled server fault (`internal_error`, 500). These codes are not tied to one operation; the full inventory with the status each handler answers with is in the top-level `x-app-level-errors` section.',
+        content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
       },
     },
     schemas: {
