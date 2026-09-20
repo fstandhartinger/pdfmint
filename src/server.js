@@ -43,7 +43,7 @@ app.use((req, res, next) => {
  * wherever they are asked.
  */
 const CANONICAL_HOST = config.publicUrl ? new URL(config.publicUrl).host : '';
-const NEVER_REDIRECT = ['/v1/', '/stripe/', '/f/', '/healthz', '/api/operator/'];
+const NEVER_REDIRECT = ['/v1/', '/stripe/', '/f/', '/healthz', '/api/operator/', '/openapi.json'];
 
 app.use((req, res, next) => {
   if (!CANONICAL_HOST) return next();
@@ -66,6 +66,11 @@ app.use(express.json({ limit: config.maxRequestBytes }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
 app.get('/healthz', (req, res) => res.json({ ok: true, ...render.stats() }));
+
+app.get('/openapi.json', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json(require('./openapi').spec);
+});
 
 app.get('/f/:token', async (req, res, next) => {
   try {
