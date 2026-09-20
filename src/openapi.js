@@ -287,7 +287,7 @@ const FileJson = {
   type: 'object',
   properties: {
     filename: { type: 'string' },
-    pages: { type: 'integer', nullable: true, description: 'Page count (absent/null when the PDF is encrypted).' },
+    pages: { type: ['integer', 'null'], description: 'Page count (absent/null when the PDF is encrypted).' },
     size: { type: 'integer', description: 'File size in bytes.' },
     url: { type: 'string', format: 'uri', description: 'Temporary hosted-file link (output "url", or the finished async job).' },
     expires_in_minutes: { type: 'integer', description: 'How long the hosted link stays valid.' },
@@ -305,8 +305,8 @@ const Job = {
     kind: { type: 'string', enum: ['pdf'] },
     status: { type: 'string', enum: ['queued', 'running', 'succeeded', 'failed', 'cancelled'] },
     created_at: { type: 'string', format: 'date-time' },
-    started_at: { type: 'string', format: 'date-time', nullable: true },
-    finished_at: { type: 'string', format: 'date-time', nullable: true },
+    started_at: { type: ['string', 'null'], format: 'date-time' },
+    finished_at: { type: ['string', 'null'], format: 'date-time' },
     attempts: { type: 'integer' },
     filename: { type: 'string' },
     pages: { type: 'integer' },
@@ -333,7 +333,7 @@ const json = (schema) => ({ description: '', content: { 'application/json': { sc
 /* ------------------------------------------------------------------ spec */
 
 const spec = {
-  openapi: '3.1.x',
+  openapi: '3.1.0',
   info: {
     title: 'PDFMint API',
     version,
@@ -421,7 +421,7 @@ const spec = {
               job_id: { type: 'string' },
               status: { type: 'string', enum: ['queued'] },
               status_url: { type: 'string', format: 'uri', description: 'GET /v1/jobs/{id} for the same job.' },
-              webhook_url: { type: 'string', nullable: true },
+              webhook_url: { type: ['string', 'null'] },
               credits_remaining: { type: 'integer' },
             },
             required: ['job_id', 'status', 'status_url', 'credits_remaining'],
@@ -657,7 +657,7 @@ const spec = {
                     key_prefix: { type: 'string' },
                     label: { type: 'string' },
                     created_at: { type: 'string', format: 'date-time' },
-                    last_used_at: { type: 'string', format: 'date-time', nullable: true },
+                    last_used_at: { type: ['string', 'null'], format: 'date-time' },
                   },
                   required: ['key_prefix', 'label', 'created_at'],
                 },

@@ -31,10 +31,25 @@ function validate(s, { routes, usedCodes, errorShapeHeaders, authSchemes } = {})
   const WIRE_OPTIONAL = ['hint', 'docs', 'details', 'request_id'];
 
   // --- structural ---
-  if (!/^\d+\.\d+\.\d+$/.test(String(s.openapi)) || !String(s.openapi).startsWith('3.1.')) {
-    // 3.1.x is the published version literal; accept it and any concrete 3.1.y.
-    if (s.openapi !== '3.1.x') problems.push(`openapi must be 3.1.x, got ${s.openapi}`);
+  // The `openapi` field must be a CONCRETE semver: @apidevtools/swagger-parser (and with it
+  // Swagger UI / editor / most generators) refuses to load a document whose version is the
+  // placeholder '3.1.x' -- "Unsupported OpenAPI version". Only 3.1.y is accepted here.
+  if (!/^3\.1\.\d+$/.test(String(s.openapi))) {
+    problems.push(`openapi must be a concrete 3.1.y version, got ${s.openapi}`);
   }
+  // `nullable` is an OAS 3.0 keyword. 3.1 uses JSON Schema 2020-12, where nullability is
+  // expressed as a type array (type: ['string', 'null']). A stray `nullable: true` is
+  // silently ignored by 3.1 consumers, so the document would lie about the wire shape.
+  const nullableAt = [];
+  (function scan(node, at) {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) return node.forEach((v, i) => scan(v, `${at}/${i}`));
+    for (const [k, v] of Object.entries(node)) {
+      if (k === 'nullable') nullableAt.push(at);
+      else scan(v, `${at}/${k}`);
+    }
+  })(s, '#');
+  for (const at of nullableAt) problems.push(`nullable is not an OAS 3.1 keyword (at ${at}); use a type array`);
   if (!s.info || !s.info.title || s.info.title !== 'PDFMint API') problems.push('info.title must be "PDFMint API"');
   if (!s.info || !s.info.version) problems.push('info.version is required');
   if (!s.info || typeof s.info.description !== 'string' || !s.info.description.includes('/docs')) {
@@ -277,6 +292,103 @@ test('mutation test: the validator bites on a dropped error code', () => {
   strip(clone);
   const problems = validate(clone, { usedCodes: codes });
   assert.ok(problems.some((p) => p.includes(`"${victim}"`)), `dropping code ${victim} must fail the validator`);
+});
+
+/**
+ * The option names normalisePdfOptions() actually reads off its input object, scanned
+ * statically out of src/options.js. This is the source of truth the spec is held against;
+ * it is derived from the implementation, never from src/openapi.js.
+ */
+function acceptedPdfOptionNames() {
+  const src = read('src/options.js');
+  const start = src.indexOf('function normalisePdfOptions');
+  assert.ok(start > -1, 'normalisePdfOptions must exist in src/options.js');
+  const body = src.slice(start, src.indexOf('\nmodule.exports', start));
+  const names = new Set();
+  for (const m of body.matchAll(/\bo\.([A-Za-z_$][\w$]*)/g)) names.add(m[1]);
+  return [...names].sort();
+}
+
+function documentedPdfOptionNames(s) {
+  const props = ((s.components && s.components.schemas && s.components.schemas.PdfOptions) || findPdfOptions(s) || {}).properties || {};
+  return Object.keys(props).sort();
+}
+
+/** PdfOptions is inlined as the `options` schema of POST /v1/pdf. */
+function findPdfOptions(s) {
+  const body = s.paths['/v1/pdf'].post.requestBody.content['application/json'].schema;
+  const props = body.properties || {};
+  return props.options || null;
+}
+
+test('bidirectional option coverage: every option normalisePdfOptions reads is documented', () => {
+  const accepted = acceptedPdfOptionNames();
+  const documented = documentedPdfOptionNames(spec);
+  // Aliases the spec documents in prose on their canonical property instead of as own keys.
+  const ALIASED = new Set(['headerTemplate', 'footerTemplate', 'preferCSSPageSize']);
+  const missing = accepted.filter((n) => !documented.includes(n) && !ALIASED.has(n));
+  assert.deepEqual(missing, [], `options accepted by src/options.js but absent from the spec: ${missing.join(', ')}`);
+
+  const undocumentedAlias = [...ALIASED].filter((a) => {
+    const json = JSON.stringify(spec);
+    return accepted.includes(a) && !json.includes(a);
+  });
+  assert.deepEqual(undocumentedAlias, [], `accepted aliases the spec never mentions: ${undocumentedAlias.join(', ')}`);
+
+  const extra = documented.filter((n) => !accepted.includes(n));
+  assert.deepEqual(extra, [], `spec documents options src/options.js never reads: ${extra.join(', ')}`);
+});
+
+test('mutation test: the validator bites on a missing option', () => {
+  // PRD G1 names this mutation explicitly: dropping a real option from the spec must fail.
+  const accepted = acceptedPdfOptionNames();
+  const victim = accepted.find((n) => !['headerTemplate', 'footerTemplate', 'preferCSSPageSize'].includes(n));
+  assert.ok(victim, 'need at least one non-alias option to mutate');
+
+  const clone = JSON.parse(JSON.stringify(spec));
+  const opts = findPdfOptions(clone);
+  delete opts.properties[victim];
+
+  const documented = Object.keys(opts.properties).sort();
+  assert.ok(
+    !documented.includes(victim),
+    `dropping option ${victim} must be detectable: the spec would no longer document it`
+  );
+  // And the real check the coverage test performs must fail on the clone:
+  const missing = accepted.filter(
+    (n) => !documented.includes(n) && !['headerTemplate', 'footerTemplate', 'preferCSSPageSize'].includes(n)
+  );
+  assert.ok(missing.includes(victim), `the option-coverage check must bite on the removed option ${victim}`);
+});
+
+test('mutation test: the validator bites on the placeholder version literal', () => {
+  // Regression guard: '3.1.x' shipped once and made @apidevtools/swagger-parser refuse the
+  // whole document, while the validator of the day whitelisted it.
+  const clone = JSON.parse(JSON.stringify(spec));
+  clone.openapi = '3.1.x';
+  const problems = validate(clone, {});
+  assert.ok(
+    problems.some((p) => p.includes('concrete 3.1.y')),
+    'a placeholder openapi version must fail the validator'
+  );
+});
+
+test('mutation test: the validator bites on an OAS 3.0 `nullable` keyword', () => {
+  const clone = JSON.parse(JSON.stringify(spec));
+  clone.components.schemas.Job.properties.started_at = { type: 'string', nullable: true };
+  const problems = validate(clone, {});
+  assert.ok(
+    problems.some((p) => p.includes('nullable is not an OAS 3.1 keyword')),
+    'a stray nullable must fail the validator'
+  );
+});
+
+test('the shipped spec declares a concrete 3.1 version and no 3.0-only keywords', () => {
+  assert.match(spec.openapi, /^3\.1\.\d+$/, 'openapi must be a concrete 3.1.y version');
+  assert.ok(
+    !JSON.stringify(spec).includes('"nullable"'),
+    'the spec must not contain the OAS 3.0 `nullable` keyword'
+  );
 });
 
 test('server.js serves /openapi.json and never redirects the legacy host away from it', () => {
