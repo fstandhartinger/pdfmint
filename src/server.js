@@ -98,6 +98,9 @@ app.get('/f/:token', async (req, res, next) => {
 
 require('./ads-report').install(app);
 visitCounter.install(app);
+// Four-stage funnel report (visits -> registrations -> trial starts -> paid), same operator
+// auth as the visitor statistics; reads existing tables only.
+require('./funnel').install(app);
 app.use('/', status.router);
 app.use('/v1', api.router);
 app.use('/', web.router);
