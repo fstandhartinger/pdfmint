@@ -98,7 +98,7 @@
   </tr>
   <tr>
     <td>Usage records</td>
-    <td>One row per request: what kind, page count, duration, whether it succeeded, and the error code if not. <strong>No document content and no request body.</strong></td>
+    <td>One row per request: what kind, page count, duration, whether it succeeded, the error code if not, and a coarse label for the kind of client it came from (for example curl, n8n or browser; derived from the user agent, which itself is not stored). <strong>No document content and no request body.</strong></td>
     <td>Kept, so quota and the status page are accurate.</td>
   </tr>
   <tr>
@@ -116,10 +116,27 @@
     <td>Page loads of this site's own pages, counted per page and per referring host. No IP address, no user agent, no identifier is stored — see <a href="#visitor-statistics">Visitor statistics</a> above.</td>
     <td>Deleted after 13 months.</td>
   </tr>
+  <tr>
+    <td>Password-reset data</td>
+    <td>When a password reset is requested: a hash of the one-time token, its expiry, and the time of the request (used to allow at most one reset email per minute).</td>
+    <td>The link works for 30 minutes. Token hash and expiry are cleared when the link is used; an unused one stays on the account, unusable, until the next reset request replaces it. The request time stays with the account.</td>
+  </tr>
+  <tr>
+    <td>Demo usage counter</td>
+    <td>Your IP address and the hour, only when you use the keyless demo without an API key, to enforce the limit of 5 renders per hour.</td>
+    <td>Deleted after 3 hours.</td>
+  </tr>
+  <tr>
+    <td>Password-reset attempt limiter</td>
+    <td>A one-way hash of your IP address.</td>
+    <td>Deleted after 2 hours.</td>
+  </tr>
 </table>
 
-<p>The application does not log your IP address or user agent. The hosting provider keeps its own
-  HTTP request logs, which do contain IP addresses; that is described under processors below.</p>
+<p>The application does not write IP addresses or user agents to its logs. The only places an
+  IP address is kept are the two short-lived rate-limit entries in the table above. Render keeps
+  HTTP request logs (which include IP addresses) for requests to the old address
+  pdfmint-b9tt.onrender.com; that is described under processors below.</p>
 
 <h2>3. Card details</h2>
 <p><strong>Card numbers never reach this service.</strong> Payment is handled entirely by Stripe on
@@ -127,16 +144,20 @@
   subscription is active.</p>
 
 <h2>4. Email</h2>
-<p>PDFMint does not send email at all. There is no newsletter, no marketing mail, and no
-  transactional mail. One consequence is stated plainly on the signup page: there is no password
-  reset and no confirmation email.</p>
+<p>PDFMint sends exactly one kind of email: the password-reset message. It is sent only when a reset
+  is requested for an account (on the forgot-password page or through the API), only to that
+  account's email address, and
+  contains a one-time link that is valid for 30 minutes. There is no newsletter, no marketing mail
+  and no confirmation email. This email is relayed through Google's SMTP service — see the
+  processors below.</p>
 
 <h2>5. Processors</h2>
-<p>Three companies process data on behalf of this service:</p>
+<p>These companies process data on behalf of this service:</p>
 <table>
   <tr><th>Processor</th><th>What they do</th><th>Where</th></tr>
-  <tr><td>Render Services, Inc.</td><td>Runs the application and keeps HTTP request logs (which include IP addresses).</td><td>Frankfurt, Germany</td></tr>
-  <tr><td>Neon, Inc.</td><td>Hosts the PostgreSQL database in which everything in section 2 is stored.</td><td>EU region</td></tr>
+  <tr><td>Hetzner Online GmbH</td><td>Provides the server that runs the application and the PostgreSQL database in which everything in section 2 is stored.</td><td>Helsinki, Finland</td></tr>
+  <tr><td>Google (Google Ireland Limited / Google LLC)</td><td>Relays the password-reset email (smtp.gmail.com), so it sees the recipient address and the message.</td><td>Chosen by Google; not limited to the EU</td></tr>
+  <tr><td>Render Services, Inc.</td><td>Only serves the old address pdfmint-b9tt.onrender.com as a redirect to pdf.mintapis.com, and keeps HTTP request logs (which include IP addresses) for requests to that old address.</td><td>Frankfurt, Germany</td></tr>
   <tr><td>Stripe, Inc.</td><td>Takes payments and stores card details. Stripe is the controller for the card data itself.</td><td>Ireland / United States</td></tr>
 </table>
 <p>Google Fonts is loaded from Google's servers for typography on this website, which means your
@@ -145,7 +166,7 @@
 
 <h2>6. Rendering a URL you supply</h2>
 <p>If you ask PDFMint to render a URL, this service fetches that URL from its own server in
-  Frankfurt. The operator of that URL will see a request from this service, not from you. Private,
+  Helsinki, Finland. The operator of that URL will see a request from this service, not from you. Private,
   loopback and link-local addresses are refused.</p>
 
 <h2>7. Your rights</h2>
@@ -164,7 +185,7 @@
 <ul>
   <li><strong>Art. 6(1)(b)</strong> — performing the contract: your account, your API keys, rendering your documents, quota accounting.</li>
   <li><strong>Art. 6(1)(c)</strong> — legal obligation: records connected to payments.</li>
-  <li><strong>Art. 6(1)(f)</strong> — legitimate interest: rate limiting and the operational logs needed to keep the service standing and to stop abuse.</li>
+  <li><strong>Art. 6(1)(f)</strong> — legitimate interest: rate limiting and the operational logs needed to keep the service standing and to stop abuse, including the demo and password-reset rate limits.</li>
 </ul>
 
 <h2>9. Changes</h2>
