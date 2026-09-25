@@ -212,6 +212,7 @@ const PDF_FIELDS = new Set([
   // page options are also accepted at the top level, not only inside "options"
   'format', 'width', 'height', 'landscape', 'margin', 'scale', 'printBackground',
   'headerHtml', 'footerHtml', 'headerTemplate', 'footerTemplate', 'pageNumbers', 'pageRanges',
+  'coverHtml',
   'mediaType', 'preferCssPageSize', 'preferCSSPageSize', 'tagged', 'outline',
 ]);
 
@@ -830,6 +831,9 @@ async function preparePdf(account, rawBody, ctx = {}) {
     scan = 'filled';
     // The template's stored options are defaults. The request wins over them —
     // it is the more specific statement of intent, and it arrived later.
+    // coverHtml rides inside normalisePdfOptions' return shape like every other page
+    // option (options.js reads/validates it), so this one merge carries a stored
+    // template's cover with the same request-wins precedence — nothing to hand-carry.
     Object.assign(options, normalisePdfOptions({ ...(tpl.options || {}), ...body }));
   }
 
@@ -840,6 +844,20 @@ async function preparePdf(account, rawBody, ctx = {}) {
     options.headerTemplate = fillPart(options.headerTemplate);
     options.footerTemplate = fillPart(options.footerTemplate);
   }
+  // The cover is filled from the same data as the body, UNGATED by header/footer
+  // mode: a cover with `{{name}}` must render filled even when the caller sends
+  // no headerHtml/footerHtml/pageNumbers at all. Strict-mode unresolved-
+  // placeholder reporting covers it via fillPart's collect().
+  if (typeof options.coverHtml === 'string') {
+    if (options.pageRanges) {
+      throw bad('invalid_option', '"coverHtml" and "pageRanges" cannot be combined: a page range cannot say whether it counts the cover.', {
+        hint: 'Render the range you want without a cover, or drop "pageRanges" and put the page break in your markup.',
+        docs: '/docs#options',
+      });
+    }
+    options.coverHtml = fillPart(options.coverHtml);
+  }
+
   let watermark = null;
   if (body.watermark) {
     const spec = typeof body.watermark === 'string' ? { text: body.watermark } : { ...body.watermark };
@@ -875,25 +893,72 @@ async function preparePdf(account, rawBody, ctx = {}) {
 /** Runs a prepared job and returns the finished buffer plus its facts. */
 async function producePdf(account, body, prepared, ctx = {}) {
   const { html, url, options, timeoutMs, strict, unresolved, scan } = prepared;
+  const debugOn = asBool(body.debug, 'debug', false);
+  const headers = body.headers && typeof body.headers === 'object' ? body.headers : undefined;
   const result = await render.render({
     html, url, options, timeoutMs, kind: 'pdf',
     waitFor: body.waitFor,
-    debug: asBool(body.debug, 'debug', false),
+    debug: debugOn,
     javascript: body.javascript,
     emulateDarkMode: asBool(body.emulateDarkMode, 'emulateDarkMode', false),
-    headers: body.headers && typeof body.headers === 'object' ? body.headers : undefined,
+    headers,
   });
+
+  // The cover: a second internal render of the same document shape, with
+  // header/footer mode fully OFF — no reserved HF margins: the margin is the
+  // snapshot normalisePdfOptions took before reserving header/footer room, so
+  // neither ensureRoomFor nor the render-time growth reaches the cover.
+  // Chromium then numbers the CONTENT render 1..N naturally, so `{total}` is the content page count with zero
+  // template changes; the merge puts the clean cover in front, and watermark,
+  // metadata, encryption and x-pdfmint-pages all operate on the merged buffer.
+  // It inherits javascript, emulateDarkMode and request headers (the same
+  // rendering environment) but NOT waitFor: a selector that exists only in the
+  // content must never time out the cover.
+  let coverBuffer = null;
+  let coverDurationMs = 0;
+  let coverPageErrors = [];
+  const mergedDebug = result.debug;
+  if (options.coverHtml) {
+    const coverOptions = {
+      ...options,
+      coverHtml: null,
+      coverMargin: undefined,
+      margin: { ...options.coverMargin },
+      displayHeaderFooter: false,
+      hasHeader: false,
+      hasFooter: false,
+      headerTemplate: undefined,
+      footerTemplate: undefined,
+    };
+    const coverResult = await render.render({
+      html: options.coverHtml, options: coverOptions, timeoutMs, kind: 'pdf',
+      debug: debugOn,
+      javascript: body.javascript,
+      emulateDarkMode: asBool(body.emulateDarkMode, 'emulateDarkMode', false),
+      headers,
+    });
+    coverBuffer = coverResult.buffer;
+    coverDurationMs = coverResult.durationMs;
+    if (debugOn && coverResult.debug) coverPageErrors = coverResult.debug.pageErrors || [];
+  }
+
+  const durationMs = result.durationMs + coverDurationMs;
+  let merged = result.buffer;
+  if (coverBuffer) {
+    const out = await render.mergePdfs([coverBuffer, result.buffer]);
+    merged = out.buffer;
+  }
 
   // Before anything is stamped onto it: if there is nothing on the page, saying
   // so is worth more than a metadata-perfect blank PDF.
   const problem = gateContent({
     ctx, strict, content: result.content, kind: 'pdf', unresolved, scan,
-    warnings: options.warnings, durationMs: result.durationMs,
+    warnings: options.warnings, durationMs,
     extra: options.displayHeaderFooter ? { header_or_footer: true } : undefined,
   });
   if (problem) throw problem;
 
-  let buffer = await render.applyMetadata(result.buffer, body.metadata);
+  let buffer = await render.applyMetadata(merged, body.metadata);
   // prepared.watermark, not body.watermark: the text has had its placeholders
   // filled from the same data as the rest of the document.
   if (prepared.watermark) buffer = await render.addWatermark(buffer, prepared.watermark);
@@ -907,7 +972,12 @@ async function producePdf(account, body, prepared, ctx = {}) {
   }
   const pages = body.password ? null : await render.countPages(buffer);
   const filename = sanitiseFilename(body.filename, 'document.pdf').replace(/(\.pdf)?$/i, '.pdf');
-  return { buffer, pages, filename, durationMs: result.durationMs, debug: result.debug };
+  // Debug page errors: the cover's first, then the content's. Duration: cover +
+  // content summed — the document took both renders.
+  if (debugOn && mergedDebug && coverPageErrors.length) {
+    mergedDebug.pageErrors = [...coverPageErrors, ...(mergedDebug.pageErrors || [])];
+  }
+  return { buffer, pages, filename, durationMs, debug: mergedDebug };
 }
 
 /**

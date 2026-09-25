@@ -1433,6 +1433,7 @@ all, these names are read from the top level of the body instead — handy for a
 <tr><td><code>footerHtml</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Markup repeated at the bottom of every page. Alias: <code>footerTemplate</code>.</td></tr>
 <tr><td><code>pageNumbers</code></td><td class="t">boolean &#124; string</td><td class="t"><code>false</code></td><td class="wrap"><code>true</code> gives a centred <code>Page {page} of {total}</code> footer. A string is used as the format. Ignored if you already set <code>footerHtml</code>.</td></tr>
 <tr><td><code>pageRanges</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Keep only these pages: comma-separated numbers and ranges, e.g. <code>1-5, 8, 11-13</code>. <code>3-</code> means "from 3 to the end" and <code>-3</code> "up to 3". Pages are numbered from 1. A range that is malformed, runs backwards, or starts past the last page is <code>invalid_option</code>, not a rendering failure.</td></tr>
+<tr><td><code>coverHtml</code></td><td class="t">string</td><td class="t">—</td><td class="wrap">Markup for a cover rendered as the first page(s), before the document. The cover carries no header, footer or page numbers, and content numbering starts at <code>1</code> with <code>{total}</code> counting content pages only. <code>&#123;&#123;placeholders&#125;&#125;</code> are filled from <code>data</code>. <code>waitFor</code> applies to the content only; combining <code>coverHtml</code> with <code>pageRanges</code> is <code>invalid_option</code>. See <a href="#options-cover">Cover page</a>.</td></tr>
 <tr><td><code>mediaType</code></td><td class="t">string</td><td class="t"><code>print</code></td><td class="wrap"><code>print</code> or <code>screen</code>. Use <code>screen</code> when your CSS was written for the browser and <code>@media print</code> rules would hide things.</td></tr>
 <tr><td><code>preferCssPageSize</code></td><td class="t">boolean</td><td class="t"><code>false</code></td><td class="wrap">Let an <code>@page { size: … }</code> rule in your CSS win over <code>format</code>. Alias: <code>preferCSSPageSize</code>.</td></tr>
 <tr><td><code>tagged</code></td><td class="t">boolean</td><td class="t"><strong><code>true</code></strong></td><td class="wrap">Emit a tagged (accessible) PDF with document structure. Set <code>false</code> for a slightly smaller file.</td></tr>
@@ -1489,6 +1490,29 @@ from a format string:</p>
 <pre><code>"options": {
   "margin": "18mm",
   "pageNumbers": "Invoice 2026-014 — page {page} of {total}"
+}</code></pre>
+</div>
+</section>
+
+<!-- ============================================================ COVER -->
+<section id="options-cover">
+<h3>Cover page <a class="anchor" href="#options-cover">#</a></h3>
+
+<p><code>coverHtml</code> renders its markup as the first page(s) of the document, before the
+content. The cover is printed with header/footer mode off, so it carries no header, no footer
+and no page numbers — and because the content is printed as its own document, its numbering
+starts at <code>1</code> on the first page after the cover, with <code>{total}</code> counting
+the content pages only. <code>coverHtml</code> accepts the same <code>&#123;&#123;placeholders&#125;&#125;</code>
+as the body, filled from <code>data</code>. It inherits <code>javascript</code>,
+<code>emulateDarkMode</code> and <code>headers</code> from the request; <code>waitFor</code>
+applies to the content only. Combining it with <code>pageRanges</code> is refused with
+<code>invalid_option</code>.</p>
+
+<div class="code">
+<button class="copy" type="button">Copy</button>
+<pre><code>"options": {
+  "pageNumbers": true,
+  "coverHtml": "&lt;h1&gt;Quarterly report {{quarter}}&lt;/h1&gt;"
 }</code></pre>
 </div>
 </section>

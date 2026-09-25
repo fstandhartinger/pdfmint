@@ -247,6 +247,10 @@ const PdfOptions = {
     footerHtml: { type: 'string', description: 'Alias: "footerTemplate". Rendered on every page; enables header/footer mode.' },
     pageNumbers: { description: 'true builds a default "Page {page} of {total}" footer; a string is a template with {page}, {total}, {date}, {title}, {url}.', anyOf: [{ type: 'boolean' }, { type: 'string' }] },
     pageRanges: { type: 'string', description: 'Comma-separated pages and ranges, 1-based, e.g. "1-5, 8, 11-13".' },
+    coverHtml: {
+      type: 'string',
+      description: 'HTML for a cover rendered as the first page(s), ahead of the document. The cover gets NO header, footer or page numbers; content numbering starts at 1 with {total} counting content pages only. {{placeholders}} are filled from "data". Inherits javascript, emulateDarkMode and headers; "waitFor" applies to the content only. Cannot be combined with "pageRanges" (invalid_option).',
+    },
     mediaType: { type: 'string', enum: ['print', 'screen'], default: 'print' },
     preferCssPageSize: { type: 'boolean', default: false, description: 'Alias: "preferCSSPageSize".' },
     tagged: { type: 'boolean', default: true },
@@ -302,6 +306,7 @@ const PdfBody = {
     footerTemplate: { type: 'string', description: 'Alias of "footerHtml".' },
     pageNumbers: PdfOptions.properties.pageNumbers,
     pageRanges: PdfOptions.properties.pageRanges,
+    coverHtml: PdfOptions.properties.coverHtml,
     mediaType: PdfOptions.properties.mediaType,
     preferCssPageSize: PdfOptions.properties.preferCssPageSize,
     preferCSSPageSize: { type: 'boolean', description: 'Alias of "preferCssPageSize".' },

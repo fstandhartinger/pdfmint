@@ -222,6 +222,9 @@ function normalisePdfOptions(input = {}) {
   if (o.pageNumbers) footerHtml = footerHtml || pageNumberTemplate(o.pageNumbers === true ? null : o.pageNumbers);
 
   const displayHeaderFooter = Boolean(headerHtml || footerHtml);
+  // Snapshot before header/footer room is reserved: a cover prints with header/footer
+  // mode off, so it gets the margin the caller asked for, not the grown one.
+  const plainMargin = { ...margin };
   const hasHeader = Boolean(headerHtml);
   const hasFooter = Boolean(footerHtml);
   if (displayHeaderFooter) {
@@ -241,6 +244,21 @@ function normalisePdfOptions(input = {}) {
 
   const pageRanges = validatePageRanges(o.pageRanges);
 
+  // The cover is a first-class page option: it must be read here, in the one place every
+  // caller's options flow through — otherwise a stored template's coverHtml would validate
+  // at PUT time and then be silently dropped at render time (the template branch merges
+  // stored options through this exact function; nothing outside its return shape survives).
+  let coverHtml = null;
+  if (o.coverHtml !== undefined && o.coverHtml !== null) {
+    if (typeof o.coverHtml !== 'string') {
+      throw bad('invalid_option', `"coverHtml" must be a string — got ${Array.isArray(o.coverHtml) ? 'an array' : typeof o.coverHtml}.`, {
+        hint: 'Send the cover markup as a JSON string, for example {"coverHtml":"<h1>{{title}}</h1>"}.',
+        docs: '/docs#options',
+      });
+    }
+    coverHtml = o.coverHtml;
+  }
+
   return {
     format: width ? undefined : (format || 'A4'),
     width, height,
@@ -255,6 +273,8 @@ function normalisePdfOptions(input = {}) {
     footerTemplate: displayHeaderFooter ? footerHtml : undefined,
     preferCSSPageSize: asBool(o.preferCssPageSize ?? o.preferCSSPageSize, 'preferCssPageSize', false),
     pageRanges,
+    coverHtml,
+    coverMargin: coverHtml ? plainMargin : undefined,
     mediaType,
     tagged: asBool(o.tagged, 'tagged', true),
     outline: asBool(o.outline, 'outline', false),
