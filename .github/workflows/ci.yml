@@ -46,18 +46,48 @@ jobs:
 
       - name: Start the service
         run: |
-          # The API suite sends 60 concurrent requests and checks that some are
-          # limited; strict-mode uses one disposable account for over 50
-          # requests. 59 fits that overlap only in the isolated CI server.
-          # Keep the npm test process at the documented default burst of 30.
-          RATE_LIMIT_BURST=59 node src/server.js > /tmp/server.log 2>&1 &
+          # Integration suites intentionally reuse disposable accounts and do
+          # hundreds of authenticated calls. Give this isolated CI service a
+          # larger bucket so unrelated assertions do not test rate limiting.
+          # The actual rate-limit integration test runs against a fresh service
+          # with the documented burst of 30 below. Neither setting changes prod.
+          RATE_LIMIT_BURST=300 node src/server.js > /tmp/server.log 2>&1 &
+          echo "$!" > /tmp/pdfmint-server.pid
           for i in $(seq 1 40); do
             curl -sf http://127.0.0.1:3000/healthz && break
             sleep 1
           done
           curl -sf http://127.0.0.1:3000/healthz || { echo '::error::the service did not start'; cat /tmp/server.log; exit 1; }
 
-      - run: npm test
+      - name: Run integration suite without the isolated rate-limit test
+        run: >-
+          node --test --test-concurrency=1
+          --test-name-pattern='^(?!.*a burst past the limit answers 429 with a Retry-After the caller can act on).*$'
+          test/*.test.js
+
+      - name: Restart service with the documented rate limit
+        if: always()
+        run: |
+          server_pid="$(cat /tmp/pdfmint-server.pid)"
+          kill "$server_pid" 2>/dev/null || true
+          for i in $(seq 1 20); do
+            kill -0 "$server_pid" 2>/dev/null || break
+            sleep 1
+          done
+          RATE_LIMIT_BURST=30 node src/server.js > /tmp/server.log 2>&1 &
+          echo "$!" > /tmp/pdfmint-server.pid
+          for i in $(seq 1 40); do
+            curl -sf http://127.0.0.1:3000/healthz && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:3000/healthz || { echo '::error::the rate-limit service did not start'; cat /tmp/server.log; exit 1; }
+
+      - name: Verify the HTTP rate limit separately
+        if: always()
+        run: >-
+          node --test --test-concurrency=1
+          --test-name-pattern='a burst past the limit answers 429 with a Retry-After the caller can act on'
+          test/api.test.js
 
       - name: Server log
         if: always()
