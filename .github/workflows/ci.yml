@@ -60,10 +60,7 @@ jobs:
           curl -sf http://127.0.0.1:3000/healthz || { echo '::error::the service did not start'; cat /tmp/server.log; exit 1; }
 
       - name: Run integration suite without the isolated rate-limit test
-        run: >-
-          node --test --test-concurrency=1
-          --test-name-pattern='^(?!.*a burst past the limit answers 429 with a Retry-After the caller can act on).*$'
-          test/*.test.js
+        run: SKIP_API_RATE_LIMIT_TEST=1 npm test
 
       - name: Restart service with the documented rate limit
         if: always()
