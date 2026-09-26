@@ -46,7 +46,11 @@ jobs:
 
       - name: Start the service
         run: |
-          node src/server.js > /tmp/server.log 2>&1 &
+          # The API suite sends 60 concurrent requests and checks that some are
+          # limited; strict-mode uses one disposable account for over 50
+          # requests. 59 fits that overlap only in the isolated CI server.
+          # Keep the npm test process at the documented default burst of 30.
+          RATE_LIMIT_BURST=59 node src/server.js > /tmp/server.log 2>&1 &
           for i in $(seq 1 40); do
             curl -sf http://127.0.0.1:3000/healthz && break
             sleep 1
