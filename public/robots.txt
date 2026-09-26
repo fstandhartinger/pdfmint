@@ -1,5 +1,6 @@
 # PDFMint — https://pdf.mintapis.com
 # The dashboard and the API are behind a key; there is nothing there for a crawler.
+# /examples/ holds the raw sample files the landing page renders. For language models: /llms.txt
 
 User-agent: *
 Allow: /
@@ -7,5 +8,6 @@ Disallow: /dashboard
 Disallow: /v1/
 Disallow: /stripe/
 Disallow: /f/
+Disallow: /examples/
 
 Sitemap: https://pdf.mintapis.com/sitemap.xml

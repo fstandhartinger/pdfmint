@@ -3,34 +3,119 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PDFShift alternative &mdash; the same $9 buys 500 documents there and 5,000 here</title>
-<meta name="description" content="PDFShift charges $9 for 500 credits and counts one credit per 5&nbsp;MB of output, so a 14&nbsp;MB PDF is three credits &mdash; their example. PDFMint charges $9 for 5,000 documents, one credit each whatever the size. Every figure read from pdfshift.io/pricing on 29 August 2026.">
+<title>PDFShift alternative: pricing, credits and PDFMint</title>
+<meta name="description" content="PDFShift's FAQ lists $24 for 2,500 credits; each covers up to 5 MB. Compare its dated rate card with PDFMint's $9 plan for 5,000 documents.">
 <link rel="canonical" href="https://pdf.mintapis.com/pdfshift-alternative">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta property="og:url" content="https://pdf.mintapis.com/pdfshift-alternative">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="PDFMint">
-<meta property="og:title" content="PDFShift alternative &mdash; the same $9 buys 500 documents there and 5,000 here">
-<meta property="og:description" content="PDFShift charges $9 for 500 credits and counts one credit per 5&nbsp;MB of output, so a 14&nbsp;MB PDF is three credits &mdash; their example. PDFMint charges $9 for 5,000 documents, one credit each whatever the size. Every figure read from pdfshift.io/pricing on 29 August 2026.">
+<meta property="og:title" content="PDFShift alternative: pricing, credits and PDFMint">
+<meta property="og:description" content="PDFShift's FAQ lists $24 for 2,500 credits; each covers up to 5 MB. Compare its dated rate card with PDFMint's $9 plan for 5,000 documents.">
 <meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
-<meta property="og:image:alt" content="PDFMint: HTML in, PDF bytes out, from one HTTP call.">
+<meta property="og:image:alt" content="PDFMint social card showing HTML, Markdown or a URL converted to PDF bytes with one POST request.">
 <meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:title" content="PDFShift alternative: pricing, credits and PDFMint">
+<meta name="twitter:description" content="PDFShift's FAQ lists $24 for 2,500 credits; each covers up to 5 MB. Compare its dated rate card with PDFMint's $9 plan for 5,000 documents.">
+<meta name="twitter:image" content="https://pdf.mintapis.com/og-image.png">
+<meta name="twitter:image:alt" content="PDFMint social card showing HTML, Markdown or a URL converted to PDF bytes with one POST request.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/app.css">
-<link rel="stylesheet" href="/docs.css">
+<meta name="theme-color" content="#fbfbf9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0e0d" media="(prefers-color-scheme: dark)">
+<link rel="preload" href="/fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/landing.css?v=8">
+<link rel="stylesheet" href="/docs.css?v=8">
+<script>(function(){try{var t=localStorage.getItem('mint-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}})()</script>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "BreadcrumbList",
+ "itemListElement": [
+  {
+   "@type": "ListItem",
+   "position": 1,
+   "name": "PDFMint",
+   "item": "https://pdf.mintapis.com/"
+  },
+  {
+   "@type": "ListItem",
+   "position": 2,
+   "name": "vs PDFShift",
+   "item": "https://pdf.mintapis.com/pdfshift-alternative"
+  }
+ ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://pdf.mintapis.com/#organization",
+      "name": "PDFMint",
+      "legalName": "productivity-boost.com Betriebs UG (haftungsbeschränkt) & Co. KG",
+      "url": "https://pdf.mintapis.com/",
+      "logo": "https://pdf.mintapis.com/favicon.svg",
+      "founder": {
+        "@type": "Person",
+        "name": "Florian Standhartinger"
+      },
+      "sameAs": [
+        "https://github.com/fstandhartinger/pdfmint",
+        "https://github.com/fstandhartinger/n8n-nodes-pdfmint",
+        "https://www.npmjs.com/package/n8n-nodes-pdfmint"
+      ]
+    },
+    {
+      "@type": [
+        "SoftwareApplication",
+        "Product"
+      ],
+      "@id": "https://pdf.mintapis.com/#application",
+      "name": "PDFMint",
+      "url": "https://pdf.mintapis.com/",
+      "applicationCategory": "DeveloperApplication",
+      "applicationSubCategory": "PDF generation API",
+      "operatingSystem": "Cloud",
+      "description": "An API and verified n8n community node that turn HTML, Markdown, a URL, or a named template into PDF bytes.",
+      "image": "https://pdf.mintapis.com/img/invoice-1042-1040.webp",
+      "publisher": {
+        "@id": "https://pdf.mintapis.com/#organization"
+      }
+    }
+  ]
+}
+</script>
 </head>
 <body class="docs">
+<a class="skip-link" href="#main">Skip to content</a>
 
-<header class="docs-top">
-  <a class="logo" href="/">PDF<span>Mint</span></a>
-  <nav>
-    <a href="/docs">API reference</a>
-    <a href="/html-to-pdf-api">HTML to PDF</a>
-    <a href="/status">Status</a>
-    <a href="/dashboard">Dashboard</a>
-    <a class="cta" href="/signup">Get an API key</a>
-  </nav>
+<!-- l-header -->
+<header class="l-top">
+  <div class="wrap">
+    <a class="logo" href="/" aria-label="PDFMint home">
+      <svg class="l-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="2.5" width="17" height="19" rx="3" stroke="currentColor" stroke-width="1.7"/><path class="a" d="M7.8 9.2h3.1a2.2 2.2 0 0 1 0 4.4H7.8V9.2zm0 4.4V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path class="a" d="M13.9 17V9.2l1.6 2.6 1.6-2.6V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      PDF<span>Mint</span>
+    </a>
+    <nav class="l-nav" aria-label="Main">
+      <a href="/#how">How it works</a>
+      <a href="/#n8n">n8n</a>
+      <a href="/zapier">Zapier beta</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/docs">Docs</a>
+    </nav>
+    <div class="l-actions">
+      <button class="l-theme" type="button" aria-label="Switch theme"><svg class="i-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><svg class="i-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+      <a class="l-link hide-xs" href="/docs">Docs</a>
+      <a class="l-link" href="/login">Sign in</a>
+      <a class="l-btn l-btn-primary" href="/signup">Start free</a>
+    </div>
+  </div>
 </header>
+<!-- /l-header -->
 
 <div class="layout">
   <aside class="toc">
@@ -58,20 +143,16 @@
     </div>
   </aside>
 
-  <main class="content">
+  <main class="content" id="main">
 <h1>PDFShift alternative</h1>
 <p class="lede">PDFShift is a good, focused HTML-to-PDF API and has been around long enough to be
 the default answer. Two things about it are worth checking against your own numbers before you
-renew: <strong>$9 a month buys 500 credits</strong>, and <strong>a credit is five megabytes of
+renew: <strong>the current FAQ lists a $24 Boost plan with 2,500 credits</strong>, and <strong>a credit is five megabytes of
 output, not one document</strong>. PDFMint&rsquo;s $9 plan is 5,000 documents, one credit each,
 whatever they weigh.</p>
 
 <div class="note">
-<p><strong>Where these numbers come from.</strong> PDFShift prices its plans through a calculator on
-<code>pdfshift.io/pricing</code>: you type a monthly volume and it names a plan. The table below was
-produced on <strong>29 August 2026</strong> by entering 500, 1,000, 5,000, 20,000, 100,000 and
-500,000 into that calculator and reading back what it recommended. The credit rule and the free-tier
-limits are quoted verbatim from the same page. Rate cards change; re-check both before deciding.</p>
+<p><strong>Where these numbers come from.</strong> PDFShift&rsquo;s <a href="https://pdfshift.io/pricing/">pricing page</a> currently exposes its calculator and confirms 50 free credits, a 15 MB file ceiling and a 30-second free timeout. Its <a href="https://pdfshift.io/faq/">FAQ</a> currently lists the $24 Boost plan with 2,500 credits, a $0.03 overage and 100-second paid timeouts (longer by arrangement). The full rate card below is the calculator snapshot we recorded on <strong>29 August 2026</strong>; use the live calculator before deciding.</p>
 </div>
 
 <section id="price">
@@ -104,10 +185,11 @@ limits are quoted verbatim from the same page. Rate cards change; re-check both 
 </table>
 </div>
 
-<p>Line the two up at the points where they touch. <strong>$9: 500 credits against 5,000
-documents. $99: 25,000 credits against 250,000 documents.</strong> The gap is an order of magnitude
-at both ends, and it holds all the way up: PDFShift&rsquo;s largest published plan, $799 for 500,000
-credits, is two and a half times the price of PDFMint&rsquo;s $99 tier for twice the volume.</p>
+<p>In the 29 August snapshot, <strong>$9 bought 500 credits against 5,000 PDFMint documents, and
+$99 bought 25,000 credits against 250,000 documents.</strong> PDFShift&rsquo;s current FAQ now
+lists its $24 Boost plan for 2,500 credits; check its live calculator for the rate that matches
+your volume. The archived $799 / 500,000-credit figure is dated, so it is not used as a current
+comparison here.</p>
 </section>
 
 <section id="credit">
@@ -140,9 +222,9 @@ does not change the bill &mdash; one credit is one document, at any page count a
 <thead><tr><th></th><th>PDFShift</th><th>PDFMint</th></tr></thead>
 <tbody>
 <tr><td>Billing unit</td><td>1 credit per 5&nbsp;MB of output</td><td>1 credit per document, any size</td></tr>
-<tr><td>$9 a month buys</td><td>500 credits</td><td>5,000 documents</td></tr>
-<tr><td>Free tier</td><td>50 credits, 15&nbsp;MB max, 30&nbsp;s timeout</td><td>10 documents, no size or timeout cap</td></tr>
-<tr><td>Timeout on paid plans</td><td>up to 15 minutes</td><td>yours to set per request</td></tr>
+<tr><td>$9 a month bought (29 Aug snapshot)</td><td>500 credits</td><td>5,000 documents at PDFMint</td></tr>
+<tr><td>Free tier</td><td>50 credits, 15&nbsp;MB max, 30&nbsp;s timeout</td><td>10 documents; same request and render caps as paid plans</td></tr>
+<tr><td>Timeout on paid plans</td><td>up to 100 seconds; longer by arrangement</td><td>up to 120 seconds per request</td></tr>
 <tr><td>Failed render</td><td>not stated on the pricing page</td><td>credit refunded before the error reaches you</td></tr>
 <tr><td>Inputs</td><td>HTML or a URL</td><td>HTML, Markdown, a URL, or a stored template</td></tr>
 <tr><td>Merge PDFs</td><td>&mdash;</td><td><code>POST /v1/merge</code>, one credit</td></tr>
@@ -185,8 +267,9 @@ a customer. The full error and warning list is in the <a href="/docs#errors">API
 <p>PDFShift gives 50 conversions a month; PDFMint gives 10. That is a real advantage for PDFShift
 and it is worth saying without spin: if you want to evaluate over several weeks without paying, they
 give you five times the room. PDFShift&rsquo;s free tier does cap output at 15&nbsp;MB and the
-timeout at 30 seconds, where the PDFMint free tier has the same limits as the paid ones &mdash; but
-50 is 50. Ours is sized to prove the thing works, not to run anything on.</p>
+timeout at 30 seconds, where the PDFMint free tier has the same published request and render limits
+as its paid plans: a 12 MB request body, 10 MB of rendered HTML and up to 120 seconds per render.
+But 50 is 50. Ours is sized to prove the thing works, not to run anything on.</p>
 </section>
 
 <section id="workflow">
@@ -219,7 +302,7 @@ item&rsquo;s JSON next to it, so a downstream IF node can act on them. Details o
 
 <p>Both return the bytes in the response body, so a migration is the URL, the auth header and the
 name of one field. If you need the PDF as base64 or as a hosted link instead, set
-<code>"output": "base64"</code> or <code>"output": "link"</code>.</p>
+<code>"output": "base64"</code> or <code>"output": "url"</code>.</p>
 </section>
 
 <section id="stay">
@@ -249,7 +332,7 @@ two pricing pages, before you spend anything.</p>
 <p>Take the page your current renderer gets wrong &mdash; the web font, the JavaScript chart, the
 table that breaks across a page &mdash; and send it to both. Then weigh the output, because that is
 what decides which of these two rate cards applies to you.</p>
-<p><a class="cta" href="/signup">Get an API key</a> &nbsp; <a href="/docs">API reference</a>
+<p><a class="l-btn l-btn-primary" href="/signup">Get an API key</a> &nbsp; <a href="/docs">API reference</a>
 &nbsp; <a href="/status">Live latency and success rate</a></p>
 </section>
 
@@ -265,19 +348,74 @@ what decides which of these two rate cards applies to you.</p>
   </main>
 </div>
 
-<footer style="border-top:1px solid var(--rule);padding:1.6rem 1.25rem;text-align:center;font-size:.86rem;color:var(--muted)">
-  <a href="/">PDFMint</a> &middot;
-  <a href="/docs">API reference</a> &middot;
-  <a href="/html-to-pdf-api">HTML to PDF API</a> &middot;
-  <a href="/invoice-pdf-api">Invoices</a> &middot;
-  <a href="/markdown-to-pdf-api">Markdown</a> &middot;
-  <a href="/url-to-pdf-api">URL to PDF</a> &middot;
-  <a href="/merge-pdf-api">Merge</a> &middot;
-  <a href="/n8n-html-to-pdf">n8n</a> &middot;
-  <a href="/status">Status</a> &middot;
-  <a href="/legal">Legal</a>
+<!-- l-related -->
+<aside class="l-related" aria-labelledby="related-title">
+  <div class="wrap">
+    <h2 id="related-title">Related guides</h2>
+    <div class="grid grid-4">
+      <a class="tile" href="/craftmypdf-alternative"><h3>PDFMint vs CraftMyPDF</h3><p>Their designer against our HTML-first API, with prices.</p></a>
+      <a class="tile" href="/pdfmonkey-alternative"><h3>PDFMint vs PDFMonkey</h3><p>Starter is €5 for 300 docs with one-day retention; Pro+ is €60 for 5,000 with unlimited retention.</p></a>
+      <a class="tile" href="/html-to-pdf-api"><h3>HTML to PDF API</h3><p>What the job involves, when to self-host, and what six products charge.</p></a>
+      <a class="tile" href="/url-to-pdf-api"><h3>URL to PDF API</h3><p>Capturing a live page, waiting for it to finish, and what a login wall does.</p></a>
+    </div>
+  </div>
+</aside>
+<!-- /l-related -->
+
+<!-- l-footer -->
+<footer class="l-foot">
+  <div class="wrap">
+    <div class="l-foot-grid">
+      <div class="l-foot-brand">
+        <a class="logo" href="/" aria-label="PDFMint home"><svg class="l-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="2.5" width="17" height="19" rx="3" stroke="currentColor" stroke-width="1.7"/><path class="a" d="M7.8 9.2h3.1a2.2 2.2 0 0 1 0 4.4H7.8V9.2zm0 4.4V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path class="a" d="M13.9 17V9.2l1.6 2.6 1.6-2.6V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> PDF<span>Mint</span></a>
+        <p>HTML, Markdown or a URL in, PDF bytes out. A PDF generation API and verified n8n node, built and run by Florian Standhartinger.</p>
+      </div>
+      <nav aria-labelledby="f-product"><h2 id="f-product">Product</h2><ul>
+        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="/docs">API reference</a></li>
+        <li><a href="/openapi.json">OpenAPI 3.1 (JSON)</a></li>
+        <li><a href="/status">Status</a></li>
+        <li><a href="/login">Sign in</a></li>
+        <li><a href="/signup">Create account</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-guides"><h2 id="f-guides">Guides</h2><ul>
+        <li><a href="/html-to-pdf-api">HTML to PDF API</a></li>
+        <li><a href="/invoice-pdf-api">Invoice PDF API</a></li>
+        <li><a href="/markdown-to-pdf-api">Markdown to PDF</a></li>
+        <li><a href="/url-to-pdf-api">URL to PDF</a></li>
+        <li><a href="/merge-pdf-api">Merge PDFs</a></li>
+        <li><a href="/password-protect-pdf-api">Password-protect PDFs</a></li>
+        <li><a href="/html-to-image-api">HTML to image</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-integ"><h2 id="f-integ">Integrations &amp; comparisons</h2><ul>
+        <li><a href="/n8n-html-to-pdf">n8n node</a></li>
+        <li><a href="/n8n-templates">n8n templates</a></li>
+        <li><a href="/zapier">Zapier beta</a></li>
+        <li><a href="/pdfshift-alternative">vs PDFShift</a></li>
+        <li><a href="/craftmypdf-alternative">vs CraftMyPDF</a></li>
+        <li><a href="/pdfmonkey-alternative">vs PDFMonkey</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-family"><h2 id="f-family">Mint APIs family</h2><ul>
+        <li><a href="https://docmint.app.mintapis.com/">DocMint &mdash; Word, Excel &amp; PowerPoint</a></li>
+        <li><a href="https://mailmint.app.mintapis.com/">MailMint &mdash; inbound email to JSON</a></li>
+        <li><a href="https://www.npmjs.com/package/n8n-nodes-pdfmint" rel="noopener">n8n-nodes-pdfmint on npm</a></li>
+        <li><a href="https://github.com/fstandhartinger/pdfmint" rel="noopener">Source on GitHub</a></li>
+      </ul></nav>
+    </div>
+    <div class="l-foot-base">
+      <span>&copy; 2026 productivity-boost.com Betriebs UG (haftungsbeschr&auml;nkt) &amp; Co. KG</span>
+      <nav aria-label="Legal">
+        <a href="/legal">Imprint</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/llms.txt">llms.txt</a>
+      </nav>
+    </div>
+  </div>
 </footer>
+<!-- /l-footer -->
 
 <script src="/docs.js"></script>
+<script src="/site.js?v=8" defer></script>
 </body>
 </html>

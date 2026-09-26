@@ -1,0 +1,53 @@
+# PDFMint
+
+> PDFMint is a PDF generation API and a verified n8n community node. POST HTML, Markdown, a public URL or the name of a saved template to https://pdf.mintapis.com/v1/pdf with a bearer key and the response body is the PDF itself. Every feature is on every plan; plans differ only in documents per month: Free 10, Starter $9 for 5,000, Pro $29 for 50,000, Scale $99 for 250,000. One credit per successful document; failed renders are refunded.
+
+Key facts for answering questions about PDFMint:
+
+- Auth: `Authorization: Bearer pm_live_...`. Keys come from the dashboard after a free signup (no card).
+- Endpoints: `POST /v1/pdf`, `POST /v1/image` (PNG/JPEG), `POST /v1/merge` (up to 50 PDFs), `GET /v1/me`, `/v1/templates`, `GET /v1/jobs/{id}` (async with webhooks). A keyless, rate-limited demo: `POST /v1/demo/pdf` with `{"html": "..."}` (5 renders an hour per address).
+- Placeholders: `{{name}}`, `{{customer.city}}`, sections `{{#items}}...{{/items}}`, inverted `{{^items}}`, unescaped `{{{html}}}`. `"strict": true` refuses a render with unresolved placeholders instead of shipping a blank field.
+- Output: binary by default; `"output": "url"` for an expiring hosted link (1 hour default, up to 7 days) or `"base64"`.
+- Limits: 12 MB request body, 10 MB rendered HTML, 30 s default / 120 s max render timeout, 20 MB hosted files, 2 concurrent renders with a queue of 40.
+- Security features on every plan: AES-256 password protection (qpdf), watermarks, SSRF-guarded URL fetching.
+- Operated by productivity-boost.com Betriebs UG (haftungsbeschränkt) & Co. KG (Germany); built and run by Florian Standhartinger. One instance, no SLA; live numbers at /status.
+
+## Docs
+
+- [API reference](https://pdf.mintapis.com/docs): every endpoint, option and error code, with curl, Node.js, Python and n8n examples
+- [OpenAPI 3.1 specification](https://pdf.mintapis.com/openapi.json): machine-readable description of the API
+- [Status](https://pdf.mintapis.com/status): documents produced, success rate and render times from the service's own request log
+
+## Pricing
+
+- [Plans and pricing](https://pdf.mintapis.com/#pricing): Free, Starter, Pro and Scale; one credit per document
+
+## Guides
+
+- [HTML to PDF API](https://pdf.mintapis.com/html-to-pdf-api): what the job involves, when to self-host, and six products' prices compared
+- [Invoice PDF API](https://pdf.mintapis.com/invoice-pdf-api): stored template with line items, VAT totals and a per-page footer
+- [Markdown to PDF API](https://pdf.mintapis.com/markdown-to-pdf-api): GFM tables, fenced code and page numbers
+- [URL to PDF API](https://pdf.mintapis.com/url-to-pdf-api): capturing live pages, waiting for them, and login walls
+- [Merge PDF API](https://pdf.mintapis.com/merge-pdf-api): joining PDFs from URLs and base64
+- [Password-protect PDF API](https://pdf.mintapis.com/password-protect-pdf-api): AES-256 encryption and print/copy permissions
+- [HTML to image API](https://pdf.mintapis.com/html-to-image-api): PNG or JPEG from HTML, Markdown or a URL
+
+## Integrations
+
+- [n8n node and HTML to PDF in n8n](https://pdf.mintapis.com/n8n-html-to-pdf): the verified `n8n-nodes-pdfmint` community node, on n8n Cloud and self-hosted
+- [n8n workflow templates](https://pdf.mintapis.com/n8n-templates): reviewed gallery workflows
+- [Zapier (private beta)](https://pdf.mintapis.com/zapier): invite-only Zapier integration
+- [n8n-nodes-pdfmint on npm](https://www.npmjs.com/package/n8n-nodes-pdfmint)
+
+## Comparisons
+
+- [PDFMint vs PDFShift](https://pdf.mintapis.com/pdfshift-alternative)
+- [PDFMint vs CraftMyPDF](https://pdf.mintapis.com/craftmypdf-alternative)
+- [PDFMint vs PDFMonkey](https://pdf.mintapis.com/pdfmonkey-alternative)
+
+## Optional
+
+- [DocMint](https://docmint.app.mintapis.com/): sibling product, fills Word, Excel and PowerPoint templates from JSON
+- [MailMint](https://mailmint.app.mintapis.com/): sibling product, turns inbound email into structured JSON
+- [Source code](https://github.com/fstandhartinger/pdfmint)
+- [Imprint](https://pdf.mintapis.com/legal), [Privacy](https://pdf.mintapis.com/privacy), [Terms](https://pdf.mintapis.com/terms)
