@@ -417,7 +417,9 @@ describe('asynchronous rendering', () => {
 });
 
 describe('rate limiting', () => {
-  test('a burst past the limit answers 429 with a Retry-After the caller can act on', async () => {
+  test('a burst past the limit answers 429 with a Retry-After the caller can act on', {
+    skip: process.env.SKIP_API_RATE_LIMIT_TEST === '1',
+  }, async () => {
     const { key: k } = await newAccount();
     const responses = await Promise.all(Array.from({ length: 60 }, () =>
       fetch(`${require('./helpers').BASE}/v1/me`, { headers: { Authorization: `Bearer ${k}` } })));

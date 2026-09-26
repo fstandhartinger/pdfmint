@@ -43,7 +43,7 @@ const BOT_UA = /bot|crawl|spider|slurp|preview|fetch|scan|monitor|lighthouse|hea
 const PAGE_ROOTS = new Set(['', 'docs', 'status', 'signup', 'login', 'dashboard', 'forgot-password', 'reset-password',
   'ads', 'privacy', 'terms', 'legal', 'zapier', 'n8n-templates', 'n8n-html-to-pdf', 'html-to-pdf-api',
   'url-to-pdf-api', 'markdown-to-pdf-api', 'invoice-pdf-api', 'merge-pdf-api', 'pdfshift-alternative',
-  'pdfmonkey-alternative', 'craftmypdf-alternative']);
+  'pdfmonkey-alternative', 'craftmypdf-alternative', 'html-to-image-api', 'password-protect-pdf-api']);
 
 // API surface, webhooks, hosted files and health checks are not pages.
 const NON_PAGE_PREFIXES = ['/v1', '/stripe', '/f', '/internal', '/api', '/healthz'];

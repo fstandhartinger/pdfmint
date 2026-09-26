@@ -1,0 +1,59 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box}
+body{margin:0;font:10pt/1.5 Inter,sans-serif;color:#111827;-webkit-print-color-adjust:exact}
+.p{padding:10mm 8mm 0;height:270mm;display:flex;flex-direction:column;overflow:hidden}
+.top{display:flex;justify-content:space-between;align-items:flex-start}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:13pt;letter-spacing:-.02em}
+.mk{width:24px;height:24px;border-radius:6px;background:#0b7a5b;color:#fff;display:grid;place-items:center;font-size:10pt}
+.from{margin-top:8px;color:#6b7280;font-size:8.5pt;line-height:1.55}
+h1{margin:0;font-size:26pt;letter-spacing:-.03em;font-weight:700;text-align:right}
+.no{color:#6b7280;text-align:right;font-size:9pt;margin-top:2px}
+.meta{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:10px;margin:16mm 0 10mm;padding:12px 0;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb}
+.meta b{display:block;font-size:7pt;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;font-weight:600;margin-bottom:3px}
+.meta span{font-size:9.5pt}
+table{width:100%;border-collapse:collapse}
+th{font-size:7pt;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;font-weight:600;text-align:left;padding:0 0 8px;border-bottom:1px solid #111827}
+td{padding:11px 0;border-bottom:1px solid #e5e7eb;vertical-align:top}
+td small{display:block;color:#6b7280;font-size:8.5pt}
+.r{text-align:right}
+.n{font-variant-numeric:tabular-nums}
+.sum{margin-left:auto;width:62mm;margin-top:8mm}
+.sum div{display:flex;justify-content:space-between;padding:5px 0;color:#374151}
+.sum .t{border-top:1px solid #111827;margin-top:5px;padding-top:9px;font-weight:700;font-size:12pt;color:#111827}
+.pay{margin-top:18mm;display:grid;grid-template-columns:1fr 1fr;gap:10mm;font-size:8.5pt;color:#374151}
+.pay b{display:block;font-size:7pt;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;font-weight:600;margin-bottom:4px}
+.badge{display:inline-block;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;border-radius:99px;padding:1px 8px;font-size:7.5pt;font-weight:600;margin-top:6px}
+.ft{margin-top:auto;display:flex;justify-content:space-between;font-size:7.5pt;color:#9ca3af;border-top:1px solid #f3f4f6;padding-top:8px}
+</style></head><body><div class="p">
+<div class="top">
+ <div><div class="brand"><span class="mk">N</span>Northwind Studio</div>
+ <div class="from">Northwind Studio GmbH<br>Torstraße 118, 10119 Berlin<br>VAT DE 312 456 789</div></div>
+ <div><h1>Invoice</h1><div class="no">No. 1042</div></div>
+</div>
+<div class="meta">
+ <div><b>Billed to</b><span>Acme Logistics Ltd<br>14 Harbour Row, Leith</span></div>
+ <div><b>Issued</b><span>1 Sep 2026</span></div>
+ <div><b>Due</b><span>15 Sep 2026</span></div>
+ <div><b>Amount due</b><span><strong>€8,948.80</strong></span></div>
+</div>
+<table>
+<thead><tr><th>Description</th><th class="r">Qty</th><th class="r">Unit</th><th class="r">Amount</th></tr></thead>
+<tbody>
+<tr><td>Brand identity workshop<small>Two half-day sessions, on site</small></td><td class="r n">2</td><td class="r n">€1,200.00</td><td class="r n">€2,400.00</td></tr>
+<tr><td>Website design<small>Design system, 12 page templates</small></td><td class="r n">36</td><td class="r n">€95.00</td><td class="r n">€3,420.00</td></tr>
+<tr><td>Copywriting<small>Home, pricing and about pages</small></td><td class="r n">8</td><td class="r n">€110.00</td><td class="r n">€880.00</td></tr>
+<tr><td>Accessibility audit<small>WCAG 2.2 AA, written report</small></td><td class="r n">1</td><td class="r n">€640.00</td><td class="r n">€640.00</td></tr>
+<tr><td>Hosting setup<small>Domain, TLS, deploy pipeline</small></td><td class="r n">1</td><td class="r n">€180.00</td><td class="r n">€180.00</td></tr>
+</tbody></table>
+<div class="sum">
+ <div><span>Subtotal</span><span class="n">€7,520.00</span></div>
+ <div><span>VAT 19%</span><span class="n">€1,428.80</span></div>
+ <div class="t"><span>Total</span><span class="n">€8,948.80</span></div>
+</div>
+<div class="pay">
+ <div><b>Payment</b>IBAN DE89 3704 0044 0532 0130 00<br>Reference INV-1042</div>
+ <div><b>Notes</b>Thank you for your business.<br><span class="badge">Net 14 days</span></div>
+</div>
+<div class="ft"><span>Northwind Studio GmbH · hello@northwind.example</span><span>Page 1 of 1</span></div>
+</div></body></html>
