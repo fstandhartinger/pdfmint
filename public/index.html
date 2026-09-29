@@ -146,21 +146,23 @@
         </figure>
 
         <div class="code-card">
-          <div class="code-tabs" role="tablist" aria-label="Example requests">
+          <div class="code-tabs">
+            <div class="code-tablist" role="tablist" aria-label="Example requests">
             <button type="button" role="tab" id="tab-curl" aria-controls="panel-curl" aria-selected="true">curl</button>
             <button type="button" role="tab" id="tab-node" aria-controls="panel-node" aria-selected="false" tabindex="-1">Node.js</button>
             <button type="button" role="tab" id="tab-n8n" aria-controls="panel-n8n" aria-selected="false" tabindex="-1">n8n</button>
+            </div>
             <button class="code-copy" type="button" id="copyBtn">Copy</button>
           </div>
 
-          <div class="code-panel" role="tabpanel" id="panel-curl" aria-labelledby="tab-curl" tabindex="0"><pre><code><span class="tok-c"># No key, no signup. 5 renders an hour per address.</span>
+          <div class="code-panel" role="tabpanel" id="panel-curl" aria-labelledby="tab-curl" tabindex="0"><pre tabindex="0"><code><span class="tok-c"># No key, no signup. 5 renders an hour per address.</span>
 curl -s https://pdf.mintapis.com/examples/invoice-1042.html \
   | jq -Rs <span class="tok-s">'{html: .}'</span> \
   | curl -X POST https://pdf.mintapis.com/v1/demo/pdf \
       -H <span class="tok-s">"Content-Type: application/json"</span> \
       --data-binary @- --output invoice-1042.pdf</code></pre></div>
 
-          <div class="code-panel" role="tabpanel" id="panel-node" aria-labelledby="tab-node" tabindex="0" hidden><pre><code><span class="tok-k">const</span> res = <span class="tok-k">await</span> <span class="tok-f">fetch</span>(<span class="tok-s">'https://pdf.mintapis.com/v1/pdf'</span>, {
+          <div class="code-panel" role="tabpanel" id="panel-node" aria-labelledby="tab-node" tabindex="0" hidden><pre tabindex="0"><code><span class="tok-k">const</span> res = <span class="tok-k">await</span> <span class="tok-f">fetch</span>(<span class="tok-s">'https://pdf.mintapis.com/v1/pdf'</span>, {
   method: <span class="tok-s">'POST'</span>,
   headers: {
     <span class="tok-n">Authorization</span>: <span class="tok-s">`Bearer ${process.env.PDFMINT_KEY}`</span>,
@@ -178,7 +180,7 @@ curl -s https://pdf.mintapis.com/examples/invoice-1042.html \
 <span class="tok-k">const</span> pdf = Buffer.<span class="tok-f">from</span>(<span class="tok-k">await</span> res.<span class="tok-f">arrayBuffer</span>());
 <span class="tok-f">console.log</span>(res.headers.<span class="tok-f">get</span>(<span class="tok-s">'X-PDFMint-Pages'</span>), pdf.length);</code></pre></div>
 
-          <div class="code-panel" role="tabpanel" id="panel-n8n" aria-labelledby="tab-n8n" tabindex="0" hidden><pre><code><span class="tok-c">// Paste this straight onto an n8n canvas (Ctrl+V).</span>
+          <div class="code-panel" role="tabpanel" id="panel-n8n" aria-labelledby="tab-n8n" tabindex="0" hidden><pre tabindex="0"><code><span class="tok-c">// Paste this straight onto an n8n canvas (Ctrl+V).</span>
 {
   <span class="tok-n">"nodes"</span>: [
     {
@@ -242,7 +244,7 @@ curl -s https://pdf.mintapis.com/examples/invoice-1042.html \
       <li>
         <h3>POST what you already have</h3>
         <p>HTML, Markdown, a public URL or the name of a saved template, plus a <code>data</code> object for the placeholders.</p>
-        <pre><code>{ "html": "&lt;h1&gt;Invoice {{number}}&lt;/h1&gt;",
+        <pre tabindex="0"><code>{ "html": "&lt;h1&gt;Invoice {{number}}&lt;/h1&gt;",
   "data": { "number": "1042" } }</code></pre>
       </li>
       <li>
@@ -432,7 +434,7 @@ curl -s https://pdf.mintapis.com/examples/invoice-1042.html \
       </div>
     </div>
 
-    <div class="tablewrap" style="margin-top:24px">
+    <div class="tablewrap" tabindex="0" style="margin-top:24px">
       <table class="cmp">
         <caption class="sr-only">Documented service limits</caption>
         <thead><tr><th scope="col">Limit</th><th scope="col">Value</th><th scope="col">What happens at the edge</th></tr></thead>
@@ -456,7 +458,7 @@ curl -s https://pdf.mintapis.com/examples/invoice-1042.html \
       <h2 class="sec-title" id="cmp-title">Measured against the alternatives</h2>
       <p>Everything below is taken from the vendors&rsquo; own published specs, pricing pages and n8n node source. The sources are named under the table.</p>
     </div>
-    <div class="tablewrap">
+    <div class="tablewrap" tabindex="0">
       <table class="cmp">
         <caption class="sr-only">PDFMint compared with CraftMyPDF and pdforge</caption>
         <thead>
