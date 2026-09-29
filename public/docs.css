@@ -1,32 +1,31 @@
-/* PDFMint API reference — layout + components on top of app.css tokens. */
+/* PDFMint docs-style pages (API reference, guides): layout + components on top of
+   the family tokens in landing.css, which every page loads first. */
 
 :root{
-  --docs-maxw:1420px;
-  --sidebar-w:250px;
-  --get:#1668c9; --post:#0b7a5b; --put:#a1690b; --del:#c0392b;
-  --tint:#eef8f4;
-  --warn-bg:#fdf6e3; --warn-rule:#e8d9a8; --warn-ink:#6b5310;
+  --docs-maxw:1320px;
+  --sidebar-w:240px;
+  --get:#1b63b8; --post:#0a6e51; --put:#8f5b06; --del:#b42318;
+  --tint:var(--l-accent-soft);
+  --warn-bg:#fdf6e3; --warn-rule:#e8d9a8; --warn-ink:#5f4a0e;
+}
+:root[data-theme="dark"]{
+  --get:#7ab4f5; --post:#5ee0b0; --put:#e5b769; --del:#f0857a;
+  --warn-bg:#231e10; --warn-rule:#4a3f22; --warn-ink:#e7d49c;
 }
 @media (prefers-color-scheme:dark){
-  :root{
-    --get:#6aa9f0; --post:#43c79c; --put:#dfae5a; --del:#e8776a;
-    --tint:#132520;
-    --warn-bg:#241f12; --warn-rule:#4a3f22; --warn-ink:#e2cd94;
+  :root:not([data-theme="light"]){
+    --get:#7ab4f5; --post:#5ee0b0; --put:#e5b769; --del:#f0857a;
+    --warn-bg:#231e10; --warn-rule:#4a3f22; --warn-ink:#e7d49c;
   }
 }
 
 /* ------------------------------------------------------------------ shell */
 
 body.docs{overflow-x:hidden}
-
-.docs-top{
-  display:flex;align-items:center;justify-content:space-between;gap:1rem;
-  padding:.85rem 1.25rem;border-bottom:1px solid var(--rule);
-  position:sticky;top:0;background:var(--bg);z-index:30;
-}
-.docs-top nav{display:flex;gap:1.1rem;align-items:center;font-size:.9rem;flex-wrap:wrap;justify-content:flex-end}
-.docs-top .cta{background:var(--accent);color:#fff;padding:.4rem .8rem;border-radius:8px;font-weight:600}
-.docs-top .cta:hover{background:var(--accent-ink);text-decoration:none}
+.content h1,.content h2,.content h3{letter-spacing:-.02em}
+.content h1{letter-spacing:-.035em;line-height:1.1;font-weight:650}
+.content .l-btn-primary{color:var(--l-on-accent)}
+.content .l-btn-primary:hover{text-decoration:none}
 
 .layout{
   max-width:var(--docs-maxw);margin:0 auto;
@@ -36,7 +35,7 @@ body.docs{overflow-x:hidden}
 
 /* --------------------------------------------------------------- sidebar */
 
-.toc{position:sticky;top:57px;align-self:start;max-height:calc(100vh - 57px);overflow-y:auto;
+.toc{position:sticky;top:var(--l-header-h);align-self:start;max-height:calc(100vh - var(--l-header-h));overflow-y:auto;
   padding:1.5rem .5rem 3rem 0;font-size:.875rem;line-height:1.45}
 .toc h2{font-size:.7rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
   margin:1.4rem 0 .45rem;font-weight:700}
@@ -53,7 +52,7 @@ body.docs{overflow-x:hidden}
 /* --------------------------------------------------------------- content */
 
 .content{min-width:0;width:100%;max-width:none;margin:0;padding:1.75rem 0 6rem}
-.content > section{scroll-margin-top:72px}
+.content > section{scroll-margin-top:76px}
 .content h1{font-size:2.1rem;margin:0 0 .3rem}
 .content h2{font-size:1.5rem;margin:3.2rem 0 .7rem;padding-top:.4rem;scroll-margin-top:72px}
 .content h3{font-size:1.1rem;margin:2rem 0 .5rem;scroll-margin-top:72px}
@@ -69,9 +68,9 @@ h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:.55}
 
 /* ----------------------------------------------------------------- bits */
 
-.pill{display:inline-block;font-family:var(--mono);font-size:.72rem;font-weight:700;
-  letter-spacing:.04em;padding:.15rem .45rem;border-radius:5px;border:1px solid currentColor;
-  vertical-align:.12em;margin-right:.5rem}
+.content .pill{display:inline-block;font-family:var(--mono);font-size:.72rem;font-weight:700;
+  letter-spacing:.04em;padding:.15rem .45rem;border-radius:5px;border:1px solid currentColor;background:none;
+  vertical-align:.12em;margin:0 .5rem 0 0;gap:0}
 .pill.get{color:var(--get)} .pill.post{color:var(--post)}
 .pill.put{color:var(--put)} .pill.del{color:var(--del)}
 .path{font-family:var(--mono);font-size:.95em}
@@ -98,6 +97,7 @@ h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:.55}
 .tw td code{white-space:nowrap}
 .tw td:first-child{white-space:nowrap}
 .tw td.wrap,.tw td.wrap code{white-space:normal}
+.tw td.wrap{max-width:none;width:auto;margin:0;padding:.55rem .75rem}
 .tw .t{color:var(--muted);font-family:var(--mono);font-size:.82rem;white-space:nowrap}
 
 /* ------------------------------------------------------------ code block */
@@ -108,14 +108,14 @@ h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:.55}
   padding:.28rem .55rem;border-radius:6px;background:var(--panel);color:var(--muted);
   border:1px solid var(--rule);opacity:.75}
 .code:hover .copy,.code .copy:focus{opacity:1}
-.code .copy:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.code .copy:hover{background:var(--accent);color:var(--l-on-accent);border-color:var(--accent)}
 .code .cap{font-size:.75rem;color:var(--muted);font-family:var(--mono);
   padding:.35rem .2rem .1rem;letter-spacing:.02em}
 
 .tabs{display:flex;gap:.35rem;flex-wrap:wrap;margin:1.2rem 0 -.4rem}
 .tabs button{background:transparent;color:var(--muted);border:1px solid var(--rule);
   padding:.34rem .75rem;font-size:.84rem;font-weight:600;border-radius:7px}
-.tabs button[aria-selected="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--l-on-accent);border-color:var(--accent)}
 .tabs button:hover{background:var(--panel)}
 .tabs button[aria-selected="true"]:hover{background:var(--accent-ink)}
 .panel[hidden]{display:none}
@@ -139,12 +139,6 @@ h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:.55}
   .content h2{font-size:1.3rem;margin-top:2.6rem}
 }
 @media (max-width:520px){
-  .docs-top{padding:.7rem .9rem}
-  .docs-top .logo{font-size:1.05rem}
-  /* One row, always: the section links live in the TOC right below anyway. */
-  .docs-top nav{gap:.75rem;font-size:.83rem;flex-wrap:nowrap}
-  .docs-top nav a:not(.cta){display:none}
-  .docs-top nav a[href="/dashboard"]{display:inline}
   .layout{padding:0 .9rem}
   .content h1{font-size:1.45rem}
   .lede{font-size:1rem}

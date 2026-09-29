@@ -3,34 +3,119 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HTML to PDF API &mdash; what the job actually involves, and what the six products charge</title>
-<meta name="description" content="A worked comparison of HTML-to-PDF APIs, with every price read off the vendor&rsquo;s own page on 29 August 2026: PDFShift, CraftMyPDF, PDFMonkey, Doppio, Api2Pdf and PDFMint. Includes what a headless-Chrome renderer gets wrong and when to self-host instead.">
+<title>HTML to PDF API: the job, and what six products charge</title>
+<meta name="description" content="Dated HTML-to-PDF API price snapshot from 29 Aug 2026: six vendors, billing units, render limits, and when self-hosting fits.">
 <link rel="canonical" href="https://pdf.mintapis.com/html-to-pdf-api">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta property="og:url" content="https://pdf.mintapis.com/html-to-pdf-api">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="PDFMint">
-<meta property="og:title" content="HTML to PDF API &mdash; what the job actually involves, and what the six products charge">
-<meta property="og:description" content="A worked comparison of HTML-to-PDF APIs, with every price read off the vendor&rsquo;s own page on 29 August 2026: PDFShift, CraftMyPDF, PDFMonkey, Doppio, Api2Pdf and PDFMint. Includes what a headless-Chrome renderer gets wrong and when to self-host instead.">
+<meta property="og:title" content="HTML to PDF API: the job, and what six products charge">
+<meta property="og:description" content="Dated HTML-to-PDF API price snapshot from 29 Aug 2026: six vendors, billing units, render limits, and when self-hosting fits.">
 <meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
-<meta property="og:image:alt" content="PDFMint: HTML in, PDF bytes out, from one HTTP call.">
+<meta property="og:image:alt" content="PDFMint social card showing HTML, Markdown or a URL converted to PDF bytes with one POST request.">
 <meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:title" content="HTML to PDF API: the job, and what six products charge">
+<meta name="twitter:description" content="Dated HTML-to-PDF API price snapshot from 29 Aug 2026: six vendors, billing units, render limits, and when self-hosting fits.">
+<meta name="twitter:image" content="https://pdf.mintapis.com/og-image.png">
+<meta name="twitter:image:alt" content="PDFMint social card showing HTML, Markdown or a URL converted to PDF bytes with one POST request.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/app.css">
-<link rel="stylesheet" href="/docs.css">
+<meta name="theme-color" content="#fbfbf9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0e0d" media="(prefers-color-scheme: dark)">
+<link rel="preload" href="/fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/landing.css?v=8">
+<link rel="stylesheet" href="/docs.css?v=8">
+<script>(function(){try{var t=localStorage.getItem('mint-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}})()</script>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "BreadcrumbList",
+ "itemListElement": [
+  {
+   "@type": "ListItem",
+   "position": 1,
+   "name": "PDFMint",
+   "item": "https://pdf.mintapis.com/"
+  },
+  {
+   "@type": "ListItem",
+   "position": 2,
+   "name": "HTML to PDF API",
+   "item": "https://pdf.mintapis.com/html-to-pdf-api"
+  }
+ ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://pdf.mintapis.com/#organization",
+      "name": "PDFMint",
+      "legalName": "productivity-boost.com Betriebs UG (haftungsbeschränkt) & Co. KG",
+      "url": "https://pdf.mintapis.com/",
+      "logo": "https://pdf.mintapis.com/favicon.svg",
+      "founder": {
+        "@type": "Person",
+        "name": "Florian Standhartinger"
+      },
+      "sameAs": [
+        "https://github.com/fstandhartinger/pdfmint",
+        "https://github.com/fstandhartinger/n8n-nodes-pdfmint",
+        "https://www.npmjs.com/package/n8n-nodes-pdfmint"
+      ]
+    },
+    {
+      "@type": [
+        "SoftwareApplication",
+        "Product"
+      ],
+      "@id": "https://pdf.mintapis.com/#application",
+      "name": "PDFMint",
+      "url": "https://pdf.mintapis.com/",
+      "applicationCategory": "DeveloperApplication",
+      "applicationSubCategory": "PDF generation API",
+      "operatingSystem": "Cloud",
+      "description": "An API and verified n8n community node that turn HTML, Markdown, a URL, or a named template into PDF bytes.",
+      "image": "https://pdf.mintapis.com/img/invoice-1042-1040.webp",
+      "publisher": {
+        "@id": "https://pdf.mintapis.com/#organization"
+      }
+    }
+  ]
+}
+</script>
 </head>
 <body class="docs">
+<a class="skip-link" href="#main">Skip to content</a>
 
-<header class="docs-top">
-  <a class="logo" href="/">PDF<span>Mint</span></a>
-  <nav>
-    <a href="/docs">API reference</a>
-    <a href="/html-to-pdf-api">HTML to PDF</a>
-    <a href="/status">Status</a>
-    <a href="/dashboard">Dashboard</a>
-    <a class="cta" href="/signup">Get an API key</a>
-  </nav>
+<!-- l-header -->
+<header class="l-top">
+  <div class="wrap">
+    <a class="logo" href="/" aria-label="PDFMint home">
+      <svg class="l-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="2.5" width="17" height="19" rx="3" stroke="currentColor" stroke-width="1.7"/><path class="a" d="M7.8 9.2h3.1a2.2 2.2 0 0 1 0 4.4H7.8V9.2zm0 4.4V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path class="a" d="M13.9 17V9.2l1.6 2.6 1.6-2.6V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      PDF<span>Mint</span>
+    </a>
+    <nav class="l-nav" aria-label="Main">
+      <a href="/#how">How it works</a>
+      <a href="/#n8n">n8n</a>
+      <a href="/zapier">Zapier beta</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/docs">Docs</a>
+    </nav>
+    <div class="l-actions">
+      <button class="l-theme" type="button" aria-label="Switch theme"><svg class="i-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><svg class="i-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+      <a class="l-link hide-xs" href="/docs">Docs</a>
+      <a class="l-link" href="/login">Sign in</a>
+      <a class="l-btn l-btn-primary" href="/signup">Start free</a>
+    </div>
+  </div>
 </header>
+<!-- /l-header -->
 
 <div class="layout">
   <aside class="toc">
@@ -58,13 +143,13 @@
     </div>
   </aside>
 
-  <main class="content">
+  <main class="content" id="main">
 <h1>HTML to PDF API</h1>
 <p class="lede">Turning HTML into a PDF looks like one function call and is really about six of them.
-This page describes the whole job honestly, then puts the current prices of six HTML-to-PDF APIs
-next to each other &mdash; every figure read off the vendor&rsquo;s own pricing page on
-<strong>29 August 2026</strong>, several of them by driving the vendor&rsquo;s own calculator rather
-than by trusting a summary. It also says plainly where a competitor is the better buy.</p>
+This page describes the whole job honestly, then puts a dated price snapshot for six HTML-to-PDF APIs
+next to each other. The calculator figures were read from vendors&rsquo; own pages on
+<strong>29 August 2026</strong>; several were obtained by using the vendor&rsquo;s own calculator.
+Prices can move, so check the linked source pages before buying.</p>
 
 <div class="note">
 <p><strong>Who wrote this.</strong> We build PDFMint, one of the six. That is a reason to check the
@@ -141,7 +226,7 @@ answer to &ldquo;who owns this at 3am&rdquo; is nobody, buy it.</p>
 </section>
 
 <section id="prices">
-<h2>What the six charge, on 29 August 2026 <a class="anchor" href="#prices">#</a></h2>
+<h2>What the six showed on 29 August 2026 <a class="anchor" href="#prices">#</a></h2>
 
 <p>Entry paid tier and the tier nearest 5,000 documents a month, so the columns are comparable.
 Every cell is the vendor&rsquo;s published figure; the per-document column is arithmetic on it.</p>
@@ -154,7 +239,7 @@ Every cell is the vendor&rsquo;s published figure; the per-document column is ar
 <tr><td><a href="/craftmypdf-alternative">CraftMyPDF</a></td><td>50 PDFs</td><td>$29 / 1,200</td><td>$49 / 3,000</td><td>$0.0163</td></tr>
 <tr><td><a href="/pdfmonkey-alternative">PDFMonkey</a></td><td>20 docs</td><td>&euro;5 / 300</td><td>&euro;15 / 3,000</td><td>&euro;0.005 <span class="t">excl. VAT</span></td></tr>
 <tr><td>Doppio</td><td>400 docs</td><td>$16 / 4,000</td><td>$16 / 4,000</td><td>$0.004</td></tr>
-<tr><td>Api2Pdf</td><td>&mdash;</td><td>$1/mo + usage</td><td>metered</td><td>see note</td></tr>
+<tr><td>Api2Pdf</td><td>trial credit</td><td>$1/mo + usage</td><td>metered</td><td>see note</td></tr>
 <tr><td><strong>PDFMint</strong></td><td>10 docs</td><td>$9 / 5,000</td><td>$9 / 5,000</td><td><strong>$0.0018</strong></td></tr>
 </tbody>
 </table>
@@ -165,7 +250,14 @@ $0.00019551 per second of compute</strong>, and their own calculator assumes two
 A 1&nbsp;MB PDF at two seconds is therefore about $0.0014 &mdash; genuinely cheap, and genuinely
 hard to forecast, which is the trade they are offering.</p>
 
-<p>Two figures deserve to be read twice. <strong>$9 a month buys 500 documents at PDFShift and
+<p class="source-links"><strong>Vendor sources:</strong> <a href="https://pdfshift.io/pricing/">PDFShift pricing</a>,
+<a href="https://www.craftmypdf.com/pricing/">CraftMyPDF pricing</a>,
+<a href="https://pdfmonkey.io/pricing">PDFMonkey pricing</a>,
+<a href="https://doppio.sh/pricing">Doppio pricing</a> and
+<a href="https://www.api2pdf.com/pricing">Api2Pdf pricing</a>. The table above records the calculator
+results or published rate cards we saw on 29 August 2026.</p>
+
+<p>Two figures deserve to be read twice. In the 29 August calculator snapshot, <strong>$9 a month bought 500 credits at PDFShift and
 5,000 here</strong>, and <strong>PDFMint&rsquo;s free tier is the smallest in the table</strong> at
 10 documents a month against PDFShift&rsquo;s and CraftMyPDF&rsquo;s 50 and Doppio&rsquo;s 400. If
 what you want is a generous free tier to run a small real workflow on, Doppio&rsquo;s 400 a month
@@ -260,14 +352,14 @@ are built for that and this is not.</p>
 one with the web font, the JavaScript chart and the table that breaks across a page. Send it to
 <code>POST /v1/pdf</code> and look at what comes back, including the <code>warnings</code> array,
 which tells you when the page rendered but was probably not what you meant.</p>
-<p><a class="cta" href="/signup">Get an API key</a> &nbsp; <a href="/docs">Read the API reference</a>
+<p><a class="l-btn l-btn-primary" href="/signup">Get an API key</a> &nbsp; <a href="/docs">Read the API reference</a>
 &nbsp; <a href="/status">See the live numbers</a></p>
 </section>
 
 <section id="more">
 <h2>The individual comparisons <a class="anchor" href="#more">#</a></h2>
 <div class="cards">
-  <div class="c"><strong><a href="/pdfshift-alternative">vs PDFShift</a></strong><span>Same $9, ten times the documents &mdash; and their credit is 5&nbsp;MB, not one file.</span></div>
+  <div class="c"><strong><a href="/pdfshift-alternative">vs PDFShift</a></strong><span>Its current FAQ lists $24 for 2,500 credits; billing is by 5&nbsp;MB of output.</span></div>
   <div class="c"><strong><a href="/craftmypdf-alternative">vs CraftMyPDF</a></strong><span>A template designer we do not have, and a password feature that starts at $99.</span></div>
   <div class="c"><strong><a href="/pdfmonkey-alternative">vs PDFMonkey</a></strong><span>&euro;5 for 300 documents kept for one day, against $9 for 5,000 you never store.</span></div>
   <div class="c"><strong><a href="/n8n-html-to-pdf">HTML to PDF in n8n</a></strong><span>The three ways to do it in a workflow, and what each one costs you.</span></div>
@@ -276,19 +368,74 @@ which tells you when the page rendered but was probably not what you meant.</p>
   </main>
 </div>
 
-<footer style="border-top:1px solid var(--rule);padding:1.6rem 1.25rem;text-align:center;font-size:.86rem;color:var(--muted)">
-  <a href="/">PDFMint</a> &middot;
-  <a href="/docs">API reference</a> &middot;
-  <a href="/html-to-pdf-api">HTML to PDF API</a> &middot;
-  <a href="/invoice-pdf-api">Invoices</a> &middot;
-  <a href="/markdown-to-pdf-api">Markdown</a> &middot;
-  <a href="/url-to-pdf-api">URL to PDF</a> &middot;
-  <a href="/merge-pdf-api">Merge</a> &middot;
-  <a href="/n8n-html-to-pdf">n8n</a> &middot;
-  <a href="/status">Status</a> &middot;
-  <a href="/legal">Legal</a>
+<!-- l-related -->
+<aside class="l-related" aria-labelledby="related-title">
+  <div class="wrap">
+    <h2 id="related-title">Related guides</h2>
+    <div class="grid grid-4">
+      <a class="tile" href="/invoice-pdf-api"><h3>Invoice PDF API</h3><p>A stored template with line items, VAT totals and a per-page footer.</p></a>
+      <a class="tile" href="/url-to-pdf-api"><h3>URL to PDF API</h3><p>Capturing a live page, waiting for it to finish, and what a login wall does.</p></a>
+      <a class="tile" href="/pdfshift-alternative"><h3>PDFMint vs PDFShift</h3><p>The current FAQ lists $24 for 2,500 credits; billing is by 5 MB of output.</p></a>
+      <a class="tile" href="/n8n-html-to-pdf"><h3>HTML to PDF in n8n</h3><p>The three ways to do it in a workflow, including two without us.</p></a>
+    </div>
+  </div>
+</aside>
+<!-- /l-related -->
+
+<!-- l-footer -->
+<footer class="l-foot">
+  <div class="wrap">
+    <div class="l-foot-grid">
+      <div class="l-foot-brand">
+        <a class="logo" href="/" aria-label="PDFMint home"><svg class="l-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="2.5" width="17" height="19" rx="3" stroke="currentColor" stroke-width="1.7"/><path class="a" d="M7.8 9.2h3.1a2.2 2.2 0 0 1 0 4.4H7.8V9.2zm0 4.4V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path class="a" d="M13.9 17V9.2l1.6 2.6 1.6-2.6V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> PDF<span>Mint</span></a>
+        <p>HTML, Markdown or a URL in, PDF bytes out. A PDF generation API and verified n8n node, built and run by Florian Standhartinger.</p>
+      </div>
+      <nav aria-labelledby="f-product"><h2 id="f-product">Product</h2><ul>
+        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="/docs">API reference</a></li>
+        <li><a href="/openapi.json">OpenAPI 3.1 (JSON)</a></li>
+        <li><a href="/status">Status</a></li>
+        <li><a href="/login">Sign in</a></li>
+        <li><a href="/signup">Create account</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-guides"><h2 id="f-guides">Guides</h2><ul>
+        <li><a href="/html-to-pdf-api">HTML to PDF API</a></li>
+        <li><a href="/invoice-pdf-api">Invoice PDF API</a></li>
+        <li><a href="/markdown-to-pdf-api">Markdown to PDF</a></li>
+        <li><a href="/url-to-pdf-api">URL to PDF</a></li>
+        <li><a href="/merge-pdf-api">Merge PDFs</a></li>
+        <li><a href="/password-protect-pdf-api">Password-protect PDFs</a></li>
+        <li><a href="/html-to-image-api">HTML to image</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-integ"><h2 id="f-integ">Integrations &amp; comparisons</h2><ul>
+        <li><a href="/n8n-html-to-pdf">n8n node</a></li>
+        <li><a href="/n8n-templates">n8n templates</a></li>
+        <li><a href="/zapier">Zapier beta</a></li>
+        <li><a href="/pdfshift-alternative">vs PDFShift</a></li>
+        <li><a href="/craftmypdf-alternative">vs CraftMyPDF</a></li>
+        <li><a href="/pdfmonkey-alternative">vs PDFMonkey</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-family"><h2 id="f-family">Mint APIs family</h2><ul>
+        <li><a href="https://docmint.app.mintapis.com/">DocMint &mdash; Word, Excel &amp; PowerPoint</a></li>
+        <li><a href="https://mailmint.app.mintapis.com/">MailMint &mdash; inbound email to JSON</a></li>
+        <li><a href="https://www.npmjs.com/package/n8n-nodes-pdfmint" rel="noopener">n8n-nodes-pdfmint on npm</a></li>
+        <li><a href="https://github.com/fstandhartinger/pdfmint" rel="noopener">Source on GitHub</a></li>
+      </ul></nav>
+    </div>
+    <div class="l-foot-base">
+      <span>&copy; 2026 productivity-boost.com Betriebs UG (haftungsbeschr&auml;nkt) &amp; Co. KG</span>
+      <nav aria-label="Legal">
+        <a href="/legal">Imprint</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/llms.txt">llms.txt</a>
+      </nav>
+    </div>
+  </div>
 </footer>
+<!-- /l-footer -->
 
 <script src="/docs.js"></script>
+<script src="/site.js?v=8" defer></script>
 </body>
 </html>

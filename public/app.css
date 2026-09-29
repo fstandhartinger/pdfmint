@@ -1,16 +1,21 @@
+/* Server-rendered pages (sign-up, sign-in, dashboard, status). Neutrals and accent follow the
+   Mint APIs family tokens in landing.css; fonts are self-hosted, no third-party request. */
+@font-face{font-family:"Inter";font-style:normal;font-weight:100 900;font-display:swap;src:url(/fonts/inter-latin-var.woff2) format("woff2")}
+@font-face{font-family:"JetBrains Mono";font-style:normal;font-weight:100 800;font-display:swap;src:url(/fonts/jetbrains-mono-latin-var.woff2) format("woff2")}
 :root{
-  --bg:#ffffff; --panel:#f7f8fa; --ink:#12141a; --muted:#5c6472; --rule:#e3e6ec;
-  --accent:#12a37a; --accent-ink:#0b7a5b; --danger:#c0392b; --code:#f2f4f7;
+  --bg:#fbfbf9; --panel:#f4f4f0; --ink:#111312; --muted:#4b514e; --rule:#e4e4de;
+  --accent:#0a7355; --accent-ink:#0a6e51; --danger:#b42318; --code:#f1f1ec;
   --radius:10px; --maxw:1080px;
   --sans:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Liberation Sans",Helvetica,Arial,sans-serif;
   --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,"Liberation Mono",Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){
-  :root{--bg:#0e1015;--panel:#171a21;--ink:#e9ecf1;--muted:#9aa3b2;--rule:#262b34;--code:#151920;}
+  :root{--bg:#0c0e0d;--panel:#141817;--ink:#eceeed;--muted:#a7afab;--rule:#232927;--code:#1a1f1d;--accent:#1f9e76;--accent-ink:#5ee0b0;}
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 a{color:var(--accent-ink);text-decoration:none}
 a:hover{text-decoration:underline}
 code,pre{font-family:var(--mono)}
