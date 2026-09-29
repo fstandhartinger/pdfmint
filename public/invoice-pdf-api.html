@@ -3,34 +3,119 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Invoice PDF API &mdash; store the layout once, POST the numbers</title>
-<meta name="description" content="Generate invoice PDFs from an API: a stored HTML template with a variable line-item table, VAT totals and a per-page footer. One real invoice measured against the live service on 30 August 2026 — 187 ms, 1 page, 47,819 bytes — including the three traps found while building it.">
+<title>Invoice PDF API — store the layout once, POST the numbers</title>
+<meta name="description" content="Generate invoice PDFs from a stored HTML template with line items, VAT totals and a per-page footer. Measured live on 30 Aug 2026: 187 ms, 1 page.">
 <link rel="canonical" href="https://pdf.mintapis.com/invoice-pdf-api">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta property="og:url" content="https://pdf.mintapis.com/invoice-pdf-api">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="PDFMint">
-<meta property="og:title" content="Invoice PDF API &mdash; store the layout once, POST the numbers">
-<meta property="og:description" content="Generate invoice PDFs from an API: a stored HTML template with a variable line-item table, VAT totals and a per-page footer. One real invoice measured against the live service on 30 August 2026 — 187 ms, 1 page, 47,819 bytes — including the three traps found while building it.">
+<meta property="og:title" content="Invoice PDF API — store the layout once, POST the numbers">
+<meta property="og:description" content="Generate invoice PDFs from a stored HTML template with line items, VAT totals and a per-page footer. Measured live on 30 Aug 2026: 187 ms, 1 page.">
 <meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
-<meta property="og:image:alt" content="PDFMint: HTML in, PDF bytes out, from one HTTP call.">
+<meta property="og:image:alt" content="PDFMint social card showing HTML, Markdown or a URL converted to PDF bytes with one POST request.">
 <meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:title" content="Invoice PDF API — store the layout once, POST the numbers">
+<meta name="twitter:description" content="Generate invoice PDFs from a stored HTML template with line items, VAT totals and a per-page footer. Measured live on 30 Aug 2026: 187 ms, 1 page.">
+<meta name="twitter:image" content="https://pdf.mintapis.com/og-image.png">
+<meta name="twitter:image:alt" content="PDFMint social card showing HTML, Markdown or a URL converted to PDF bytes with one POST request.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/app.css">
-<link rel="stylesheet" href="/docs.css">
+<meta name="theme-color" content="#fbfbf9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0e0d" media="(prefers-color-scheme: dark)">
+<link rel="preload" href="/fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/landing.css?v=8">
+<link rel="stylesheet" href="/docs.css?v=8">
+<script>(function(){try{var t=localStorage.getItem('mint-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}})()</script>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "BreadcrumbList",
+ "itemListElement": [
+  {
+   "@type": "ListItem",
+   "position": 1,
+   "name": "PDFMint",
+   "item": "https://pdf.mintapis.com/"
+  },
+  {
+   "@type": "ListItem",
+   "position": 2,
+   "name": "Invoice PDF API",
+   "item": "https://pdf.mintapis.com/invoice-pdf-api"
+  }
+ ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://pdf.mintapis.com/#organization",
+      "name": "PDFMint",
+      "legalName": "productivity-boost.com Betriebs UG (haftungsbeschränkt) & Co. KG",
+      "url": "https://pdf.mintapis.com/",
+      "logo": "https://pdf.mintapis.com/favicon.svg",
+      "founder": {
+        "@type": "Person",
+        "name": "Florian Standhartinger"
+      },
+      "sameAs": [
+        "https://github.com/fstandhartinger/pdfmint",
+        "https://github.com/fstandhartinger/n8n-nodes-pdfmint",
+        "https://www.npmjs.com/package/n8n-nodes-pdfmint"
+      ]
+    },
+    {
+      "@type": [
+        "SoftwareApplication",
+        "Product"
+      ],
+      "@id": "https://pdf.mintapis.com/#application",
+      "name": "PDFMint",
+      "url": "https://pdf.mintapis.com/",
+      "applicationCategory": "DeveloperApplication",
+      "applicationSubCategory": "PDF generation API",
+      "operatingSystem": "Cloud",
+      "description": "An API and verified n8n community node that turn HTML, Markdown, a URL, or a named template into PDF bytes.",
+      "image": "https://pdf.mintapis.com/img/invoice-1042-1040.webp",
+      "publisher": {
+        "@id": "https://pdf.mintapis.com/#organization"
+      }
+    }
+  ]
+}
+</script>
 </head>
 <body class="docs">
+<a class="skip-link" href="#main">Skip to content</a>
 
-<header class="docs-top">
-  <a class="logo" href="/">PDF<span>Mint</span></a>
-  <nav>
-    <a href="/docs">API reference</a>
-    <a href="/html-to-pdf-api">HTML to PDF</a>
-    <a href="/status">Status</a>
-    <a href="/dashboard">Dashboard</a>
-    <a class="cta" href="/signup">Get an API key</a>
-  </nav>
+<!-- l-header -->
+<header class="l-top">
+  <div class="wrap">
+    <a class="logo" href="/" aria-label="PDFMint home">
+      <svg class="l-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="2.5" width="17" height="19" rx="3" stroke="currentColor" stroke-width="1.7"/><path class="a" d="M7.8 9.2h3.1a2.2 2.2 0 0 1 0 4.4H7.8V9.2zm0 4.4V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path class="a" d="M13.9 17V9.2l1.6 2.6 1.6-2.6V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      PDF<span>Mint</span>
+    </a>
+    <nav class="l-nav" aria-label="Main">
+      <a href="/#how">How it works</a>
+      <a href="/#n8n">n8n</a>
+      <a href="/zapier">Zapier beta</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/docs">Docs</a>
+    </nav>
+    <div class="l-actions">
+      <button class="l-theme" type="button" aria-label="Switch theme"><svg class="i-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><svg class="i-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+      <a class="l-link hide-xs" href="/docs">Docs</a>
+      <a class="l-link" href="/login">Sign in</a>
+      <a class="l-btn l-btn-primary" href="/signup">Start free</a>
+    </div>
+  </div>
 </header>
+<!-- /l-header -->
 
 <div class="layout">
   <aside class="toc">
@@ -58,7 +143,7 @@
     </div>
   </aside>
 
-  <main class="content">
+  <main class="content" id="main">
 
 <h1>Invoice PDF API</h1>
 <p class="lede">Store the layout once, then POST the numbers. This page is one real invoice &mdash;
@@ -266,7 +351,7 @@ also a fair statement about how much production invoicing traffic this has seen.
 <p>Take your ugliest real invoice &mdash; the one with the long product names, the credit note line
 and the address that needs three lines &mdash; and render that one. A template that survives your
 worst document will survive the rest.</p>
-<p><a class="cta" href="/signup">Get an API key</a> &nbsp; <a href="/docs#templates">Template reference</a>
+<p><a class="l-btn l-btn-primary" href="/signup">Get an API key</a> &nbsp; <a href="/docs#templates">Template reference</a>
 &nbsp; <a href="/status">Live latency and success rate</a></p>
 </section>
 
@@ -282,19 +367,74 @@ worst document will survive the rest.</p>
   </main>
 </div>
 
-<footer style="border-top:1px solid var(--rule);padding:1.6rem 1.25rem;text-align:center;font-size:.86rem;color:var(--muted)">
-  <a href="/">PDFMint</a> &middot;
-  <a href="/docs">API reference</a> &middot;
-  <a href="/html-to-pdf-api">HTML to PDF API</a> &middot;
-  <a href="/invoice-pdf-api">Invoices</a> &middot;
-  <a href="/markdown-to-pdf-api">Markdown</a> &middot;
-  <a href="/url-to-pdf-api">URL to PDF</a> &middot;
-  <a href="/merge-pdf-api">Merge</a> &middot;
-  <a href="/n8n-html-to-pdf">n8n</a> &middot;
-  <a href="/status">Status</a> &middot;
-  <a href="/legal">Legal</a>
+<!-- l-related -->
+<aside class="l-related" aria-labelledby="related-title">
+  <div class="wrap">
+    <h2 id="related-title">Related guides</h2>
+    <div class="grid grid-4">
+      <a class="tile" href="/html-to-pdf-api"><h3>HTML to PDF API</h3><p>What the job involves, when to self-host, and what six products charge.</p></a>
+      <a class="tile" href="/password-protect-pdf-api"><h3>Password-protect PDF API</h3><p>AES-256 encryption, owner password and print/copy permissions on every plan.</p></a>
+      <a class="tile" href="/merge-pdf-api"><h3>Merge PDF API</h3><p>Up to 50 PDFs from URLs and base64 in one request, one credit.</p></a>
+      <a class="tile" href="/n8n-templates"><h3>n8n workflow templates</h3><p>Reviewed n8n gallery workflows that generate PDFs.</p></a>
+    </div>
+  </div>
+</aside>
+<!-- /l-related -->
+
+<!-- l-footer -->
+<footer class="l-foot">
+  <div class="wrap">
+    <div class="l-foot-grid">
+      <div class="l-foot-brand">
+        <a class="logo" href="/" aria-label="PDFMint home"><svg class="l-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="2.5" width="17" height="19" rx="3" stroke="currentColor" stroke-width="1.7"/><path class="a" d="M7.8 9.2h3.1a2.2 2.2 0 0 1 0 4.4H7.8V9.2zm0 4.4V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path class="a" d="M13.9 17V9.2l1.6 2.6 1.6-2.6V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> PDF<span>Mint</span></a>
+        <p>HTML, Markdown or a URL in, PDF bytes out. A PDF generation API and verified n8n node, built and run by Florian Standhartinger.</p>
+      </div>
+      <nav aria-labelledby="f-product"><h2 id="f-product">Product</h2><ul>
+        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="/docs">API reference</a></li>
+        <li><a href="/openapi.json">OpenAPI 3.1 (JSON)</a></li>
+        <li><a href="/status">Status</a></li>
+        <li><a href="/login">Sign in</a></li>
+        <li><a href="/signup">Create account</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-guides"><h2 id="f-guides">Guides</h2><ul>
+        <li><a href="/html-to-pdf-api">HTML to PDF API</a></li>
+        <li><a href="/invoice-pdf-api">Invoice PDF API</a></li>
+        <li><a href="/markdown-to-pdf-api">Markdown to PDF</a></li>
+        <li><a href="/url-to-pdf-api">URL to PDF</a></li>
+        <li><a href="/merge-pdf-api">Merge PDFs</a></li>
+        <li><a href="/password-protect-pdf-api">Password-protect PDFs</a></li>
+        <li><a href="/html-to-image-api">HTML to image</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-integ"><h2 id="f-integ">Integrations &amp; comparisons</h2><ul>
+        <li><a href="/n8n-html-to-pdf">n8n node</a></li>
+        <li><a href="/n8n-templates">n8n templates</a></li>
+        <li><a href="/zapier">Zapier beta</a></li>
+        <li><a href="/pdfshift-alternative">vs PDFShift</a></li>
+        <li><a href="/craftmypdf-alternative">vs CraftMyPDF</a></li>
+        <li><a href="/pdfmonkey-alternative">vs PDFMonkey</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-family"><h2 id="f-family">Mint APIs family</h2><ul>
+        <li><a href="https://docmint.app.mintapis.com/">DocMint &mdash; Word, Excel &amp; PowerPoint</a></li>
+        <li><a href="https://mailmint.app.mintapis.com/">MailMint &mdash; inbound email to JSON</a></li>
+        <li><a href="https://www.npmjs.com/package/n8n-nodes-pdfmint" rel="noopener">n8n-nodes-pdfmint on npm</a></li>
+        <li><a href="https://github.com/fstandhartinger/pdfmint" rel="noopener">Source on GitHub</a></li>
+      </ul></nav>
+    </div>
+    <div class="l-foot-base">
+      <span>&copy; 2026 productivity-boost.com Betriebs UG (haftungsbeschr&auml;nkt) &amp; Co. KG</span>
+      <nav aria-label="Legal">
+        <a href="/legal">Imprint</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/llms.txt">llms.txt</a>
+      </nav>
+    </div>
+  </div>
 </footer>
+<!-- /l-footer -->
 
 <script src="/docs.js"></script>
+<script src="/site.js?v=8" defer></script>
 </body>
 </html>

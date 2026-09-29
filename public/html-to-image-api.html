@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HTML to image API — PNG or JPEG from HTML, Markdown or a URL</title>
+<meta name="description" content="Render HTML, Markdown or a URL to PNG or JPEG over HTTP: a 1200×630 social card with placeholders, the white-margin trap, and what it does not do.">
+<link rel="canonical" href="https://pdf.mintapis.com/html-to-image-api">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:url" content="https://pdf.mintapis.com/html-to-image-api">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="PDFMint">
+<meta property="og:title" content="HTML to image API — PNG or JPEG from HTML, Markdown or a URL">
+<meta property="og:description" content="Render HTML, Markdown or a URL to PNG or JPEG over HTTP: a 1200×630 social card with placeholders, the white-margin trap, and what it does not do.">
+<meta property="og:image" content="https://pdf.mintapis.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="PDFMint social card showing HTML, Markdown or a URL converted to PDF bytes with one POST request.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="HTML to image API — PNG or JPEG from HTML, Markdown or a URL">
+<meta name="twitter:description" content="Render HTML, Markdown or a URL to PNG or JPEG over HTTP: a 1200×630 social card with placeholders, the white-margin trap, and what it does not do.">
+<meta name="twitter:image" content="https://pdf.mintapis.com/og-image.png">
+<meta name="twitter:image:alt" content="PDFMint social card showing HTML, Markdown or a URL converted to PDF bytes with one POST request.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#fbfbf9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0e0d" media="(prefers-color-scheme: dark)">
+<link rel="preload" href="/fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/landing.css?v=8">
+<link rel="stylesheet" href="/docs.css?v=8">
+<script>(function(){try{var t=localStorage.getItem('mint-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}})()</script>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "BreadcrumbList",
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "PDFMint",
+     "item": "https://pdf.mintapis.com/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "HTML to image API",
+     "item": "https://pdf.mintapis.com/html-to-image-api"
+    }
+   ]
+  },
+  {
+   "@type": "TechArticle",
+   "headline": "HTML to image API — PNG or JPEG from HTML, Markdown or a URL",
+   "description": "Render HTML, Markdown or a URL to PNG or JPEG over HTTP: a 1200×630 social card with placeholders, the white-margin trap, and what it does not do.",
+   "url": "https://pdf.mintapis.com/html-to-image-api",
+   "datePublished": "2026-09-26",
+   "dateModified": "2026-09-26",
+   "inLanguage": "en",
+   "author": {
+    "@type": "Person",
+    "name": "Florian Standhartinger"
+   },
+   "publisher": {
+    "@type": "Organization",
+    "name": "PDFMint",
+    "legalName": "productivity-boost.com Betriebs UG (haftungsbeschränkt) & Co. KG",
+    "url": "https://pdf.mintapis.com/"
+   }
+  }
+ ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://pdf.mintapis.com/#organization",
+      "name": "PDFMint",
+      "legalName": "productivity-boost.com Betriebs UG (haftungsbeschränkt) & Co. KG",
+      "url": "https://pdf.mintapis.com/",
+      "logo": "https://pdf.mintapis.com/favicon.svg",
+      "founder": {
+        "@type": "Person",
+        "name": "Florian Standhartinger"
+      },
+      "sameAs": [
+        "https://github.com/fstandhartinger/pdfmint",
+        "https://github.com/fstandhartinger/n8n-nodes-pdfmint",
+        "https://www.npmjs.com/package/n8n-nodes-pdfmint"
+      ]
+    },
+    {
+      "@type": [
+        "SoftwareApplication",
+        "Product"
+      ],
+      "@id": "https://pdf.mintapis.com/#application",
+      "name": "PDFMint",
+      "url": "https://pdf.mintapis.com/",
+      "applicationCategory": "DeveloperApplication",
+      "applicationSubCategory": "PDF generation API",
+      "operatingSystem": "Cloud",
+      "description": "An API and verified n8n community node that turn HTML, Markdown, a URL, or a named template into PDF bytes.",
+      "image": "https://pdf.mintapis.com/img/invoice-1042-1040.webp",
+      "publisher": {
+        "@id": "https://pdf.mintapis.com/#organization"
+      }
+    }
+  ]
+}
+</script>
+</head>
+<body class="docs">
+<a class="skip-link" href="#main">Skip to content</a>
+
+<!-- l-header -->
+<header class="l-top">
+  <div class="wrap">
+    <a class="logo" href="/" aria-label="PDFMint home">
+      <svg class="l-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="2.5" width="17" height="19" rx="3" stroke="currentColor" stroke-width="1.7"/><path class="a" d="M7.8 9.2h3.1a2.2 2.2 0 0 1 0 4.4H7.8V9.2zm0 4.4V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path class="a" d="M13.9 17V9.2l1.6 2.6 1.6-2.6V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      PDF<span>Mint</span>
+    </a>
+    <nav class="l-nav" aria-label="Main">
+      <a href="/#how">How it works</a>
+      <a href="/#n8n">n8n</a>
+      <a href="/zapier">Zapier beta</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/docs">Docs</a>
+    </nav>
+    <div class="l-actions">
+      <button class="l-theme" type="button" aria-label="Switch theme"><svg class="i-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><svg class="i-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+      <a class="l-link hide-xs" href="/docs">Docs</a>
+      <a class="l-link" href="/login">Sign in</a>
+      <a class="l-btn l-btn-primary" href="/signup">Start free</a>
+    </div>
+  </div>
+</header>
+<!-- /l-header -->
+
+<div class="layout">
+  <aside class="toc">
+    <button class="toc-toggle" id="tocToggle" aria-expanded="false" aria-controls="tocBody">On this page</button>
+    <div class="toc-body" id="tocBody">
+      <h2>On this page</h2>
+      <ul>
+        <li><a href="#card">A social card from a template string</a></li>
+        <li><a href="#margin">The trap: an 8-pixel white frame</a></li>
+        <li><a href="#options">The options that matter</a></li>
+        <li><a href="#limits">What it does not do</a></li>
+        <li><a href="#selfhost">When to do it yourself instead</a></li>
+        <li><a href="#try">Try it</a></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="content" id="main">
+<h1>HTML to image API</h1>
+<p class="lede"><code>POST /v1/image</code> renders HTML, Markdown or a public URL in the same
+Chromium that makes PDFMint&rsquo;s PDFs, and returns a PNG or a JPEG instead. Same key, same
+placeholders, same strict mode, one credit. This page builds a real social card with it, shows the
+one trap that gives every first attempt a white frame, and says plainly what it does not do.</p>
+<div class="note"><p><strong>How this page was checked.</strong> Every request, error message and
+pixel size below was produced on 26 September 2026 by a local build of the PDFMint code that serves
+pdf.mintapis.com (commit <code>83dddcb</code>), on a free account. No timings are quoted.</p></div>
+<section id="card">
+<h2>A social card from a template string <a class="anchor" href="#card">#</a></h2>
+<p>The most common job: a 1200&times;630 Open Graph image per blog post, product or invoice,
+filled from data. The HTML carries <code>{{placeholders}}</code>; the <code>data</code> object fills
+them; <code>strict</code> refuses to render if one is missing, so a card never ships reading
+&ldquo;{{title}}&rdquo;.</p>
+<div class="code"><pre><code>curl -s -X POST https://pdf.mintapis.com/v1/image \
+  -H "Authorization: Bearer $PDFMINT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -o og-card.png \
+  -d '{
+    "html": "&lt;style&gt;body{margin:0}&lt;/style&gt;&lt;div style=\"width:1200px;height:630px;box-sizing:border-box;padding:72px;background:#0b3d2e;color:#fff;font-family:Inter,sans-serif;display:flex;flex-direction:column;justify-content:space-between\"&gt;&lt;div style=\"font-size:28px;opacity:.7\"&gt;{{site}}&lt;/div&gt;&lt;div style=\"font-size:68px;font-weight:700;line-height:1.05\"&gt;{{title}}&lt;/div&gt;&lt;div style=\"font-size:26px;opacity:.7\"&gt;{{author}} &middot; {{date}}&lt;/div&gt;&lt;/div&gt;",
+    "data": { "site": "northwind.example/blog",
+              "title": "Shipping invoices from n8n without a template editor",
+              "author": "Ada Lovelace", "date": "26 Sep 2026" },
+    "strict": true,
+    "type": "png", "width": 1200, "height": 630,
+    "fullPage": false, "deviceScaleFactor": 1,
+    "filename": "og-card"
+  }'</code></pre><button class="copy" type="button">Copy</button></div>
+<p>The response is <code>200</code>, <code>Content-Type: image/png</code>,
+<code>Content-Disposition: attachment; filename="og-card.png"</code> &mdash; the extension is added
+because <code>type</code> says PNG &mdash; and the image is exactly <strong>1200&times;630</strong>.
+With <code>"deviceScaleFactor": 2</code> (the default) the same request returns
+<strong>2400&times;1260</strong>: sharper on retina screens, four times the pixels.</p>
+</section>
+
+<section id="margin">
+<h2>The trap: an 8-pixel white frame <a class="anchor" href="#margin">#</a></h2>
+<p>Leave out the <code>&lt;style&gt;body{margin:0}&lt;/style&gt;</code> at the start of the HTML
+above and the card comes back with a white border on the top and left: the browser&rsquo;s default
+8&nbsp;px body margin, faithfully rendered, pushing a 1200-pixel box out of a 1200-pixel viewport.
+Every screenshot tool built on Chrome does this.</p>
+<div class="note warn"><p>The <code>css</code> field will <em>not</em> fix it for HTML input: it
+applies to Markdown only, so the rule has to be inside your HTML. We checked &mdash; a request with
+<code>"css": "body{margin:0}"</code> and HTML input still has a white pixel at (2,&nbsp;2).</p></div>
+</section>
+
+<section id="options">
+<h2>The options that matter <a class="anchor" href="#options">#</a></h2>
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>Default</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>type</code></td><td class="t">png</td><td class="wrap"><code>png</code> or <code>jpeg</code>. Anything else, WebP included, is refused with <code>invalid_option</code>.</td></tr>
+<tr><td><code>quality</code></td><td class="t">85</td><td class="wrap">JPEG only, 1&ndash;100.</td></tr>
+<tr><td><code>width</code> / <code>height</code></td><td class="t">1280 / 800</td><td class="wrap">The viewport. <code>height</code> only bounds the image when <code>fullPage</code> is off.</td></tr>
+<tr><td><code>fullPage</code></td><td class="t"><code>true</code></td><td class="wrap">Capture the whole scrollable page. Turn it off for fixed-size cards.</td></tr>
+<tr><td><code>deviceScaleFactor</code></td><td class="t">2</td><td class="wrap">Pixel density. 2 doubles both dimensions.</td></tr>
+<tr><td><code>omitBackground</code></td><td class="t"><code>false</code></td><td class="wrap">Transparent instead of white &mdash; PNG only, in practice.</td></tr>
+<tr><td><code>output</code></td><td class="t">binary</td><td class="wrap"><code>binary</code>, <code>url</code> (expiring hosted link) or <code>base64</code>.</td></tr>
+</tbody></table></div>
+<p><code>waitFor</code>, <code>timeout</code>, <code>javascript</code> and the <code>url</code> source
+behave exactly as on <code>/v1/pdf</code>, so a chart that draws after load can be waited for with a
+CSS selector. The full list is in the <a href="/docs#image">API reference</a>.</p>
+</section>
+
+<section id="limits">
+<h2>What it does not do <a class="anchor" href="#limits">#</a></h2>
+<ul>
+<li><strong>No saved templates.</strong> <code>{"template": "invoice", "type": "png"}</code> returns
+<code>unsupported_source</code>: &ldquo;Images can be rendered from &quot;html&quot;,
+&quot;markdown&quot; or &quot;url&quot;, not from a saved template.&rdquo; Send the HTML itself.</li>
+<li><strong>No WebP or AVIF.</strong> <code>"type": "webp"</code> returns <code>invalid_option</code>:
+&ldquo;&quot;type&quot; must be &quot;png&quot; or &quot;jpeg&quot;&rdquo;. Convert afterwards if you need them.</li>
+<li><strong>One engine.</strong> It is Chromium. If you need a screenshot as Safari or Firefox would
+draw it, this is the wrong tool.</li>
+<li><strong>Pages behind a login</strong> come back as a picture of the login form, for the reasons
+set out on the <a href="/url-to-pdf-api">URL to PDF page</a>.</li>
+</ul>
+</section>
+
+<section id="selfhost">
+<h2>When to do it yourself instead <a class="anchor" href="#selfhost">#</a></h2>
+<p>If you already run Playwright or Puppeteer, <code>page.screenshot()</code> is a few lines and
+free, and nothing on this page beats it. The API earns its credit when you do not want Chromium,
+its fonts and its memory in your own container &mdash; Inter, JetBrains Mono, Noto CJK and Noto
+Color Emoji are installed on ours &mdash; or when the image is made inside a workflow tool: the
+<a href="/n8n-html-to-pdf">n8n node</a> has a Generate Image operation that returns the PNG as
+binary on the item.</p>
+<p>It costs what a PDF costs: one credit per image, 10 a month on the free plan, 5,000 for $9 on
+Starter. A failed render is refunded.</p>
+</section>
+
+<section id="try">
+<h2>Try it <a class="anchor" href="#try">#</a></h2>
+<p><a class="l-btn l-btn-primary" href="/signup">Get a free API key</a> &nbsp; <a href="/docs#image">Image reference</a></p>
+</section>
+
+  </main>
+</div>
+
+<!-- l-related -->
+<aside class="l-related" aria-labelledby="related-title">
+  <div class="wrap">
+    <h2 id="related-title">Related guides</h2>
+    <div class="grid grid-4">
+      <a class="tile" href="/url-to-pdf-api"><h3>URL to PDF API</h3><p>Capturing a live page, waiting for it to finish, and what a login wall does.</p></a>
+      <a class="tile" href="/html-to-pdf-api"><h3>HTML to PDF API</h3><p>What the job involves, when to self-host, and what six products charge.</p></a>
+      <a class="tile" href="/markdown-to-pdf-api"><h3>Markdown to PDF API</h3><p>GFM tables, fenced code and page numbers without pandoc or LaTeX.</p></a>
+      <a class="tile" href="/n8n-html-to-pdf"><h3>HTML to PDF in n8n</h3><p>The three ways to do it in a workflow, including two without us.</p></a>
+    </div>
+  </div>
+</aside>
+<!-- /l-related -->
+
+<!-- l-footer -->
+<footer class="l-foot">
+  <div class="wrap">
+    <div class="l-foot-grid">
+      <div class="l-foot-brand">
+        <a class="logo" href="/" aria-label="PDFMint home"><svg class="l-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="2.5" width="17" height="19" rx="3" stroke="currentColor" stroke-width="1.7"/><path class="a" d="M7.8 9.2h3.1a2.2 2.2 0 0 1 0 4.4H7.8V9.2zm0 4.4V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path class="a" d="M13.9 17V9.2l1.6 2.6 1.6-2.6V17" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> PDF<span>Mint</span></a>
+        <p>HTML, Markdown or a URL in, PDF bytes out. A PDF generation API and verified n8n node, built and run by Florian Standhartinger.</p>
+      </div>
+      <nav aria-labelledby="f-product"><h2 id="f-product">Product</h2><ul>
+        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="/docs">API reference</a></li>
+        <li><a href="/openapi.json">OpenAPI 3.1 (JSON)</a></li>
+        <li><a href="/status">Status</a></li>
+        <li><a href="/login">Sign in</a></li>
+        <li><a href="/signup">Create account</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-guides"><h2 id="f-guides">Guides</h2><ul>
+        <li><a href="/html-to-pdf-api">HTML to PDF API</a></li>
+        <li><a href="/invoice-pdf-api">Invoice PDF API</a></li>
+        <li><a href="/markdown-to-pdf-api">Markdown to PDF</a></li>
+        <li><a href="/url-to-pdf-api">URL to PDF</a></li>
+        <li><a href="/merge-pdf-api">Merge PDFs</a></li>
+        <li><a href="/password-protect-pdf-api">Password-protect PDFs</a></li>
+        <li><a href="/html-to-image-api">HTML to image</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-integ"><h2 id="f-integ">Integrations &amp; comparisons</h2><ul>
+        <li><a href="/n8n-html-to-pdf">n8n node</a></li>
+        <li><a href="/n8n-templates">n8n templates</a></li>
+        <li><a href="/zapier">Zapier beta</a></li>
+        <li><a href="/pdfshift-alternative">vs PDFShift</a></li>
+        <li><a href="/craftmypdf-alternative">vs CraftMyPDF</a></li>
+        <li><a href="/pdfmonkey-alternative">vs PDFMonkey</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-family"><h2 id="f-family">Mint APIs family</h2><ul>
+        <li><a href="https://docmint.app.mintapis.com/">DocMint &mdash; Word, Excel &amp; PowerPoint</a></li>
+        <li><a href="https://mailmint.app.mintapis.com/">MailMint &mdash; inbound email to JSON</a></li>
+        <li><a href="https://www.npmjs.com/package/n8n-nodes-pdfmint" rel="noopener">n8n-nodes-pdfmint on npm</a></li>
+        <li><a href="https://github.com/fstandhartinger/pdfmint" rel="noopener">Source on GitHub</a></li>
+      </ul></nav>
+    </div>
+    <div class="l-foot-base">
+      <span>&copy; 2026 productivity-boost.com Betriebs UG (haftungsbeschr&auml;nkt) &amp; Co. KG</span>
+      <nav aria-label="Legal">
+        <a href="/legal">Imprint</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/llms.txt">llms.txt</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+<!-- /l-footer -->
+
+<script src="/docs.js"></script>
+<script src="/site.js?v=8" defer></script>
+</body>
+</html>
