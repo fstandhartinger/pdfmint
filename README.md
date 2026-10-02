@@ -53,15 +53,19 @@ The full reference, with runnable curl, Node.js, Python and n8n examples, is at
 
 Numbers quoted on the site are checked against this code by
 `test/documented-limits.test.js`, which fails the build when a page and the code
-disagree. On the live service, on 23 August 2026:
+disagree. On the live service, on 23 August 2026, when it ran on a single Render Starter
+instance:
 
 - **328 ms** for a one-page Markdown document, through the public API.
 - **128 MB** peak for eight concurrent renders in a 512 MB container.
-- **$7.00/month** to run the whole thing — one Render Starter instance and a free-tier
-  Postgres. `ops/INFRASTRUCTURE.md` lists every resource it created and
-  `ops/reap.sh --destroy` removes them.
 
 PDFMint is new. Those are the only numbers there are, so they are the only ones quoted.
+
+By 30 August, `pdf.mintapis.com` was being served from a Hetzner server that also runs
+other services, and still is (checked 2 October), so there is no per-service monthly bill
+to quote any more. The old Render host still answers, because early versions of the n8n
+node pointed at it. `ops/INFRASTRUCTURE.md` has the details and lists every resource that
+was created.
 
 ## Plans
 
