@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 
 const { BASE } = require('./helpers');
+const formtoken = require('../src/formtoken');
 
 /**
  * Signup accepted any string as an email, so the free tier was free to mint: a
@@ -21,7 +22,7 @@ async function signup(email, password = 'testpassword123') {
   const res = await fetch(`${BASE}/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ email, password }).toString(),
+    body: new URLSearchParams({ email, password, ft: formtoken.issue('signup', Date.now() - 5000) }).toString(),
     redirect: 'manual',
   });
   return { status: res.status, body: await res.text() };

@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const { BASE } = require('./helpers');
 const { query } = require('../src/db');
 const ads = require('../src/ads');
+const formtoken = require('../src/formtoken');
 
 const CAMPAIGN = 'growth-ads-pdfmint-20260910';
 
@@ -39,7 +40,7 @@ async function getSignupForm(campaignQuery) {
 }
 
 async function postSignup(email, adsToken, password = 'testpassword123') {
-  const fields = { email, password };
+  const fields = { email, password, ft: formtoken.issue('signup', Date.now() - 5000) };
   if (adsToken) fields.ads = adsToken;
   const res = await fetch(`${BASE}/signup`, {
     method: 'POST',

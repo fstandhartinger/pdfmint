@@ -48,7 +48,7 @@ test('privacy page claims match the code', () => {
     'smtp.gmail.com',
     '30 minutes',
     '3 hours',
-    '2 hours',
+    '25 hours',
     'pdfmint-b9tt.onrender.com',
     'hetzner online gmbh',
     'the request time stays with the account',
@@ -65,8 +65,8 @@ test('privacy page retention windows match the code', () => {
     'src/recovery.js must keep interval \'30 minutes\' (reset link validity)',
   );
   assert.ok(
-    recovery.includes("interval '2 hours'"),
-    'src/recovery.js must keep interval \'2 hours\' (reset attempt limiter)',
+    recovery.includes("interval '25 hours'"),
+    'src/recovery.js must keep interval \'25 hours\' (reset attempt limiter, incl. the 24 h per-email bucket)',
   );
 
   const api = read('src/api.js');

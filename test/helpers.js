@@ -3,6 +3,11 @@
 const crypto = require('node:crypto');
 const { query } = require('../src/db');
 const { PLANS } = require('../src/config');
+const formtoken = require('../src/formtoken');
+
+// POST /signup refuses a form token younger than 3 s, so helpers mint one
+// already aged. The server derives the same secret from the same environment.
+const signupToken = () => formtoken.issue('signup', Date.now() - 5000);
 
 /**
  * These tests exercise real behaviour: a real HTTP server, a real Chromium, a
@@ -34,7 +39,7 @@ async function newAccount(plan = 'starter') {
   const res = await fetch(`${BASE}/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ email, password: 'testpassword123' }).toString(),
+    body: new URLSearchParams({ email, password: 'testpassword123', ft: signupToken() }).toString(),
     redirect: 'manual',
   });
   const cookie = (res.headers.getSetCookie ? res.headers.getSetCookie() : [res.headers.get('set-cookie')])

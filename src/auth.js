@@ -75,7 +75,7 @@ async function revokeApiKey(accountId, keyPrefix) {
 }
 
 async function verifyLogin(email, password) {
-  const { rows } = await query(`SELECT * FROM accounts WHERE email = $1`, [String(email).trim().toLowerCase()]);
+  const { rows } = await query(`SELECT * FROM accounts WHERE email = $1 AND quarantined_at IS NULL`, [String(email).trim().toLowerCase()]);
   if (!rows.length) return null;
   const ok = await bcrypt.compare(String(password), rows[0].password_hash);
   return ok ? rows[0] : null;
@@ -119,7 +119,7 @@ async function authenticate(req) {
   }
   const { rows } = await query(
     `SELECT a.*, k.id AS key_id FROM api_keys k JOIN accounts a ON a.id = k.account_id
-     WHERE k.key_hash = $1 AND k.revoked_at IS NULL`,
+     WHERE k.key_hash = $1 AND k.revoked_at IS NULL AND a.quarantined_at IS NULL`,
     [hashKey(key)],
   );
   if (!rows.length) {
@@ -202,7 +202,7 @@ function takeKeyForSession(sessionId) {
 async function accountForSession(sessionId) {
   if (!sessionId) return null;
   const { rows } = await query(
-    `SELECT a.* FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.id = $1 AND s.expires_at > now()`,
+    `SELECT a.* FROM sessions s JOIN accounts a ON a.id = s.account_id WHERE s.id = $1 AND s.expires_at > now() AND a.quarantined_at IS NULL`,
     [sessionId],
   );
   if (!rows.length) return null;

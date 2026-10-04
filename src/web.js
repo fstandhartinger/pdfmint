@@ -11,6 +11,7 @@ const { createAccount, verifyLogin, createSession, accountForSession, destroySes
         stashKeyForSession, takeKeyForSession, revokeApiKey } = require('./auth');
 const ads = require('./ads');
 const billing = require('./billing');
+const formtoken = require('./formtoken');
 const { escapeHtml } = require('./markdown');
 
 const router = express.Router();
@@ -63,6 +64,7 @@ function authForm(kind, error, values = {}, adsToken = null) {
   ${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}
   <form method="post" action="/${kind}">
     ${isSignup && adsToken ? `<input type="hidden" name="ads" value="${escapeHtml(adsToken)}">` : ''}
+    ${isSignup ? `<input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true"><input type="hidden" name="ft" value="${formtoken.issue('signup')}">` : ''}
     <label>Email<input type="email" name="email" required autocomplete="email" value="${escapeHtml(values.email || '')}"></label>
     <label>Password<input type="password" name="password" required minlength="8" autocomplete="${isSignup ? 'new-password' : 'current-password'}"></label>
     <button type="submit">${isSignup ? 'Create account' : 'Sign in'}</button>
@@ -171,6 +173,11 @@ router.post('/signup', asyncRoute(async (req, res) => {
   // The posted value is only carried back into a re-rendered form when it still
   // verifies — a forged token never survives a round trip and never attributes.
   const adsToken = ads.verifyToken(req.body?.ads) ? String(req.body.ads) : null;
+  // The signup bot answers a filled honeypot or a missing/forged/too-fresh form
+  // token. Either way no account is created and the reply is a plain form error.
+  if ((req.body?.website && String(req.body.website).length) || !formtoken.check('signup', req.body?.ft)) {
+    return res.status(400).type('html').send(authForm('signup', 'Please wait a few seconds and try again.', { email }, adsToken));
+  }
   if (!email || !password || String(password).length < 8) {
     return res.status(400).type('html').send(authForm('signup', 'Enter an email address and a password of at least 8 characters.', { email }, adsToken));
   }

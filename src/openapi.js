@@ -69,7 +69,6 @@ const ERR = {
   invalid_email: 'The email address is not valid.',
   invalid_password: 'The new password is too short or over 72 UTF-8 bytes.',
   invalid_reset_token: 'The reset link is invalid or has expired.',
-  recovery_unavailable: 'Email delivery is temporarily unavailable.',
 };
 
 /**
@@ -781,14 +780,13 @@ const spec = {
       post: {
         tags: ['recovery'],
         summary: 'Request a password-reset link',
-        description: 'Always answers the same whether or not the account exists. Rate-limited to 20 attempts per hour per client IP address.',
+        description: 'Always answers the same whether or not the account exists. Rate-limited to 5 attempts per hour per client IP address.',
         security: [],
         requestBody: json({ type: 'object', required: ['email'], properties: { email: { type: 'string', format: 'email' } } }),
         responses: {
           202: json({ type: 'object', properties: { message: { type: 'string' } }, required: ['message'] }),
           400: errResponse(400, [E('invalid_email', ERR.invalid_email)], '`invalid_email` — the address is not valid.'),
-          429: errResponse(429, [E('rate_limited', ERR.rate_limited)], '`rate_limited` — more than 20 recovery attempts in one hour.'),
-          503: errResponse(503, [E('recovery_unavailable', ERR.recovery_unavailable)], '`recovery_unavailable` — email delivery is temporarily down.'),
+          429: errResponse(429, [E('rate_limited', ERR.rate_limited)], '`rate_limited` — more than 5 recovery attempts in one hour.'),
         },
       },
     },
@@ -802,7 +800,7 @@ const spec = {
         responses: {
           200: json({ type: 'object', properties: { message: { type: 'string' } }, required: ['message'] }),
           400: errResponse(400, [E('invalid_reset_token', ERR.invalid_reset_token), E('invalid_password', ERR.invalid_password)], '`invalid_reset_token` or `invalid_password`.'),
-          429: errResponse(429, [E('rate_limited', ERR.rate_limited)], '`rate_limited` — more than 20 recovery attempts in one hour.'),
+          429: errResponse(429, [E('rate_limited', ERR.rate_limited)], '`rate_limited` — more than 5 recovery attempts in one hour.'),
         },
       },
     },
