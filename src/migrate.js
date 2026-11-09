@@ -13,7 +13,7 @@ const STATEMENTS = [
      plan           TEXT NOT NULL DEFAULT 'free',
      credits_limit  INTEGER NOT NULL DEFAULT 300,
      credits_used   INTEGER NOT NULL DEFAULT 0,
-     period_start   TIMESTAMPTZ NOT NULL DEFAULT date_trunc('month', now()),
+     period_start   TIMESTAMPTZ NOT NULL DEFAULT (date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'),
      stripe_customer_id     TEXT,
      stripe_subscription_id TEXT,
      created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -145,6 +145,13 @@ const STATEMENTS = [
   // a successful signup. See src/ads.js for why the table stores no email, no IP
   // and no click id.
   ...require('./ads').migration,
+  // The quota month starts at 00:00 UTC whatever the database's TimeZone is. The
+  // old default truncated in the session zone, and on a Europe/Berlin database
+  // stored 23:00 UTC of the previous day, which rollPeriod() read as "last month"
+  // and so reset the counter on every request. Existing rows are deliberately
+  // left alone: rollPeriod() moves each one to the right instant on its next request.
+  `ALTER TABLE accounts ALTER COLUMN period_start
+     SET DEFAULT (date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')`,
 ];
 
 async function migrate() {
