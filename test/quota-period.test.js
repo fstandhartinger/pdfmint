@@ -34,7 +34,7 @@ describe('a billing renewal must not hand out a second monthly quota', () => {
       `UPDATE accounts
           SET stripe_customer_id = $2,
               credits_used  = 120,
-              period_start  = date_trunc('month', now() AT TIME ZONE 'UTC')
+              period_start  = (date_trunc('month', now() AT TIME ZONE 'UTC')) AT TIME ZONE 'UTC'
         WHERE email = $1`,
       [email, customerId],
     );
@@ -61,7 +61,7 @@ describe('a billing renewal must not hand out a second monthly quota', () => {
       `UPDATE accounts
           SET stripe_customer_id = $2,
               credits_used  = 4990,
-              period_start  = date_trunc('month', now() AT TIME ZONE 'UTC') - interval '2 months'
+              period_start  = (date_trunc('month', now() AT TIME ZONE 'UTC') - interval '2 months') AT TIME ZONE 'UTC'
         WHERE email = $1`,
       [email, customerId],
     );

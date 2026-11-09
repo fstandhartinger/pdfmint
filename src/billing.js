@@ -550,9 +550,9 @@ async function handleEventInTransaction(event) {
         await run(
           `UPDATE accounts
               SET credits_used = 0,
-                  period_start = date_trunc('month', now() AT TIME ZONE 'UTC')
+                  period_start = date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
             WHERE stripe_customer_id = $1
-              AND period_start < date_trunc('month', now() AT TIME ZONE 'UTC')`,
+              AND period_start < date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`,
           [customerId],
         );
       }
