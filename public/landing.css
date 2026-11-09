@@ -94,7 +94,7 @@ img,svg{max-width:100%}
 img{height:auto;display:block}
 a{color:var(--l-accent-ink);text-decoration:none;text-underline-offset:.18em}
 a:hover{text-decoration:underline}
-p a:not(.l-btn):not(.pill),.checks a{ text-decoration:underline }
+p a:not(.l-btn):not(.pill),.checks a,.measured .t a{ text-decoration:underline }
 h1,h2,h3{color:var(--l-ink);text-wrap:balance}
 p{text-wrap:pretty}
 code,pre,kbd{font-family:var(--l-mono)}
@@ -403,3 +403,9 @@ table.cmp thead .us{color:var(--l-accent-ink)}
   *,*::before,*::after{transition-duration:.01ms !important;animation-duration:.01ms !important;scroll-behavior:auto !important}
 }
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+
+/* landing: live demo button status line, closing price line */
+.hero-try{margin:14px 0 0;font-size:.86rem;line-height:1.55;color:var(--l-ink-2);max-width:29rem;min-height:2.7em}
+.hero-try + .hero-note{margin-top:14px}
+#tryDemo[aria-busy="true"]{opacity:.65;cursor:progress}
+.cta-price{margin:18px 0 0;font-size:.9rem;color:var(--l-ink-3)}

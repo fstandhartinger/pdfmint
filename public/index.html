@@ -28,7 +28,7 @@
 <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt">
 <link rel="preload" href="/fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" as="image" href="/img/invoice-1042-1040.webp" imagesrcset="/img/invoice-1042-520.webp 520w, /img/invoice-1042-1040.webp 1040w" imagesizes="(min-width: 980px) 440px, (min-width: 521px) 420px, 100vw" fetchpriority="high">
-<link rel="stylesheet" href="/landing.css?v=8">
+<link rel="stylesheet" href="/landing.css?v=9">
 <script>(function(){try{var t=localStorage.getItem('mint-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}})()</script>
 <script type="application/ld+json">
 {
@@ -130,11 +130,13 @@
         <p class="hero-sub">PDFMint is a PDF generation API and an <strong>n8n community node</strong>. One POST with the content you already have &mdash; no template editor to learn, no template ID to paste, no second request to fetch the file.</p>
         <div class="hero-cta">
           <a class="l-btn l-btn-primary l-btn-lg" href="/signup">Get a free API key <span class="arr" aria-hidden="true">&rarr;</span></a>
-          <a class="l-btn l-btn-ghost l-btn-lg" href="/docs">Read the docs</a>
+          <a class="l-btn l-btn-ghost l-btn-lg" id="tryDemo" href="/examples/invoice-1042.pdf">Render a test PDF now</a>
         </div>
+        <p class="hero-try" id="tryStatus" role="status" aria-live="polite">No signup: the button sends <a href="/examples/invoice-1042.html">this invoice HTML</a> to the live demo endpoint and hands you the PDF it returns.</p>
         <p class="hero-note">
           <span><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>10 documents a month free</span>
           <span><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>No card</span>
+          <span><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Then $9 a month for 5,000</span>
           <span><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Every feature on every plan</span>
         </p>
       </div>
@@ -212,8 +214,8 @@ curl -s https://pdf.mintapis.com/examples/invoice-1042.html \
 
     <div class="measured">
       <div>
-        <div class="n">502 ms</div>
-        <div class="t">Median of 25 runs of the keyed <code>POST /v1/pdf</code> call (an <code>&lt;h1&gt;</code>, 20&nbsp;mm margin), p95 733&nbsp;ms, measured 2026-08-26 with <code>bench/render-latency.mjs</code> from one machine in Germany &mdash; network round trip included.</div>
+        <div class="n">Live numbers</div>
+        <div class="t">Success rate and median and 95th-percentile render time for the last 24 hours are on the <a href="/status">status page</a>, computed from the service&rsquo;s own request log. We do not freeze a speed figure on this page.</div>
       </div>
       <div>
         <div class="n">2 at a time</div>
@@ -224,7 +226,7 @@ curl -s https://pdf.mintapis.com/examples/invoice-1042.html \
         <div class="t">Per document on the $9 Starter plan &mdash; 5,000 documents a month. A failed render is refunded before the error reaches you.</div>
       </div>
     </div>
-    <p class="measured-note">PDFMint is new &mdash; these are the only numbers we have measured, so they are the only ones we quote. The keyless demo in the curl tab is a separate, rate-limited endpoint on the same renderer; its timings vary with load, so we do not quote them.</p>
+    <p class="measured-note">PDFMint is new, so there are no customer logos here. The keyless demo behind the button and the curl tab is a separate, rate-limited endpoint on the same renderer: 5 renders an hour per address.</p>
   </div>
 </section>
 
@@ -252,6 +254,123 @@ curl -s https://pdf.mintapis.com/examples/invoice-1042.html \
         <p>The body is the PDF itself, with <code>X-PDFMint-Pages</code> and the credits left in the headers. Or ask for <code>"output": "url"</code> and get an expiring link.</p>
       </li>
     </ol>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------ n8n section -->
+<section class="sec tinted" id="n8n" aria-labelledby="n8n-title">
+  <div class="wrap">
+    <div class="split">
+      <div>
+        <p class="eyebrow">Integrations &middot; n8n community node</p>
+        <h2 class="sec-title" id="n8n-title">The file comes back on the node</h2>
+        <p class="lead">Install <a href="https://www.npmjs.com/package/n8n-nodes-pdfmint" rel="noopener"><code>n8n-nodes-pdfmint</code></a>, paste your API key once, and the PDF arrives as binary data on the PDFMint node itself. We build PDFMint and publish the node, so the node and the API it calls are maintained by the same people. <strong>Verified by n8n</strong> &mdash; it is listed in n8n&rsquo;s community-node registry with <code>isPublished: true</code>, the list n8n Cloud installs from. Check it yourself, without an account, in <code>https://api.n8n.io/api/community-nodes</code>.</p>
+        <ul class="checks">
+          <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span><b>Ready-made workflows.</b> <a href="/n8n-templates">Nine reviewed workflows in n8n&rsquo;s gallery</a> &mdash; six use PDFMint directly, three more DocMint and MailMint &mdash; each run in a real n8n before publishing.</span></li>
+          <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span><b>No second HTTP Request node.</b> The node calls <code>prepareBinaryData</code>, so the file is attached to the item and ready for Gmail, Drive, S3 or Slack.</span></li>
+          <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span><b>Templates are a dropdown.</b> The node loads the templates on your account, so you pick a name instead of pasting an id.</span></li>
+          <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span><b><code>usableAsTool: true</code>.</b> An n8n AI Agent can call PDFMint directly as a tool. Neither the CraftMyPDF nor the pdforge node declares this.</span></li>
+          <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span><b>Four operations.</b> Generate PDF, Generate Image, Merge PDFs and Get Usage &mdash; the same account, the same credential.</span></li>
+        </ul>
+      </div>
+
+      <div class="split-media">
+        <div class="n8n-node">
+          <div class="bar">
+            <span class="dot"></span>
+            <b>PDFMint</b>
+            <span class="op">generate pdf</span>
+          </div>
+          <div class="n8n-rows">
+            <div class="n8n-row"><span class="lab">Credential</span><span class="val">PDFMint account</span></div>
+            <div class="n8n-row"><span class="lab">Operation</span><span class="val sel">Generate PDF</span></div>
+            <div class="n8n-row"><span class="lab">Source</span><span class="val sel">Template</span></div>
+            <div class="n8n-row"><span class="lab">Template Name</span><span class="val sel">invoice &#9662;</span></div>
+            <div class="n8n-row"><span class="lab">Data</span><span class="val">{{ $json }}</span></div>
+            <div class="n8n-row"><span class="lab">Output</span><span class="val sel">File (Binary)</span></div>
+            <div class="n8n-row"><span class="lab">File Name</span><span class="val">invoice-1042.pdf</span></div>
+          </div>
+          <div class="n8n-out">
+            <span class="chip on">invoice-1042.pdf</span>
+            <span class="chip">pages: 1</span>
+            <span class="chip">durationMs</span>
+            <span class="chip">creditsRemaining</span>
+          </div>
+        </div>
+        <p class="cmp-note">The node also puts <code>pages</code>, <code>durationMs</code>, <code>creditsRemaining</code> and any warning on the item&rsquo;s JSON, next to the binary &mdash; so a downstream IF node can act on them.</p>
+      </div>
+    </div>
+
+    <div class="integ" style="margin-top:56px">
+      <a class="tile" href="/n8n-html-to-pdf">
+        <h3>n8n <span class="tag">verified</span></h3>
+        <p>The community node, on n8n Cloud and self-hosted &mdash; and the two ways to do HTML to PDF in n8n that do not involve us.</p>
+      </a>
+      <a class="tile" href="/zapier">
+        <h3>Zapier <span class="tag">private beta</span></h3>
+        <p>Generate PDFs and images, render saved templates and merge PDFs inside a Zap. Invite link on the page; not in Zapier&rsquo;s public directory yet.</p>
+      </a>
+      <a class="tile" href="/docs#quickstart">
+        <h3>Plain HTTP <span class="tag">any platform</span></h3>
+        <p>Everything else &mdash; your backend, a cron job, an HTTP module in another automation tool. One bearer token, an OpenAPI 3.1 spec at <code>/openapi.json</code>.</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- -------------------------------------------------------------- pricing -->
+<section class="sec" id="pricing" aria-labelledby="pricing-title">
+  <div class="wrap">
+    <div class="sec-head center">
+      <p class="eyebrow">Pricing</p>
+      <h2 class="sec-title" id="pricing-title">One credit per document</h2>
+      <p>A PDF, an image or a merge costs one credit. Failed renders are refunded automatically. Credits reset on the first of the month.</p>
+    </div>
+    <div class="price-grid">
+      <div class="pcard">
+        <h3 class="pname">Free</h3>
+        <div class="amt">$0<small> /month</small></div>
+        <div class="docs">10 documents</div>
+        <div class="per">no card required</div>
+        <p class="plan-for">Enough to paste the first curl, wire up the n8n node and see a real PDF. Not enough to run a workflow on.</p>
+        <a class="l-btn l-btn-ghost" href="/signup">Start free</a>
+      </div>
+      <div class="pcard feat">
+        <h3 class="pname">Starter <span class="badge">Most workflows</span></h3>
+        <div class="amt">$9<small> /month</small></div>
+        <div class="docs">5,000 documents</div>
+        <div class="per">$0.0018 per document</div>
+        <p class="plan-for">For a live product: order confirmations, invoices, weekly reports.</p>
+        <a class="l-btn l-btn-primary" href="/signup">Choose Starter</a>
+      </div>
+      <div class="pcard">
+        <h3 class="pname">Pro</h3>
+        <div class="amt">$29<small> /month</small></div>
+        <div class="docs">50,000 documents</div>
+        <div class="per">$0.00058 per document</div>
+        <p class="plan-for">For batch runs &mdash; a statement per customer, on the first of every month.</p>
+        <a class="l-btn l-btn-ghost" href="/signup">Choose Pro</a>
+      </div>
+      <div class="pcard">
+        <h3 class="pname">Scale</h3>
+        <div class="amt">$99<small> /month</small></div>
+        <div class="docs">250,000 documents</div>
+        <div class="per">$0.000396 per document</div>
+        <p class="plan-for">For pipelines that generate documents as a matter of routine.</p>
+        <a class="l-btn l-btn-ghost" href="/signup">Choose Scale</a>
+      </div>
+    </div>
+
+    <div class="plan-all">
+      <b>Every plan has every feature.</b> Password protection, headers and footers, page numbers, custom page sizes, templates, images, merging, hosted links and the n8n node are on the free tier too. The only thing that changes is how many documents you get.
+    </div>
+
+    <p class="price-foot">Start on Free with no card; 10 documents a month is the whole of it, so a workflow that runs daily needs Starter. Checkout runs on Stripe, where you can add a VAT ID if you need one on the invoice &mdash; optional, and ignorable if you do not. Upgrade or cancel from the <a href="/dashboard">dashboard</a> whenever you like.</p>
   </div>
 </section>
 
@@ -337,74 +456,8 @@ curl -s https://pdf.mintapis.com/examples/invoice-1042.html \
   </div>
 </section>
 
-<!-- ------------------------------------------------------------ n8n section -->
-<section class="sec tinted" id="n8n" aria-labelledby="n8n-title">
-  <div class="wrap">
-    <div class="split">
-      <div>
-        <p class="eyebrow">Integrations &middot; n8n community node</p>
-        <h2 class="sec-title" id="n8n-title">The file comes back on the node</h2>
-        <p class="lead">Install <a href="https://www.npmjs.com/package/n8n-nodes-pdfmint" rel="noopener"><code>n8n-nodes-pdfmint</code></a>, paste your API key once, and the PDF arrives as binary data on the PDFMint node itself. We build PDFMint and publish the node, so the node and the API it calls are maintained by the same people. <strong>Verified by n8n</strong> &mdash; it is listed in n8n&rsquo;s community-node registry with <code>isPublished: true</code>, the list n8n Cloud installs from. Check it yourself, without an account, in <code>https://api.n8n.io/api/community-nodes</code>.</p>
-        <ul class="checks">
-          <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span><b>Ready-made workflows.</b> <a href="/n8n-templates">Nine reviewed workflows in n8n&rsquo;s gallery</a> &mdash; six use PDFMint directly, three more DocMint and MailMint &mdash; each run in a real n8n before publishing.</span></li>
-          <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span><b>No second HTTP Request node.</b> The node calls <code>prepareBinaryData</code>, so the file is attached to the item and ready for Gmail, Drive, S3 or Slack.</span></li>
-          <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span><b>Templates are a dropdown.</b> The node loads the templates on your account, so you pick a name instead of pasting an id.</span></li>
-          <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span><b><code>usableAsTool: true</code>.</b> An n8n AI Agent can call PDFMint directly as a tool. Neither the CraftMyPDF nor the pdforge node declares this.</span></li>
-          <li><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span><b>Four operations.</b> Generate PDF, Generate Image, Merge PDFs and Get Usage &mdash; the same account, the same credential.</span></li>
-        </ul>
-      </div>
-
-      <div class="split-media">
-        <div class="n8n-node">
-          <div class="bar">
-            <span class="dot"></span>
-            <b>PDFMint</b>
-            <span class="op">generate pdf</span>
-          </div>
-          <div class="n8n-rows">
-            <div class="n8n-row"><span class="lab">Credential</span><span class="val">PDFMint account</span></div>
-            <div class="n8n-row"><span class="lab">Operation</span><span class="val sel">Generate PDF</span></div>
-            <div class="n8n-row"><span class="lab">Source</span><span class="val sel">Template</span></div>
-            <div class="n8n-row"><span class="lab">Template Name</span><span class="val sel">invoice &#9662;</span></div>
-            <div class="n8n-row"><span class="lab">Data</span><span class="val">{{ $json }}</span></div>
-            <div class="n8n-row"><span class="lab">Output</span><span class="val sel">File (Binary)</span></div>
-            <div class="n8n-row"><span class="lab">File Name</span><span class="val">invoice-1042.pdf</span></div>
-          </div>
-          <div class="n8n-out">
-            <span class="chip on">invoice-1042.pdf</span>
-            <span class="chip">pages: 1</span>
-            <span class="chip">durationMs</span>
-            <span class="chip">creditsRemaining</span>
-          </div>
-        </div>
-        <p class="cmp-note">The node also puts <code>pages</code>, <code>durationMs</code>, <code>creditsRemaining</code> and any warning on the item&rsquo;s JSON, next to the binary &mdash; so a downstream IF node can act on them.</p>
-      </div>
-    </div>
-
-    <div class="integ" style="margin-top:56px">
-      <a class="tile" href="/n8n-html-to-pdf">
-        <h3>n8n <span class="tag">verified</span></h3>
-        <p>The community node, on n8n Cloud and self-hosted &mdash; and the two ways to do HTML to PDF in n8n that do not involve us.</p>
-      </a>
-      <a class="tile" href="/zapier">
-        <h3>Zapier <span class="tag">private beta</span></h3>
-        <p>Generate PDFs and images, render saved templates and merge PDFs inside a Zap. Invite link on the page; not in Zapier&rsquo;s public directory yet.</p>
-      </a>
-      <a class="tile" href="/docs#quickstart">
-        <h3>Plain HTTP <span class="tag">any platform</span></h3>
-        <p>Everything else &mdash; your backend, a cron job, an HTTP module in another automation tool. One bearer token, an OpenAPI 3.1 spec at <code>/openapi.json</code>.</p>
-      </a>
-    </div>
-  </div>
-</section>
-
 <!-- ------------------------------------------------------------ endpoints -->
-<section class="sec" id="api" aria-labelledby="api-title">
+<section class="sec tinted" id="api" aria-labelledby="api-title">
   <div class="wrap">
     <div class="sec-head">
       <p class="eyebrow">The rest of the API</p>
@@ -451,7 +504,7 @@ curl -s https://pdf.mintapis.com/examples/invoice-1042.html \
 </section>
 
 <!-- ----------------------------------------------------------- comparison -->
-<section class="sec tinted" id="compare-table" aria-labelledby="cmp-title">
+<section class="sec" id="compare-table" aria-labelledby="cmp-title">
   <div class="wrap">
     <div class="sec-head">
       <p class="eyebrow">How it compares</p>
@@ -511,57 +564,6 @@ curl -s https://pdf.mintapis.com/examples/invoice-1042.html \
     </div>
     <p class="scroll-hint">Scroll the table sideways to see every column.</p>
     <p class="cmp-note">Sources, and when we looked: CraftMyPDF&rsquo;s published OpenAPI specification (<code>craftmypdf_api.yaml</code>) and pricing page, and pdforge&rsquo;s pricing page and the source of its n8n node, both read on <b>26 August 2026</b>; PDFMint&rsquo;s own source and plan table. Every competitor cell describes what those documents said on that date and nothing more &mdash; if either vendor ships an HTML endpoint tomorrow, this table is out of date rather than right. Tell us and we will correct it. Dashes mean we did not find a published figure. These are good products with a different bet &mdash; a hosted drag-and-drop template designer. If that is what you want, buy that. PDFMint is for people who already have the HTML.</p>
-  </div>
-</section>
-
-<!-- -------------------------------------------------------------- pricing -->
-<section class="sec" id="pricing" aria-labelledby="pricing-title">
-  <div class="wrap">
-    <div class="sec-head center">
-      <p class="eyebrow">Pricing</p>
-      <h2 class="sec-title" id="pricing-title">One credit per document</h2>
-      <p>A PDF, an image or a merge costs one credit. Failed renders are refunded automatically. Credits reset on the first of the month.</p>
-    </div>
-    <div class="price-grid">
-      <div class="pcard">
-        <h3 class="pname">Free</h3>
-        <div class="amt">$0<small> /month</small></div>
-        <div class="docs">10 documents</div>
-        <div class="per">no card required</div>
-        <p class="plan-for">Enough to paste the first curl, wire up the n8n node and see a real PDF. Not enough to run a workflow on.</p>
-        <a class="l-btn l-btn-ghost" href="/signup">Start free</a>
-      </div>
-      <div class="pcard feat">
-        <h3 class="pname">Starter <span class="badge">Most workflows</span></h3>
-        <div class="amt">$9<small> /month</small></div>
-        <div class="docs">5,000 documents</div>
-        <div class="per">$0.0018 per document</div>
-        <p class="plan-for">For a live product: order confirmations, invoices, weekly reports.</p>
-        <a class="l-btn l-btn-primary" href="/signup">Choose Starter</a>
-      </div>
-      <div class="pcard">
-        <h3 class="pname">Pro</h3>
-        <div class="amt">$29<small> /month</small></div>
-        <div class="docs">50,000 documents</div>
-        <div class="per">$0.00058 per document</div>
-        <p class="plan-for">For batch runs &mdash; a statement per customer, on the first of every month.</p>
-        <a class="l-btn l-btn-ghost" href="/signup">Choose Pro</a>
-      </div>
-      <div class="pcard">
-        <h3 class="pname">Scale</h3>
-        <div class="amt">$99<small> /month</small></div>
-        <div class="docs">250,000 documents</div>
-        <div class="per">$0.000396 per document</div>
-        <p class="plan-for">For pipelines that generate documents as a matter of routine.</p>
-        <a class="l-btn l-btn-ghost" href="/signup">Choose Scale</a>
-      </div>
-    </div>
-
-    <div class="plan-all">
-      <b>Every plan has every feature.</b> Password protection, headers and footers, page numbers, custom page sizes, templates, images, merging, hosted links and the n8n node are on the free tier too. The only thing that changes is how many documents you get.
-    </div>
-
-    <p class="price-foot">Start on Free with no card; 10 documents a month is the whole of it, so a workflow that runs daily needs Starter. Checkout runs on Stripe, where you can add a VAT ID if you need one on the invoice &mdash; optional, and ignorable if you do not. Upgrade or cancel from the <a href="/dashboard">dashboard</a> whenever you like.</p>
   </div>
 </section>
 
@@ -640,6 +642,7 @@ curl -s https://pdf.mintapis.com/examples/invoice-1042.html \
         <a class="l-btn l-btn-primary l-btn-lg" href="/signup">Get a free API key <span class="arr" aria-hidden="true">&rarr;</span></a>
         <a class="l-btn l-btn-ghost l-btn-lg" href="/docs">Read the docs</a>
       </div>
+      <p class="cta-price">Then $9 a month for 5,000 documents. Cancel from the dashboard.</p>
     </div>
   </div>
 </section>
@@ -719,5 +722,6 @@ curl -s https://pdf.mintapis.com/examples/invoice-1042.html \
 <!-- /l-footer -->
 
 <script src="/site.js?v=8" defer></script>
+<script src="/try-demo.js?v=1" defer></script>
 </body>
 </html>
