@@ -36,6 +36,7 @@ test('recovery: expiry, one use, races, unknown email, session invalidation, SMT
   try {
     const oldSession = await auth.createSession(account.id);
     const known = await request();
+    assert.deepEqual(mailSent.from, { name: 'Mint QA', address: 'noreply@pdf.mintapis.com' });
     const secret = token();
     const { rows } = await db.query('SELECT reset_token_hash, reset_expires_at FROM accounts WHERE id=$1', [account.id]);
     assert.notEqual(rows[0].reset_token_hash, secret);
@@ -248,7 +249,7 @@ test('mail.js sends through Resend when RESEND_API_KEY is set', async () => {
     assert.equal(calls.length, 1);
     assert.equal(calls[0].url, 'https://api.resend.com/emails');
     const body = JSON.parse(calls[0].opts.body);
-    assert.equal(body.from, 'PDFMint <noreply@mail.mintapis.com>');
+    assert.equal(body.from, 'PDFMint <noreply@pdf.mintapis.com>');
     assert.equal(body.to, 'u@example.test');
     assert.equal(calls[0].opts.headers.authorization, 'Bearer test-key-not-logged');
     assert.equal(calls[0].opts.method, 'POST');
