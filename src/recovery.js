@@ -85,7 +85,7 @@ async function forgot(email, { product, sendMail } = {}) {
       await client.query(`UPDATE accounts SET reset_token_hash = $2, reset_expires_at = now() + interval '30 minutes', reset_requested_at = now() WHERE id = $1`, [account.id, digest(token)]);
       try {
         await send({
-          from: { name: product, address: process.env.SMTP_FROM || 'support@smooth-operator.online' },
+          from: { name: product, address: mail.recoverySender },
           to: account.email,
           subject: `Reset your ${product} password`,
           text: `A password reset was requested for your ${product} account.\n\nOpen this link within 30 minutes:\n${link}\n\nThis link works once. If you did not request it, ignore this email. Your password has not changed.`,

@@ -1,6 +1,7 @@
 'use strict';
 
 const nodemailer = require('nodemailer');
+const recoverySender = 'noreply@pdf.mintapis.com';
 
 // One sender for the whole service. Resend is preferred when its key is set;
 // otherwise the SMTP relay (Postfix) is used exactly as before. The key is
@@ -27,7 +28,7 @@ async function sendMail({ from, to, subject, text }) {
         authorization: `Bearer ${process.env.RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: process.env.MAIL_FROM || 'PDFMint <noreply@mail.mintapis.com>',
+        from: `PDFMint <${recoverySender}>`,
         to, subject, text,
       }),
       signal: AbortSignal.timeout(10000),
@@ -38,4 +39,4 @@ async function sendMail({ from, to, subject, text }) {
   await transport().sendMail({ from, to, subject, text });
 }
 
-module.exports = { sendMail, transport };
+module.exports = { sendMail, transport, recoverySender };
