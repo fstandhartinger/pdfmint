@@ -1,7 +1,6 @@
 'use strict';
 
 const express = require('express');
-const crypto = require('node:crypto');
 const path = require('node:path');
 
 const { config } = require('./config');
@@ -15,21 +14,21 @@ const status = require('./status');
 const render = require('./render');
 const jobs = require('./jobs');
 const visitCounter = require('./visit-counter');
+const { createLogger, httpLogger, captureConsole, installProcessHandlers } = require('./logkit.cjs');
+
+// Structured JSON logs (logging standard, AGENTS.md): every console.* line becomes one JSON object with
+// level, request ids flow through, crashes are logged with stack. The privacy page promises that no IP
+// addresses or user agents reach the logs, so the access line leaves both out.
+const log = createLogger({ app: 'pdfmint' });
+if (process.env.NODE_ENV !== 'test') { captureConsole(log); installProcessHandlers(log); }
 
 const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
-app.use((req, res, next) => {
-  req.id = crypto.randomBytes(8).toString('hex');
-  res.set('X-Request-Id', req.id);
-  const started = Date.now();
-  res.on('finish', () => {
-    if (req.path === '/healthz') return;
-    console.log(`${res.statusCode} ${req.method} ${req.path} ${Date.now() - started}ms id=${req.id}`);
-  });
-  next();
-});
+// Request id (accepts a valid incoming X-Request-Id, else a new one; echoed in X-Request-Id) and one
+// structured access line per request: method, path, route, status, duration_ms, account_id.
+app.use(httpLogger(log, { ip: false, ua: false, skip: ['/healthz'] }));
 
 /**
  * One page, one URL. The same site answers on pdfmint-b9tt.onrender.com,
