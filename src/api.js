@@ -82,6 +82,7 @@ const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next
 
 const authenticateOnly = asyncRoute(async (req, res, next) => {
   req.account = await authenticate(req);
+  if (req.account) req.logFields = { ...(req.logFields || {}), account_id: req.account.id, plan: req.account.plan };
   next();
 });
 
